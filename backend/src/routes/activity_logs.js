@@ -6,12 +6,12 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const router = express.Router();
 
 // Helper: บันทึก activity log
-const logActivity = async (userId, action, entityType, entityId, details, ipAddress) => {
+const logActivity = async (userId, action, entityType, entityId, details, ipAddress, severity = 'info') => {
   try {
     await pool.query(
-      `INSERT INTO activity_logs (id, user_id, action, entity_type, entity_id, details, ip_address)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [uuidv4(), userId, action, entityType, entityId, details ? JSON.stringify(details) : null, ipAddress || null]
+      `INSERT INTO activity_logs (id, user_id, action, entity_type, entity_id, details, ip_address, severity)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), userId, action, entityType, entityId, details ? JSON.stringify(details) : null, ipAddress || null, severity]
     );
   } catch (err) {
     console.error('Activity log error:', err);
@@ -24,7 +24,7 @@ router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) =>
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
     const offset = (page - 1) * limit;
-    const { user_id, action, entity_type } = req.query;
+    const { user_id, action, entity_type, severity } = req.query;
 
     let whereClause = 'WHERE 1=1';
     const params = [];
@@ -40,6 +40,10 @@ router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) =>
     if (entity_type) {
       whereClause += ' AND al.entity_type = ?';
       params.push(entity_type);
+    }
+    if (severity) {
+      whereClause += ' AND al.severity = ?';
+      params.push(severity);
     }
 
     const result = await pool.query(

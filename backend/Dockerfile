@@ -4,10 +4,12 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci --omit=dev
 
 COPY . .
 
+ENV NODE_ENV=production
+
 EXPOSE 5000
 
-CMD ["npm", "run", "dev"]
+CMD ["node", "src/index.js"]

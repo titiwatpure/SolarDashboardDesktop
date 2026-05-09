@@ -7,7 +7,8 @@ html {
 }
 
 body {
-  @apply font-sans text-gray-900;
+  font-family: 'Sarabun', 'THSarabunNew', sans-serif;
+  @apply text-gray-900;
 }
 
 /* Custom scrollbar */
@@ -27,4 +28,20 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Toast animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
 }

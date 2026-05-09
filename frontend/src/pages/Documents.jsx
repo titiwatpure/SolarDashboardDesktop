@@ -1,5 +1,5 @@
-import { FileCog, FileText, FileUp, FolderOpen, Link2, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { FileCog, FileText, FileUp, FolderOpen, Trash2, Download, Upload } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
 import { documentsAPI, projectsAPI } from '../utils/api';
 import { DOCUMENT_TYPES } from '../utils/constants';
 
@@ -24,6 +24,9 @@ export default function Documents() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     project_id: '',
     document_name: '',
@@ -69,10 +72,25 @@ export default function Documents() {
 
     try {
       setSaving(true);
-      await documentsAPI.upload({
-        ...formData,
-        file_size: formData.file_size ? Number(formData.file_size) : null
-      });
+
+      if (selectedFile) {
+        // ส่งไฟล์จริงผ่าน FormData
+        const formDataObj = new FormData();
+        formDataObj.append('file', selectedFile);
+        formDataObj.append('project_id', formData.project_id);
+        formDataObj.append('document_name', formData.document_name || selectedFile.name);
+        formDataObj.append('document_type', formData.document_type);
+        formDataObj.append('description', formData.description);
+
+        await documentsAPI.upload(formDataObj);
+      } else {
+        // ส่งแค่ metadata (ไม่มีไฟล์)
+        await documentsAPI.upload({
+          ...formData,
+          file_size: formData.file_size ? Number(formData.file_size) : null
+        });
+      }
+
       setFormData({
         project_id: '',
         document_name: '',
@@ -81,13 +99,50 @@ export default function Documents() {
         file_size: '',
         description: ''
       });
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       loadPageData();
     } catch (error) {
       console.error('Failed to create document:', error);
-      alert('บันทึกเอกสารไม่สำเร็จ');
+      alert(error.response?.data?.error || 'บันทึกเอกสารไม่สำเร็จ');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleFileSelect = (file) => {
+    if (!file) return;
+    setSelectedFile(file);
+    // ตั้งชื่อเอกสารอัตโนมัติจากชื่อไฟล์
+    if (!formData.document_name) {
+      setFormData((prev) => ({ ...prev, document_name: file.name.replace(/\.[^/.]+$/, '') }));
+    }
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '-';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   const handleDelete = async (id) => {
@@ -177,17 +232,14 @@ export default function Documents() {
               ))}
             </select>
 
-            <div className="relative">
-              <Link2 size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                name="file_path"
-                value={formData.file_path}
-                onChange={handleChange}
-                placeholder="file path หรือ URL"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white"
-              />
-            </div>
+            <input
+              type="text"
+              name="file_path"
+              value={formData.file_path}
+              onChange={handleChange}
+              placeholder="URL หรือ file path (ถ้าไม่อัปโหลดไฟล์)"
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white"
+            />
 
             <input
               type="number"
@@ -205,6 +257,56 @@ export default function Documents() {
               onChange={handleChange}
               placeholder="คำอธิบายเพิ่มเติม"
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white"
+            />
+          </div>
+
+          {/* File Upload Area */}
+          <div
+            className={`mt-4 rounded-2xl border-2 border-dashed p-6 text-center transition ${
+              dragActive ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'
+            } ${selectedFile ? 'border-green-300 bg-green-50' : ''}`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            {selectedFile ? (
+              <div className="flex items-center justify-center gap-3">
+                <FileText size={24} className="text-green-600" />
+                <div className="text-left">
+                  <p className="text-sm font-medium text-slate-900">{selectedFile.name}</p>
+                  <p className="text-xs text-slate-500">{formatFileSize(selectedFile.size)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                  className="ml-2 rounded-full p-1 text-red-500 hover:bg-red-50"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <Upload size={32} className="mx-auto text-slate-400" />
+                <p className="mt-2 text-sm text-slate-600">
+                  ลากไฟล์มาวางที่นี่ หรือ{' '}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-blue-600 underline hover:text-blue-700"
+                  >
+                    เลือกไฟล์
+                  </button>
+                </p>
+                <p className="mt-1 text-xs text-slate-400">รองรับ PDF, Word, Excel, PowerPoint, รูปภาพ, ZIP (สูงสุด 50MB)</p>
+              </>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.txt,.zip,.rar"
+              onChange={(e) => handleFileSelect(e.target.files?.[0])}
             />
           </div>
 
@@ -292,13 +394,26 @@ export default function Documents() {
                   <td className="px-5 py-4 text-slate-700">{document.project_name || '-'}</td>
                   <td className="px-5 py-4 text-slate-700">{formatDate(document.uploaded_at)}</td>
                   <td className="px-5 py-4">
-                    <button
-                      onClick={() => handleDelete(document.id)}
-                      className="rounded-full p-2 text-red-500 transition-colors hover:bg-red-50"
-                      title="ลบ"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {document.file_path && (
+                        <a
+                          href={documentsAPI.getDownloadUrl(document.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full p-2 text-blue-500 transition-colors hover:bg-blue-50"
+                          title="ดาวน์โหลด"
+                        >
+                          <Download size={16} />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleDelete(document.id)}
+                        className="rounded-full p-2 text-red-500 transition-colors hover:bg-red-50"
+                        title="ลบ"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

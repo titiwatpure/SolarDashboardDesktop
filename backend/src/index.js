@@ -14,10 +14,20 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Static files - uploads directory (removed: use authenticated /api/documents/download/:id endpoint instead)
+
+// Serve frontend in production
+if (isProduction) {
+  const frontendBuild = path.join(__dirname, '..', '..', 'frontend', 'build');
+  app.use(express.static(frontendBuild));
+}
 
 // ========================
 // Middleware - ซอฟต์แวร์กลางสำหรับประมวลผลคำขอ
@@ -65,18 +75,64 @@ app.use('/api/reports', require('./routes/reports'));
 app.use('/api/activity-logs', require('./routes/activity_logs'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api', require('./routes/checkpoints'));
+app.use('/api/backup', require('./routes/backup'));
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+// Health check with DB connectivity
+const pool = require('./database');
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({
+      status: 'OK',
+      message: 'Server is running',
+      database: 'connected',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'ERROR',
+      message: 'Database connection failed',
+      database: 'disconnected',
+    });
+  }
 });
 
-// Error handling
+// SPA fallback - serve frontend for non-API routes in production
+if (isProduction) {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', '..', 'frontend', 'build', 'index.html'));
+  });
+}
+
+// Structured error handling
+const { AppError } = require('./utils/errors');
+const { logActivity } = require('./routes/activity_logs');
+
 app.use((err, req, res, _next) => {
   console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+
+  // Log the error
+  const ipAddress = req.ip || req.socket?.remoteAddress;
+  logActivity(req.user?.id || null, 'error', 'system', null, {
+    message: err.message,
+    path: req.path,
+    method: req.method,
+  }, ipAddress, 'error');
+
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      error: err.message,
+      code: err.errorCode,
+      details: err.details,
+    });
+  }
+
+  res.status(err.status || 500).json({
+    error: 'เกิดข้อผิดพลาดภายในระบบ',
+    code: 'INTERNAL_ERROR',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
   });
 });
 
@@ -85,7 +141,12 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection:', reason);
 });
 
-app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
-});
+// Start server only when not imported for testing
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server started on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
+  });
+}
+
+module.exports = app;

@@ -149,6 +149,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบงาน' });
     }
 
+    // เช็คสิทธิ์: admin, assigned_to, หรือ created_by เท่านั้น
+    if (req.user.role !== 'admin' && existing.assigned_to !== req.user.id && existing.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'ไม่มีสิทธิ์แก้ไขงานนี้' });
+    }
+
     // #28: Priority validation on PUT
     const validPriorities = ['low', 'medium', 'high', 'urgent'];
     if (priority && !validPriorities.includes(priority)) {

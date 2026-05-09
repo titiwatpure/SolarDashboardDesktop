@@ -158,9 +158,7 @@ export default function Organizations() {
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900">{org.org_name}</h3>
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      org.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                    }`}>
+                    <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-indigo-50 text-indigo-700">
                       {ORG_TYPES[org.org_type] || org.org_type}
                     </span>
                   </div>

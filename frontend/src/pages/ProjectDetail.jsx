@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, MapPin, Zap, FileText, Clock,
@@ -54,11 +54,14 @@ export default function ProjectDetail() {
   const [showUserPicker, setShowUserPicker] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
 
+  const requestIdRef = useRef(0);
+
   useEffect(() => {
-    loadAll();
+    const currentId = ++requestIdRef.current;
+    loadAll(currentId);
   }, [id]);
 
-  const loadAll = async () => {
+  const loadAll = async (reqId) => {
     try {
       setLoading(true);
       const [proj, tl, orgs, usersResult] = await Promise.all([
@@ -67,14 +70,15 @@ export default function ProjectDetail() {
         projectsAPI.getOrganizations(id),
         usersAPI.getAll()
       ]);
+      if (reqId !== requestIdRef.current) return;
       setProject(proj);
       setTimeline(tl);
       setProjectOrgs(Array.isArray(orgs) ? orgs : (orgs.data || []));
       setAllUsers(Array.isArray(usersResult) ? usersResult : (usersResult.data || []));
     } catch (error) {
-      console.error('Failed to load:', error);
+      if (reqId === requestIdRef.current) console.error('Failed to load:', error);
     } finally {
-      setLoading(false);
+      if (reqId === requestIdRef.current) setLoading(false);
     }
   };
 

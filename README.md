@@ -4,23 +4,23 @@
 
 ## คุณสมบัติหลัก
 
-### 📊 Dashboard
+### Dashboard
 - **KPI Cards** แสดงจำนวนโครงการทั้งหมด เสร็จแล้ว กำลังดำเนินการ และติดปัญหา
 - **Pipeline Visualization** แสดงการไหลของโครงการในแต่ละขั้นตอน
 - **Project Table** ตารางรายละเอียดโครงการพร้อมการกรองข้อมูล
 
-### 🏗️ การจัดการโครงการ
+### การจัดการโครงการ
 - เพิ่ม / แก้ไข / ลบ โครงการ
-- ระบบ Workflow 7 ขั้นตอน: Survey → Design → ERC → Grid → Construction → Testing → COD
+- ระบบ Workflow 7 ขั้นตอน: Survey -> Design -> ERC -> Grid -> Construction -> Testing -> COD
 - สถานะโครงการ: Pending, In Progress, Blocked, Completed
-- Logic อัตโนมัติ: Step = COD → Completed, ค้าง > 14 วัน → Blocked
+- Logic อัตโนมัติ: Step = COD -> Completed
 
-### 📋 ระบบกฎหมายและใบอนุญาต
-- ≤ 1000 kVA = แจ้งยกเว้น
-- \> 1000 kVA = ขอใบอนุญาต
+### ระบบกฎหมายและใบอนุญาต
+- <= 1000 kVA = แจ้งยกเว้น
+- > 1000 kVA = ขอใบอนุญาต
 - มีการขายไฟ = ต้องขอใบอนุญาต
 
-### 🏢 หน่วยงาน
+### หน่วยงาน
 รองรับหน่วยงานต่อไปนี้:
 - กกพ. (ERC)
 - PEA / MEA
@@ -28,21 +28,33 @@
 - กรมโรงงาน
 - นิคมอุตสาหกรรม
 
-### 📄 จัดการเอกสาร
-- Upload ไฟล์เอกสาร (SLD, ใบอนุญาต, Test Report)
+### จัดการเอกสาร
+- **Upload ไฟล์จริง** รองรับ PDF, Word, Excel, PowerPoint, รูปภาพ, ZIP (สูงสุด 50MB)
+- Drag-and-drop file upload
+- ดาวน์โหลดไฟล์จากในระบบ
 - ตรวจสอบและติดตามสถานะเอกสาร
 
-### 📈 รายงาน
-- สรุปตามสถานะ
-- สรุปตามขนาด (≤ / > 1MW)
+### รายงาน
+- สรุปตามสถานะ / ขนาด / จังหวัด / ขั้นตอน
 - Export Excel / PDF
 
-### 👥 ผู้ใช้งาน
+### ผู้ใช้งาน
 - สิทธิ์ระดับ Admin และ Engineer
-- ระบบ JWT Authentication
-- สามารถจัดการผู้ใช้งานหลายคน
+- ระบบ JWT Authentication + Refresh Token
+- เปลี่ยนรหัสผ่านได้
+- ระบบแจ้งเตือนอัตโนมัติ
 
-## 🚀 การติดตั้ง
+### ระบบแจ้งเตือน
+- แจ้งเตือนเมื่อสถานะโครงการเปลี่ยน
+- แจ้งเตือนเมื่อมีงานถูกมอบหมาย
+- Badge แสดงจำนวนแจ้งเตือนที่ยังไม่อ่าน (ดึงจาก API จริง)
+
+### ตั้งค่า
+- ดูข้อมูลผู้ใช้
+- เปลี่ยนรหัสผ่าน
+- ตั้งค่าการแจ้งเตือน
+
+## การติดตั้ง
 
 ### Backend Setup
 ```bash
@@ -50,6 +62,8 @@ cd backend
 npm install
 cp .env.example .env
 # แก้ไขไฟล์ .env ตามสภาพแวดล้อมของคุณ
+# สำคัญ: ตั้ง JWT_SECRET เป็นค่าที่ปลอดภัย
+node src/init-db.cjs
 npm run dev
 ```
 
@@ -60,17 +74,24 @@ npm install
 npm start
 ```
 
-### Database Setup
+### Docker (ทั้งระบบ)
 ```bash
-# สร้าง PostgreSQL database
-psql -U postgres
-CREATE DATABASE solar_dashboard;
 
-# Import schema
-psql -U postgres -d solar_dashboard -f backend/src/models/database-schema.sql
+
 ```
 
-## 🎨 UI/UX Design
+### Database
+ระบบใช้ **SQLite** ไม่ต้องติดตั้ง PostgreSQL
+ไฟล์ฐานข้อมูล: `backend/solar_dashboard.db`
+
+## ข้อมูลเข้าสู่ระบบทดลอง
+
+```
+Username: admin
+Password: admin
+```
+
+## UI/UX Design
 - **โทนสี:**
   - น้ำเงินเข้ม (หลัก) #0066cc
   - เขียว (สำเร็จ) #10b981
@@ -78,107 +99,121 @@ psql -U postgres -d solar_dashboard -f backend/src/models/database-schema.sql
   - แดง (ปัญหา) #ef4444
 
 - **Layout:**
-  - Sidebar เมนูด้านซ้าย
-  - Header ด้านบน
-  - พื้นที่แสดงผลหลักตรงกลาง
+  - Sidebar เมนูด้านซ้าย (dark theme)
+  - Header ด้านบน sticky
+  - Responsive Design (มือถือ + Desktop)
   - Card Design with Shadow
-  - Grid Layout
-  - Responsive Design
 
-## 📁 โครงสร้างโปรเจกต์
+## โครงสร้างโปรเจกต์
 
 ```
 Dashboard/
 ├── backend/
 │   ├── src/
-│   │   ├── routes/        # API endpoints
-│   │   ├── models/        # Database models
-│   │   ├── middleware/    # Authentication
-│   │   ├── controllers/   # Business logic
-│   │   ├── database.js    # Database connection
-│   │   └── index.js       # Server entry point
-│   ├── package.json
-│   └── .env.example
+│   │   ├── routes/           # API endpoints
+│   │   │   ├── auth.js       # Login + Register + Refresh Token
+│   │   │   ├── projects.js   # Projects CRUD + KPI + Timeline
+│   │   │   ├── users.js      # Users CRUD + Change Password
+│   │   │   ├── documents.js  # Documents + File Upload (multer)
+│   │   │   ├── organizations.js
+│   │   │   ├── reports.js
+│   │   │   ├── tasks.js
+│   │   │   ├── notifications.js
+│   │   │   └── activity_logs.js
+│   │   ├── models/
+│   │   ├── middleware/       # JWT Auth + Role Authorization
+│   │   ├── database.js      # SQLite connection
+│   │   ├── init-db.cjs      # Database init + seed
+│   │   └── index.js         # Express server
+│   ├── uploads/             # Uploaded files
+│   ├── __tests__/           # Jest + Supertest tests
+│   ├── Dockerfile
+│   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── pages/         # Page components
-│   │   ├── utils/         # Utility functions
-│   │   ├── styles/        # CSS files
-│   │   ├── App.jsx        # Main app component
-│   │   └── index.js       # Entry point
-│   ├── public/
-│   ├── package.json
-│   ├── tailwind.config.js
-│   └── postcss.config.js
-└── README.md
+│   │   ├── context/         # React Context (AuthContext)
+│   │   ├── components/      # Reusable components
+│   │   ├── pages/           # Page components
+│   │   ├── utils/           # API + Constants
+│   │   ├── styles/
+│   │   ├── App.jsx
+│   │   └── index.js
+│   ├── Dockerfile
+│   └── package.json
+├── docker-compose.yml
+├── README.md
+└── .gitignore
 ```
 
-## 🔐 การทำงานของระบบ
-
-### Authentication Flow
-1. ผู้ใช้เข้าสู่ระบบด้วย username และ password
-2. Backend ตรวจสอบข้อมูลและสร้าง JWT Token
-3. Frontend เก็บ Token ใน localStorage
-4. ทุก request ส่ง Token ใน Authorization header
-
-### Project Workflow
-1. ระบบตรวจสอบขนาด (kVA) และสิทธิ์การขายไฟ
-2. กำหนดประเภทใบอนุญาตโดยอัตโนมัติ
-3. สร้างขั้นตอนงาน 7 ขั้นตอน
-4. ติดตามความคืบหน้าและอัปเดตสถานะ
-5. เมื่อถึง COD จะตั้งสถานะเป็น Completed
-
-## 📱 Responsive Design
-- Mobile-first approach
-- Sidebar ปิดอัตโนมัติบนมือถือ
-- Navigation drawer สำหรับมือถือ
-- ตารางสามารถเลื่อนได้บนมือถือ
-
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Backend
-- Node.js + Express.js
+- Node.js 18 + Express.js
 - SQLite3 Database
-- JWT Authentication
-- CORS enabled
+- JWT Authentication + Refresh Token
+- bcrypt (12 rounds)
+- multer (file upload)
+- Helmet + CORS + Rate Limiting
 
 ### Frontend
 - React 18
 - React Router v6
 - Tailwind CSS
 - Lucide React Icons
-- Recharts for visualization
-- Axios for API calls
+- Recharts (charts)
+- Axios (API)
+- XLSX + jsPDF (export)
 
-## 📝 ข้อมูลเข้าสู่ระบบทดลอง
-
-```
-Username: admin
-Password: admin
-Role: Admin
-```
-
-## 🔄 API Endpoints
+## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - เข้าสู่ระบบ
-- `POST /api/auth/register` - สร้างผู้ใช้ใหม่
+- `POST /api/auth/login` - เข้าสู่ระบบ (return accessToken + refreshToken)
+- `POST /api/auth/refresh` - ขอ accessToken ใหม่
+- `POST /api/auth/logout` - ออกจากระบบ (invalidate refresh token)
+- `POST /api/auth/register` - สร้างผู้ใช้ใหม่ (Admin)
 
 ### Projects
-- `GET /api/projects` - ดึงรายชื่อโครงการ
-- `GET /api/projects/:id` - ดึงรายละเอียดโครงการ
-- `POST /api/projects` - สร้างโครงการใหม่
+- `GET /api/projects` - รายชื่อโครงการ (pagination + filter)
+- `GET /api/projects/:id` - รายละเอียดโครงการ
+- `POST /api/projects` - สร้างโครงการ
 - `PUT /api/projects/:id` - อัปเดตโครงการ
-- `DELETE /api/projects/:id` - ลบโครงการ
-- `GET /api/projects/stats/kpis` - ดึง KPI
+- `DELETE /api/projects/:id` - ลบโครงการ (Admin)
+- `GET /api/projects/stats/kpis` - KPI stats
+- `GET /api/projects/:id/timeline` - Timeline
+- `GET /api/projects/:id/organizations` - หน่วยงานที่เกี่ยวข้อง
 
 ### Users
-- `GET /api/users` - ดึงรายชื่อผู้ใช้ (Admin)
-- `GET /api/users/profile` - ดึงโปรไฟล์ผู้ใช้ปัจจุบัน
-- `POST /api/users` - สร้างผู้ใช้ใหม่
+- `GET /api/users` - รายชื่อผู้ใช้ (Admin)
+- `GET /api/users/profile` - โปรไฟล์ปัจจุบัน
+- `POST /api/users` - สร้างผู้ใช้ (Admin)
 - `PUT /api/users/:id` - อัปเดตโปรไฟล์
-- `DELETE /api/users/:id` - ลบผู้ใช้
+- `PUT /api/users/change-password` - เปลี่ยนรหัสผ่าน
+- `DELETE /api/users/:id` - ลบผู้ใช้ (Admin)
+
+### Documents
+- `GET /api/documents` - รายการเอกสาร
+- `GET /api/documents/project/:id` - เอกสารตามโครงการ
+- `POST /api/documents` - เพิ่มเอกสาร (รองรับ file upload)
+- `GET /api/documents/download/:id` - ดาวน์โหลดไฟล์
+- `DELETE /api/documents/:id` - ลบเอกสาร (Admin)
+
+### Organizations
+- `GET /api/organizations` - รายการหน่วยงาน
+- `POST /api/organizations` - สร้างหน่วยงาน (Admin)
+- `PUT /api/organizations/:id` - อัปเดต (Admin)
+- `DELETE /api/organizations/:id` - ลบ (Admin)
+
+### Tasks
+- `GET /api/tasks` - รายการงาน
+- `POST /api/tasks` - สร้างงาน
+- `PUT /api/tasks/:id` - อัปเดตงาน
+- `DELETE /api/tasks/:id` - ลบงาน (Admin)
+
+### Notifications
+- `GET /api/notifications` - แจ้งเตือน
+- `GET /api/notifications/unread-count` - จำนวนที่ยังไม่อ่าน
+- `PUT /api/notifications/:id/read` - อ่านแล้ว
+- `PUT /api/notifications/read-all` - อ่านทั้งหมด
 
 ### Reports
 - `GET /api/reports/summary/status` - สรุปตามสถานะ
@@ -186,25 +221,26 @@ Role: Admin
 - `GET /api/reports/summary/province` - สรุปตามจังหวัด
 - `GET /api/reports/summary/step` - สรุปตามขั้นตอน
 
-## ✨ ส่วนขยายในอนาคต
+### Activity Logs (Admin)
+- `GET /api/activity-logs` - บันทึกกิจกรรม
+- `GET /api/activity-logs/recent` - กิจกรรมล่าสุด
 
-- [ ] Real-time notification system
-- [ ] Advanced reporting & analytics
-- [ ] Integration with external APIs
-- [ ] Mobile app version
-- [ ] Multi-language support
-- [ ] Advanced permission system
-- [ ] Document storage integration
-- [ ] Email notification
+### System
+- `GET /api/health` - สถานะเซิร์ฟเวอร์
 
-## 📄 License
+## การรัน Tests
+
+```bash
+cd backend
+npm test
+```
+
+## Responsive Design
+- Mobile-first approach
+- Sidebar ปิดอัตโนมัติบนมือถือ
+- Navigation drawer สำหรับมือถือ
+- ตารางสามารถเลื่อนได้บนมือถือ
+
+## License
 
 MIT License
-
-## 👨‍💻 Developer
-
-สร้างสำหรับระบบติดตามโครงการ Solar ในประเทศไทย
-
----
-
-**Note**: นี่คือระบบเวอร์ชันพื้นฐาน โดยมีคุณสมบัติเบื้องต้นทั้งหมดสำหรับการติดตามโครงการ Solar โปรแกรมเมอร์สามารถขยายและปรับปรุงระบบตามความต้องการจริง

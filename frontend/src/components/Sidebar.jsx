@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Building2,
@@ -12,6 +12,8 @@ import {
   Users,
   Zap
 } from 'lucide-react';
+import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const menuItems = [
   { id: 'dashboard', label: 'หน้าหลัก', icon: LayoutDashboard, path: '/' },
@@ -35,8 +37,16 @@ function BrandMark() {
   );
 }
 
-export default function Sidebar({ isOpen, onClose, onLogout, user }) {
+export default function Sidebar({ isOpen, onClose }) {
+  const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <>
@@ -107,18 +117,42 @@ export default function Sidebar({ isOpen, onClose, onLogout, user }) {
                 <p className="truncate text-sm font-semibold text-white">{user?.full_name || user?.username}</p>
                 <p className="text-xs text-slate-400">{user?.role === 'admin' ? 'Admin' : 'Engineer'}</p>
               </div>
-              <button className="rounded-xl p-1.5 text-slate-400 transition hover:bg-white/5 hover:text-white">
-                <ChevronDown size={16} />
+              <button
+                onClick={() => setUserMenuOpen((open) => !open)}
+                className="rounded-xl p-1.5 text-slate-400 transition hover:bg-white/5 hover:text-white"
+              >
+                <ChevronDown size={16} className={`transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
               </button>
             </div>
 
-            <button
-              onClick={onLogout}
-              className="mt-4 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
-            >
-              <LogOut size={16} />
-              ออกจากระบบ
-            </button>
+            {userMenuOpen && (
+              <div className="mt-3 space-y-1">
+                <button
+                  onClick={() => { setUserMenuOpen(false); navigate('/settings'); onClose(); }}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
+                >
+                  <Settings size={16} />
+                  ตั้งค่าบัญชี
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
+                >
+                  <LogOut size={16} />
+                  ออกจากระบบ
+                </button>
+              </div>
+            )}
+
+            {!userMenuOpen && (
+              <button
+                onClick={handleLogout}
+                className="mt-4 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
+              >
+                <LogOut size={16} />
+                ออกจากระบบ
+              </button>
+            )}
           </div>
         </div>
       </aside>

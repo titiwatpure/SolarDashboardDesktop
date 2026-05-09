@@ -1,8 +1,9 @@
 import { Edit2, Plus, ShieldCheck, Trash2, User, Users2, X, Loader } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { usersAPI } from '../utils/api';
+import { ROLES } from '../utils/constants';
 
-const emptyForm = { username: '', email: '', password: '', full_name: '', role: 'engineer' };
+const emptyForm = { username: '', email: '', password: '', full_name: '', role: 'engineer', status: 'active' };
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -57,6 +58,7 @@ export default function Users() {
       password: '',
       full_name: user.full_name || '',
       role: user.role || 'engineer',
+      status: user.status || 'active',
     });
     setError('');
     setIsModalOpen(true);
@@ -71,6 +73,8 @@ export default function Users() {
         await usersAPI.update(editingUser.id, {
           full_name: formData.full_name,
           email: formData.email,
+          role: formData.role,
+          status: formData.status,
         });
       } else {
         await usersAPI.create(formData);
@@ -89,9 +93,10 @@ export default function Users() {
   const summary = useMemo(() => {
     const total = pagination?.total || users.length;
     const admins = users.filter((u) => u.role === 'admin').length;
-    const engineers = users.filter((u) => u.role !== 'admin').length;
+    const engineers = users.filter((u) => u.role === 'engineer').length;
+    const staff = users.filter((u) => u.role === 'staff').length;
     const active = users.filter((u) => u.status === 'active').length;
-    return { total, admins, engineers, active };
+    return { total, admins, engineers, staff, active };
   }, [users, pagination]);
 
   return (
@@ -211,9 +216,12 @@ export default function Users() {
                   <td className="px-5 py-4 text-slate-700">{user.email}</td>
                   <td className="px-5 py-4">
                     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                      user.role === 'admin' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'
+                      user.role === 'admin' ? 'bg-violet-50 text-violet-700'
+                      : user.role === 'engineer' ? 'bg-blue-50 text-blue-700'
+                      : user.role === 'staff' ? 'bg-amber-50 text-amber-700'
+                      : 'bg-slate-100 text-slate-700'
                     }`}>
-                      {user.role === 'admin' ? 'Administrator' : 'Engineer'}
+                      {ROLES[user.role] || user.role}
                     </span>
                   </td>
                   <td className="px-5 py-4">
@@ -337,29 +345,30 @@ export default function Users() {
                 />
               </div>
 
-              {!editingUser && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">บทบาท</label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, role: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
-                  >
-                    <option value="engineer">Engineer</option>
-                    <option value="admin">Administrator</option>
-                  </select>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">บทบาท</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, role: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+                >
+                  {Object.entries(ROLES).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
 
               {editingUser && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">บทบาท</label>
-                  <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    editingUser.role === 'admin' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'
-                  }`}>
-                    {editingUser.role === 'admin' ? 'Administrator' : 'Engineer'}
-                  </div>
-                  <p className="mt-1 text-xs text-slate-400">ไม่สามารถเปลี่ยนบทบาทได้</p>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">สถานะ</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, status: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+                  >
+                    <option value="active">ใช้งานอยู่</option>
+                    <option value="inactive">ไม่ใช้งาน</option>
+                  </select>
                 </div>
               )}
 

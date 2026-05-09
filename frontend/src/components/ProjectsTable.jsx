@@ -2,8 +2,9 @@ import { Edit2, Eye, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { projectsAPI } from '../utils/api';
-import { PERMIT_TYPES, STATUS_COLORS, STATUS_LABELS, STEP_LABELS } from '../utils/constants';
+import { PERMIT_TYPES, STATUS_COLORS, STATUS_LABELS, STEP_LABELS, RISK_LEVELS } from '../utils/constants';
 import StatusModal from './StatusModal';
+import RiskBadge from './RiskBadge';
 
 const permitClassNames = {
   exemption: 'bg-emerald-50 text-emerald-700',
@@ -97,6 +98,7 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
               <th className="px-5 py-4 text-left font-semibold">จังหวัด</th>
               <th className="px-5 py-4 text-left font-semibold">ขั้นตอนปัจจุบัน</th>
               <th className="px-5 py-4 text-left font-semibold">สถานะ</th>
+              <th className="px-5 py-4 text-left font-semibold">ความเสี่ยง</th>
               <th className="px-5 py-4 text-left font-semibold">หน่วยงาน</th>
               <th className="px-5 py-4 text-left font-semibold">ผู้รับผิดชอบ</th>
               <th className="px-5 py-4 text-left font-semibold">อัปเดตล่าสุด</th>
@@ -107,7 +109,7 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
           <tbody className="divide-y divide-slate-100 text-sm">
             {!loading && projects.length === 0 && (
               <tr>
-                <td colSpan="11" className="px-5 py-10 text-center text-slate-500">
+                <td colSpan="12" className="px-5 py-10 text-center text-slate-500">
                   ยังไม่มีข้อมูลโครงการ
                 </td>
               </tr>
@@ -135,6 +137,12 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[project.status]}`}>
                     {STATUS_LABELS[project.status] || project.status}
                   </span>
+                </td>
+                <td className="px-5 py-4">
+                  <RiskBadge level={project.risk_level} />
+                  {(!project.risk_level || project.risk_level === 'low') && (
+                    <span className="text-xs text-slate-400">-</span>
+                  )}
                 </td>
                 <td className="px-5 py-4 text-slate-700 max-w-[200px] truncate" title={project.organizations || ''}>
                   {project.organizations || '-'}

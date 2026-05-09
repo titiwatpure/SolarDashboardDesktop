@@ -1,16 +1,15 @@
--- Sample data for testing
--- เพิ่มข้อมูลผู้ใช้ตัวอย่าง (ทำก่อนการ run file นี้)
+-- Sample data for testing (SQLite compatible)
+-- รัน init-db.cjs ก่อน แล้วค่อย run file นี้
 
--- Insert demo organizations
-INSERT INTO organizations (id, org_name, org_type, status) VALUES
-(gen_random_uuid(), 'สำนักกำกับกิจการพลังงาน (กกพ.)', 'erc', 'active'),
-(gen_random_uuid(), 'บริษัท การไฟฟ้าส่วนภูมิภาค (PEA)', 'pea', 'active'),
-(gen_random_uuid(), 'บริษัท การไฟฟ้านครหลวง (MEA)', 'mea', 'active'),
-(gen_random_uuid(), 'องค์การบริหารส่วนตำบล (อบต.)', 'tambon', 'active'),
-(gen_random_uuid(), 'เทศบาลเมือง', 'municipal', 'active'),
-(gen_random_uuid(), 'กรมโรงงาน', 'factory', 'active'),
-(gen_random_uuid(), 'นิคมอุตสาหกรรม', 'industrial', 'active')
-ON CONFLICT (org_name) DO NOTHING;
+-- Insert demo organizations (ใช้ SQLite randomblob แทน gen_random_uuid())
+INSERT OR IGNORE INTO organizations (id, org_name, org_type, status) VALUES
+(lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random())%4+1,1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))), 'สำนักกำกับกิจการพลังงาน (กกพ.)', 'erc', 'active'),
+(lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random())%4+1,1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))), 'บริษัท การไฟฟ้าส่วนภูมิภาค (PEA)', 'pea', 'active'),
+(lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random())%4+1,1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))), 'บริษัท การไฟฟ้านครหลวง (MEA)', 'mea', 'active'),
+(lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random())%4+1,1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))), 'องค์การบริหารส่วนตำบล (อบต.)', 'tambon', 'active'),
+(lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random())%4+1,1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))), 'เทศบาลเมือง', 'municipal', 'active'),
+(lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random())%4+1,1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))), 'กรมโรงงาน', 'factory', 'active'),
+(lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random())%4+1,1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))), 'นิคมอุตสาหกรรม', 'industrial', 'active');
 
 -- Note: To add sample projects, use the API or manually insert
 -- Example of inserting a project:
@@ -20,7 +19,7 @@ INSERT INTO projects (
   status, current_step, description, has_power_selling, requires_permit,
   permit_type, start_date
 ) VALUES (
-  gen_random_uuid(),
+  lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random())%4+1,1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))),
   'โครงการติดตั้ง Solar Rooftop บริษัท ABC',
   'PROJ-001',
   100,
@@ -29,9 +28,9 @@ INSERT INTO projects (
   'in_progress',
   'design',
   'โครงการติดตั้งแผงโซลาร์บนหลังคาของอาคาร',
-  false,
-  true,
+  0,
+  1,
   'exemption',
-  NOW()
+  datetime('now')
 );
 */

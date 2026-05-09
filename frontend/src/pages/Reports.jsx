@@ -17,6 +17,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { reportsAPI } from '../utils/api';
 import { STATUS_LABELS, STEP_LABELS } from '../utils/constants';
+import { SARABUN_BASE64 } from '../utils/thaiFont';
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#94a3b8'];
 
@@ -98,26 +99,32 @@ export default function Reports() {
 
   const handleExportPdf = useCallback(() => {
     const doc = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 20;
 
-    // Title
-    doc.setFontSize(18);
-    doc.text('Solar Dashboard Report', pageWidth / 2, y, { align: 'center' });
-    y += 8;
-    doc.setFontSize(10);
+    // เพิ่มฟอนต์ภาษาไทย
+    doc.addFileToVFS('Sarabun.ttf', SARABUN_BASE64);
+    doc.addFont('Sarabun.ttf', 'Sarabun', 'normal');
+    doc.setFont('Sarabun');
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 15;
+
+    // หัวเรื่อง
+    doc.setFontSize(16);
+    doc.text('รายงาน Solar Dashboard', pageWidth / 2, y, { align: 'center' });
+    y += 7;
+    doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }), pageWidth / 2, y, { align: 'center' });
     doc.setTextColor(0);
-    y += 12;
+    y += 8;
 
-    // Table 1: Status summary
-    doc.setFontSize(13);
-    doc.text('Summary by Status', 14, y);
+    // ตาราง 1: สรุปตามสถานะ
+    doc.setFontSize(12);
+    doc.text('สรุปตามสถานะ', 14, y);
     y += 2;
     autoTable(doc, {
       startY: y,
-      head: [['Status', 'Count', '%']],
+      head: [['สถานะ', 'จำนวน', 'สัดส่วน (%)']],
       body: statusData.map(r => [
         STATUS_LABELS[r.status] || r.status,
         String(r.count),
@@ -125,17 +132,17 @@ export default function Reports() {
       ]),
       theme: 'grid',
       headStyles: { fillColor: [37, 99, 235] },
-      styles: { fontSize: 10 }
+      styles: { font: 'Sarabun', fontSize: 9 }
     });
-    y = doc.lastAutoTable.finalY + 12;
+    y = doc.lastAutoTable.finalY + 10;
 
-    // Table 2: Size summary
-    doc.setFontSize(13);
-    doc.text('Summary by Size', 14, y);
+    // ตาราง 2: สรุปตามขนาด
+    doc.setFontSize(12);
+    doc.text('สรุปตามขนาดโครงการ', 14, y);
     y += 2;
     autoTable(doc, {
       startY: y,
-      head: [['Size Category', 'Count', 'Avg (kW)', 'Total (kW)']],
+      head: [['กลุ่มขนาด', 'จำนวน', 'เฉลี่ย (kW)', 'รวม (kW)']],
       body: sizeData.map(r => [
         r.size_category,
         String(r.count),
@@ -144,40 +151,36 @@ export default function Reports() {
       ]),
       theme: 'grid',
       headStyles: { fillColor: [37, 99, 235] },
-      styles: { fontSize: 10 }
+      styles: { font: 'Sarabun', fontSize: 9 }
     });
-    y = doc.lastAutoTable.finalY + 12;
+    y = doc.lastAutoTable.finalY + 10;
 
-    // Table 3: Step summary
-    doc.setFontSize(13);
-    doc.text('Summary by Step', 14, y);
+    // ตาราง 3: สรุปตามขั้นตอน
+    doc.setFontSize(12);
+    doc.text('สรุปตามขั้นตอน', 14, y);
     y += 2;
     autoTable(doc, {
       startY: y,
-      head: [['Step', 'Count']],
+      head: [['ขั้นตอน', 'จำนวนโครงการ']],
       body: stepData.map(r => [
         STEP_LABELS[r.step] || r.step,
         String(r.count)
       ]),
       theme: 'grid',
       headStyles: { fillColor: [37, 99, 235] },
-      styles: { fontSize: 10 }
+      styles: { font: 'Sarabun', fontSize: 9 }
     });
-    y = doc.lastAutoTable.finalY + 12;
+    y = doc.lastAutoTable.finalY + 10;
 
-    // Check if need new page
-    if (y > 240) {
-      doc.addPage();
-      y = 20;
-    }
+    if (y > 230) { doc.addPage(); y = 15; }
 
-    // Table 4: Province summary
-    doc.setFontSize(13);
-    doc.text('Summary by Province', 14, y);
+    // ตาราง 4: สรุปตามจังหวัด
+    doc.setFontSize(12);
+    doc.text('สรุปตามจังหวัด', 14, y);
     y += 2;
     autoTable(doc, {
       startY: y,
-      head: [['Province', 'Count', 'Completed', 'Success Rate']],
+      head: [['จังหวัด', 'จำนวน', 'เสร็จแล้ว', 'อัตราสำเร็จ']],
       body: provinceData.map(r => [
         r.province,
         String(r.count),
@@ -186,11 +189,10 @@ export default function Reports() {
       ]),
       theme: 'grid',
       headStyles: { fillColor: [37, 99, 235] },
-      styles: { fontSize: 10 }
+      styles: { font: 'Sarabun', fontSize: 9 }
     });
 
-    const date = new Date().toISOString().slice(0, 10);
-    doc.save(`Solar Dashboard Report ${date}.pdf`);
+    doc.save(`รายงาน Solar Dashboard ${new Date().toISOString().slice(0, 10)}.pdf`);
   }, [statusData, sizeData, stepData, provinceData]);
 
   const pieData = useMemo(

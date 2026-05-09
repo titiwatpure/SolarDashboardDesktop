@@ -2,11 +2,11 @@
 
 ## ข้อกำหนดระบบ
 
-- Node.js >= 16.0.0
+- Node.js >= 18.0.0
 - npm >= 8.0.0
 - Git
 
-> ✅ **ระบบนี้ใช้ SQLite** เป็นฐานข้อมูล ไม่ต้องติดตั้ง PostgreSQL
+> ระบบนี้ใช้ **SQLite** เป็นฐานข้อมูล ไม่ต้องติดตั้ง PostgreSQL
 
 ---
 
@@ -24,8 +24,9 @@ npm install
 ```env
 PORT=5000
 NODE_ENV=development
-JWT_SECRET=your_secret_key_here
-JWT_EXPIRATION=7d
+JWT_SECRET=เปลี่ยนเป็นค่าที่ปลอดภัย
+ACCESS_TOKEN_EXPIRY=15m
+REFRESH_TOKEN_EXPIRY_DAYS=30
 CORS_ORIGIN=http://localhost:3000
 ```
 
@@ -53,6 +54,21 @@ npm start
 
 ---
 
+## ติดตั้งด้วย Docker
+
+```bash
+# ทั้ง backend + frontend
+docker compose up -d --build
+
+# ดู logs
+docker compose logs -f
+
+# หยุด
+docker compose down
+```
+
+---
+
 ## ข้อมูลเข้าสู่ระบบทดลอง
 
 ```
@@ -69,11 +85,12 @@ Password: admin
 PORT=5000
 NODE_ENV=development
 JWT_SECRET=เปลี่ยนเป็นค่าที่ปลอดภัย
-JWT_EXPIRATION=7d
+ACCESS_TOKEN_EXPIRY=15m
+REFRESH_TOKEN_EXPIRY_DAYS=30
 CORS_ORIGIN=http://localhost:3000
 ```
 
-### Frontend (`frontend/.env`) — ถ้ามี
+### Frontend (`frontend/.env`)
 ```env
 REACT_APP_API_URL=http://localhost:5000/api
 ```
@@ -90,9 +107,15 @@ cd backend
 node src/init-db.cjs
 ```
 
-### เพิ่มตารางใหม่
-แก้ไขไฟล์ `backend/src/init-db.cjs` ในส่วน `const tables = [...]`
-แล้วรัน `node src/init-db.cjs` อีกครั้ง
+### ข้อมูลไม่หายเมื่อรันซ้ำ
+- ใช้ `CREATE TABLE IF NOT EXISTS` - ถ้าตารางมีอยู่แล้วไม่ทำอะไร
+- ใช้ `INSERT OR IGNORE` - ถ้าข้อมูลมีอยู่แล้วไม่เขียนทับ
+- ข้อมูลที่คุณบันทึกเองจะอยู่ครบ
+
+### Backup ฐานข้อมูล
+```bash
+cp backend/solar_dashboard.db backend/solar_dashboard_backup.db
+```
 
 ---
 
@@ -100,46 +123,35 @@ node src/init-db.cjs
 
 ### ผ่าน API (ต้อง Login เป็น Admin ก่อน)
 ```bash
-curl -X POST http://localhost:5000/api/users \
+curl -X POST http://localhost:5000/api/auth/register \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{"username":"engineer1","email":"eng@example.com","password":"pass123","role":"engineer"}'
+  -d '{"username":"engineer1","email":"eng@example.com","password":"pass1234","full_name":"Engineer One","role":"engineer"}'
 ```
 
 ### ผ่านหน้า Users ในระบบ
-เข้าเมนู **ผู้ใช้งาน** → กดปุ่ม **เพิ่มผู้ใช้**
+เข้าเมนู **ผู้ใช้งาน** -> กดปุ่ม **เพิ่มผู้ใช้**
 
 ---
 
-## ทดสอบ API
+## การอัปเดตแอป
 
 ```bash
-# Login
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}'
+# 1. ดึงโค้ดใหม่
+git pull
 
-# ดึงรายชื่อโครงการ (ต้องส่ง token)
-curl -X GET http://localhost:5000/api/projects \
-  -H "Authorization: Bearer YOUR_TOKEN"
+# 2. ลง dependencies ใหม่ (ถ้ามี)
+cd backend && npm install
+cd ../frontend && npm install
 
-# Health Check
-curl http://localhost:5000/api/health
+# 3. รัน init-db (ถ้ามีตารางใหม่)
+cd ../backend && node src/init-db.cjs
+
+# 4. รันใหม่
+npm run dev
 ```
 
----
-
-## วิธีรันพร้อมกัน (Development)
-
-**Terminal 1 — Backend:**
-```bash
-cd backend && npm run dev
-```
-
-**Terminal 2 — Frontend:**
-```bash
-cd frontend && npm start
-```
+> ข้อมูลเดิมใน `solar_dashboard.db` ไม่หาย
 
 ---
 
@@ -149,11 +161,20 @@ cd frontend && npm start
 # Frontend
 cd frontend
 npm run build
-# ไฟล์จะอยู่ที่ frontend/build/
 
-# Backend — รันตรงๆ ด้วย Node.js
+# Backend serve frontend ด้วย
 cd backend
-npm start
+NODE_ENV=production node src/index.js
+# เปิด http://localhost:5000
+```
+
+---
+
+## รัน Tests
+
+```bash
+cd backend
+npm test
 ```
 
 ---
@@ -165,14 +186,18 @@ npm start
 | Port 5000 ถูกใช้อยู่ | แก้ `PORT=5001` ใน `.env` |
 | CORS error | ตรวจสอบ `CORS_ORIGIN` ใน `.env` |
 | npm modules not found | ลบ `node_modules` แล้วรัน `npm install` ใหม่ |
-| Token หมดอายุ | Login ใหม่ หรือปรับ `JWT_EXPIRATION` |
+| Token หมดอายุ | Login ใหม่ (ระบบมี refresh token อัตโนมัติ) |
 | ฐานข้อมูลว่างเปล่า | รัน `node src/init-db.cjs` ใหม่ |
+| Upload ไฟล์ไม่ได้ | ตรวจสอบว่ามีโฟลเดอร์ `backend/uploads/` |
 
 ---
 
 ## ความปลอดภัย
 
-1. ❌ **ห้าม** commit ไฟล์ `.env` ขึ้น Git
-2. ✅ เปลี่ยน `JWT_SECRET` ให้เป็นค่าที่ปลอดภัย
-3. ✅ ใช้ HTTPS ใน production
-4. ✅ ระบบใช้ parameterized queries ป้องกัน SQL Injection อยู่แล้ว
+1. **ห้าม** commit ไฟล์ `.env` ขึ้น Git (อยู่ใน `.gitignore` แล้ว)
+2. เปลี่ยน `JWT_SECRET` ให้เป็นค่าที่ปลอดภัย
+3. ใช้ HTTPS ใน production
+4. ระบบใช้ parameterized queries ป้องกัน SQL Injection
+5. Rate limiting: 200 req/min ทั่วไป, 20 req/15min สำหรับ login
+6. bcrypt 12 rounds สำหรับรหัสผ่าน
+7. JWT HS256 + Refresh Token rotation

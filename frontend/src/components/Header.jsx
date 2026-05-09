@@ -1,6 +1,8 @@
 import { Bell, LogOut, Menu, Settings, User } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { notificationsAPI } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 const pageTitles = {
   '/': 'ภาพรวมโครงการ',
@@ -13,12 +15,29 @@ const pageTitles = {
   '/settings': 'ตั้งค่า'
 };
 
-export default function Header({ user, onLogout, onToggleSidebar }) {
+export default function Header({ onToggleSidebar }) {
+  const { user, logout } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const profileRef = useRef(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
-  // ปิด dropdown เมื่อคลิกข้างนอก
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await notificationsAPI.getUnreadCount();
+      setUnreadCount(res?.count || 0);
+    } catch {
+      // เงียบไว้
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
+
   useEffect(() => {
     if (!isProfileOpen) return;
     const handleClickOutside = (e) => {
@@ -38,6 +57,11 @@ export default function Header({ user, onLogout, onToggleSidebar }) {
       }),
     []
   );
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur">
@@ -65,11 +89,16 @@ export default function Header({ user, onLogout, onToggleSidebar }) {
             วันที่ {todayLabel} น.
           </div>
 
-          <button className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
+          <button
+            onClick={() => navigate('/settings')}
+            className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+          >
             <Bell size={18} />
-            <span className="absolute right-2 top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-              5
-            </span>
+            {unreadCount > 0 && (
+              <span className="absolute right-2 top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
 
           <div className="relative" ref={profileRef}>
@@ -90,16 +119,22 @@ export default function Header({ user, onLogout, onToggleSidebar }) {
 
             {isProfileOpen && (
               <div className="absolute right-0 mt-3 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-2 shadow-xl">
-                <button className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50">
+                <button
+                  onClick={() => { setIsProfileOpen(false); navigate('/settings'); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                >
                   <User size={16} />
                   โปรไฟล์
                 </button>
-                <button className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50">
+                <button
+                  onClick={() => { setIsProfileOpen(false); navigate('/settings'); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                >
                   <Settings size={16} />
                   ตั้งค่าบัญชี
                 </button>
                 <button
-                  onClick={onLogout}
+                  onClick={handleLogout}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 transition hover:bg-red-50"
                 >
                   <LogOut size={16} />

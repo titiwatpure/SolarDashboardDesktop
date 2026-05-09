@@ -1,37 +1,47 @@
 # Solar Dashboard - Quick Start
 
 ## ความต้องการ
-- Node.js 16+
+- Node.js 18+
 - npm
 
-> ✅ ไม่ต้องติดตั้ง PostgreSQL — ระบบใช้ **SQLite** (ไฟล์ `.db` ในเครื่องเลย)
+> ระบบนี้ใช้ **SQLite** ไม่ต้องติดตั้ง PostgreSQL หรือ database server อื่น
 
 ---
 
 ## เริ่มต้นใน 3 ขั้นตอน
 
-### 1️⃣ Backend
+### 1. Backend
 ```bash
 cd backend
 npm install
-# สร้าง .env แล้วใส่ JWT_SECRET=mysecret เป็นอย่างน้อย
+cp .env.example .env
+# แก้ JWT_SECRET ใน .env ให้เป็นค่าที่ปลอดภัย
 node src/init-db.cjs
 npm run dev
 ```
 
-### 2️⃣ Frontend
+### 2. Frontend (เปิด terminal ใหม่)
 ```bash
 cd frontend
 npm install
 npm start
 ```
 
-### 3️⃣ เข้าสู่ระบบ
-เปิด [http://localhost:3000](http://localhost:3000)
+### 3. เข้าสู่ระบบ
+เปิด http://localhost:3000
 ```
 Username: admin
 Password: admin
 ```
+
+---
+
+## หรือใช้ Docker (ทั้งระบบ)
+
+```bash
+docker compose up -d --build
+```
+เปิด http://localhost:3000
 
 ---
 
@@ -42,24 +52,26 @@ Password: admin
 | ภาพรวม | KPI, Pipeline, ตารางโครงการ |
 | โครงการ | เพิ่ม/แก้ไข/ลบ, Workflow 7 ขั้นตอน |
 | หน่วยงาน | จัดการ กกพ., PEA, MEA และอื่นๆ |
-| รายงาน | สรุปตามสถานะ/ขนาด/จังหวัด/ขั้นตอน |
+| เอกสาร | Upload/ดาวน์โหลดไฟล์จริง |
+| รายงาน | สรุปตามสถานะ/ขนาด/จังหวัด + Export |
 | ผู้ใช้งาน | Admin / Engineer |
+| ตั้งค่า | เปลี่ยนรหัสผ่าน, ตั้งค่าแจ้งเตือน |
 
-## API Endpoints
+## API Endpoints หลัก
 
 ```
-POST   /api/auth/login
-GET    /api/projects
-POST   /api/projects
-PUT    /api/projects/:id
-DELETE /api/projects/:id
-GET    /api/projects/stats/kpis
-GET    /api/users
-GET    /api/reports/summary/status
-GET    /api/reports/summary/size
-GET    /api/reports/summary/province
-GET    /api/reports/summary/step
-GET    /api/health
+POST   /api/auth/login              # เข้าสู่ระบบ
+POST   /api/auth/refresh            # ขอ token ใหม่
+POST   /api/auth/logout             # ออกจากระบบ
+GET    /api/projects                # รายการโครงการ
+POST   /api/projects                # สร้างโครงการ
+GET    /api/projects/stats/kpis     # KPI
+GET    /api/users                   # รายการผู้ใช้
+PUT    /api/users/change-password   # เปลี่ยนรหัสผ่าน
+POST   /api/documents               # เพิ่มเอกสาร (file upload)
+GET    /api/documents/download/:id  # ดาวน์โหลดไฟล์
+GET    /api/notifications/unread-count  # แจ้งเตือน
+GET    /api/health                  # สถานะเซิร์ฟเวอร์
 ```
 
 ## แก้ไขปัญหาเบื้องต้น
@@ -68,168 +80,19 @@ GET    /api/health
 |-------|---------|
 | CORS error | ตรวจสอบ `CORS_ORIGIN` ใน `.env` |
 | Port ถูกใช้อยู่ | เปลี่ยน `PORT` ใน `.env` |
-| ข้อมูลขาดหาย | รัน `node src/init-db.cjs` ใหม่ |
+| ข้อมูลหาย | รัน `node src/init-db.cjs` ใหม่ (ข้อมูลเดิมไม่หาย) |
+| Token หมดอายุ | Login ใหม่ หรือใช้ refresh token |
 
-## 🎯 คุณสมบัติหลักที่ได้รับ
-
-### ✅ Dashboard
-- KPI Cards แสดงสถิติทั่วไป
-- Pipeline visualization แสดงความคืบหน้า
-- ตารางโครงการพร้อม filter
-
-### ✅ โครงการ
-- เพิ่ม / แก้ไข / ลบ โครงการ
-- 7 ขั้นตอนการดำเนินการ
-- 4 สถานะโครงการ
-- Logic อัตโนมัติสำหรับสถานะ
-
-### ✅ ระบบกฎหมาย
-- ✓ การตรวจสอบขนาด (≤ / > 1000 kVA)
-- ✓ การตรวจสอบการขายไฟ
-- ✓ กำหนดประเภทใบอนุญาตอัตโนมัติ
-
-### ✅ หน่วยงาน
-รองรับ 7 ประเภท: กกพ., PEA, MEA, อบต., เทศบาล, กรมโรงงาน, นิคมอุตสาหกรรม
-
-### ✅ เอกสาร
-- Upload ไฟล์ (SLD, ใบอนุญาต, Test Report)
-- ติดตามสถานะเอกสาร
-
-### ✅ รายงาน
-- สรุปตามสถานะ, ขนาด, จังหวัด, ขั้นตอน
-- Visualization ด้วย charts
-
-### ✅ ผู้ใช้งาน
-- Role-based access (Admin, Engineer)
-- JWT Authentication
-
-### ✅ ตั้งค่า
-- ตั้งค่าทั่วไป
-- ความปลอดภัย
-- การแจ้งเตือน
-- ระบบ
-
-## 🎨 UI Design
-
-### โทนสี
-- **น้ำเงินเข้ม** (หลัก): #0066cc
-- **เขียว** (สำเร็จ): #10b981
-- **เหลือง** (กำลังดำเนินการ): #f59e0b
-- **แดง** (ปัญหา): #ef4444
-
-### Layout
-- Sidebar Navigation
-- Header ด้านบน
-- Responsive Design
-- Card-based UI
-- Shadow Effects
-- Grid Layout
-
-## 📁 Project Structure
-
-```
-Dashboard/
-├── backend/          # Express API
-├── frontend/         # React Application
-├── README.md         # Documentation
-├── INSTALLATION.md   # Setup Guide
-├── DEVELOPMENT.md    # Dev Guide
-└── docker-compose.yml # Docker config
-```
-
-## 🔗 API Endpoints (ตัวอย่าง)
-
-```
-# Authentication
-POST   /api/auth/login
-POST   /api/auth/register
-
-# Projects
-GET    /api/projects
-GET    /api/projects/:id
-POST   /api/projects
-PUT    /api/projects/:id
-DELETE /api/projects/:id
-GET    /api/projects/stats/kpis
-
-# Users
-GET    /api/users
-GET    /api/users/profile
-POST   /api/users
-PUT    /api/users/:id
-DELETE /api/users/:id
-
-# Organizations
-GET    /api/organizations
-
-# Documents
-GET    /api/documents/project/:id
-POST   /api/documents
-DELETE /api/documents/:id
-
-# Reports
-GET    /api/reports/summary/status
-GET    /api/reports/summary/size
-GET    /api/reports/summary/province
-GET    /api/reports/summary/step
-```
-
-## 🔧 Troubleshooting
-
-### ❌ CORS Error
-→ ตรวจสอบ CORS_ORIGIN ใน backend .env
-
-### ❌ Port already in use
-→ ใช้ port อื่น: `PORT=5001 npm run dev`
-
-### ❌ Database connection error
-→ ตรวจสอบ DB credentials ใน .env
-
-### ❌ npm modules not found
-→ ลบ node_modules และ run `npm install` ใหม่
-
-## 📚 Documentation
-
-- [INSTALLATION.md](INSTALLATION.md) - คำแนะนำการติดตั้ง
-- [DEVELOPMENT.md](DEVELOPMENT.md) - คำแนะนำการพัฒนา
-- [API Documentation](#-api-endpoints) - API Endpoints
-- [README.md](README.md) - เอกสารหลัก
-
-## 🚢 Deploy to Production
+## รัน Tests
 
 ```bash
-# Build Frontend
-cd frontend
-npm run build
-
-# Deploy Backend
 cd backend
-npm start  # ใช้ NODE_ENV=production
-
-# หรือใช้ Docker
-docker-compose -f docker-compose.yml up -d
+npm test
 ```
 
-## 💡 Tips & Tricks
+## Documentation
 
-1. ใช้ Postman สำหรับทดสอบ API
-2. ใช้ React DevTools สำหรับ debug frontend
-3. ใช้ pgAdmin สำหรับจัดการ database
-4. Monitor logs ด้วย `tail -f logs.txt`
-
-## 🆘 ต้องการความช่วยเหลือ?
-
-อ่านเอกสารลายละเอียดเพิ่มเติมใน:
-- [INSTALLATION.md](INSTALLATION.md)
-- [DEVELOPMENT.md](DEVELOPMENT.md)
-- [README.md](README.md)
-
-## 📝 License
-
-MIT License - ใช้ได้ฟรี
-
----
-
-**Happy Coding! 🎉**
-
-หากมีข้อถามหรือปัญหา โปรดติดต่อทีมพัฒนา
+- [README.md](README.md) - เอกสารหลัก
+- [INSTALLATION.md](INSTALLATION.md) - คู่มือการติดตั้ง
+- [DEVELOPMENT.md](DEVELOPMENT.md) - คู่มือการพัฒนา
+- [USAGE_GUIDE.md](USAGE_GUIDE.md) - คู่มือการใช้งาน

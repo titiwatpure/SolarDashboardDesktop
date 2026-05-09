@@ -82,6 +82,7 @@ export const apiCall = async (method, url, data = null) => {
 
 export const authAPI = {
   login: (username, password) => apiCall('POST', '/auth/login', { username, password }),
+  logout: () => apiCall('POST', '/auth/logout-all'),
 };
 
 export const projectsAPI = {
@@ -104,13 +105,27 @@ export const usersAPI = {
   update: (id, data) => apiCall('PUT', `/users/${id}`, data),
   create: (data) => apiCall('POST', '/users', data),
   delete: (id) => apiCall('DELETE', `/users/${id}`),
+  changePassword: (currentPassword, newPassword) => apiCall('PUT', '/users/change-password', { currentPassword, newPassword }),
 };
 
 export const documentsAPI = {
   getAll: (params) => apiCall('GET', `/documents?${new URLSearchParams(params || {})}`),
   getByProject: (projectId) => apiCall('GET', `/documents/project/${projectId}`),
-  upload: (data) => apiCall('POST', '/documents', data),
+  upload: (data) => {
+    // ถ้าเป็น FormData (มีไฟล์) ให้ส่งเป็น multipart
+    if (data instanceof FormData) {
+      const token = localStorage.getItem('token');
+      return axios.post(`${API_BASE_URL}/documents`, data, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'multipart/form-data',
+        },
+      }).then((res) => res.data);
+    }
+    return apiCall('POST', '/documents', data);
+  },
   delete: (id) => apiCall('DELETE', `/documents/${id}`),
+  getDownloadUrl: (id) => `${API_BASE_URL}/documents/download/${id}`,
 };
 
 export const organizationsAPI = {
@@ -127,4 +142,33 @@ export const reportsAPI = {
   getSummaryByProvince: () => apiCall('GET', '/reports/summary/province'),
   getSummaryByStep: () => apiCall('GET', '/reports/summary/step'),
   getSummaryByStepStatus: () => apiCall('GET', '/reports/summary/step-status'),
+};
+
+export const notificationsAPI = {
+  getAll: (params) => apiCall('GET', `/notifications?${new URLSearchParams(params || {})}`),
+  getUnreadCount: () => apiCall('GET', '/notifications/unread-count'),
+  markAsRead: (id) => apiCall('PUT', `/notifications/${id}/read`),
+  markAllAsRead: () => apiCall('PUT', '/notifications/read-all'),
+  delete: (id) => apiCall('DELETE', `/notifications/${id}`),
+};
+
+export const tasksAPI = {
+  getAll: (params) => apiCall('GET', `/tasks?${new URLSearchParams(params || {})}`),
+  getById: (id) => apiCall('GET', `/tasks/${id}`),
+  create: (data) => apiCall('POST', '/tasks', data),
+  update: (id, data) => apiCall('PUT', `/tasks/${id}`, data),
+  delete: (id) => apiCall('DELETE', `/tasks/${id}`),
+};
+
+export const activityLogsAPI = {
+  getAll: (params) => apiCall('GET', `/activity-logs?${new URLSearchParams(params || {})}`),
+  getRecent: () => apiCall('GET', '/activity-logs/recent'),
+};
+
+export const backupAPI = {
+  create: () => apiCall('POST', '/backup'),
+  getAll: () => apiCall('GET', '/backup'),
+  download: (name) => `${API_BASE_URL}/backup/download/${encodeURIComponent(name)}`,
+  delete: (name) => apiCall('DELETE', `/backup/${encodeURIComponent(name)}`),
+  restore: (name) => apiCall('POST', `/backup/restore/${encodeURIComponent(name)}`),
 };

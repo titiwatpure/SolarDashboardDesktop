@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertTriangle, FolderKanban, FileCheck2, ArrowRight, XCircle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FolderKanban, FileCheck2, ArrowRight, XCircle, ShieldAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { projectsAPI } from '../utils/api';
@@ -48,7 +48,16 @@ const cardConfig = [
     iconClassName: 'bg-red-100 text-red-600',
     linkClassName: 'text-red-600',
     filter: { status: 'blocked' }
-  }
+  },
+  {
+    key: 'critical_risk',
+    label: 'ความเสี่ยงวิกฤต',
+    helper: 'โครงการ',
+    icon: ShieldAlert,
+    iconClassName: 'bg-red-100 text-red-600',
+    linkClassName: 'text-red-600',
+    filter: { risk_level: 'critical' }
+  },
 ];
 
 // รับ props:
@@ -81,7 +90,7 @@ export default function KPICards({ refreshKey = 0 }) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
       {cardConfig.map((card) => {
         const Icon = card.icon;
 

@@ -1,321 +1,253 @@
-# 📖 คู่มือการใช้งาน Solar Dashboard
 
-## 📋 สารบัญ
+# คู่มือการใช้งาน Solar Dashboard
+
+## สารบัญ
 1. [การเริ่มต้น](#การเริ่มต้น)
-2. [โครงสร้างโปรเจกต์](#โครงสร้างโปรเจกต์)
-3. [การเข้าสู่ระบบ](#การเข้าสู่ระบบ)
-4. [การใช้งานระบบ](#การใช้งานระบบ)
-5. [การปรับเปลี่ยนแก้ไข](#การปรับเปลี่ยนแก้ไข)
+2. [การเข้าสู่ระบบ](#การเข้าสู่ระบบ)
+3. [การใช้งานแต่ละหน้า](#การใช้งานแต่ละหน้า)
+4. [การอัปเดตสถานะโครงการ](#การอัปเดตสถานะโครงการ)
+5. [การจัดการเอกสาร](#การจัดการเอกสาร)
+6. [การเปลี่ยนรหัสผ่าน](#การเปลี่ยนรหัสผ่าน)
+7. [การติดตั้งในองค์กร](#การติดตั้งในองค์กร)
 
 ---
 
 ## การเริ่มต้น
 
-### 1️⃣ ตรวจสอบสภาพแวดล้อม
+### ตรวจสอบ Node.js
 ```bash
-# ตรวจสอบ Node.js
-node --version  # ควรเป็น v14 ขึ้นไป
-
-# ตรวจสอบ npm
+node --version   # ควรเป็น v18 ขึ้นไป
 npm --version
 ```
 
-### 2️⃣ ติดตั้ง Dependencies
+### ติดตั้ง Backend
 ```bash
-# ติดตั้งไลบรารีสำหรับ Backend
 cd backend
 npm install
+cp .env.example .env
+node src/init-db.cjs
+npm run dev
+```
 
-# ติดตั้งไลบรารีสำหรับ Frontend
-cd ../frontend
+### ติดตั้ง Frontend (เปิด terminal ใหม่)
+```bash
+cd frontend
 npm install
+npm start
 ```
 
-### 3️⃣ ตั้งค่า Database
+### หรือใช้ Docker
 ```bash
-# สร้างไฟล์ .env ในโฟลเดอร์ backend
-touch backend/.env
-
-# เพิ่มการตั้งค่าต่อไปนี้:
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=solar_dashboard
-DB_USER=postgres
-DB_PASSWORD=your_password
-JWT_SECRET=your_secret_key
-NODE_ENV=development
-PORT=5000
-CORS_ORIGIN=http://localhost:3000
-```
-
-### 4️⃣ สร้างฐานข้อมูล
-```bash
-# เข้าสู่ PostgreSQL
-psql -U postgres
-
-# สร้างฐานข้อมูล
-CREATE DATABASE solar_dashboard;
-
-# นำเข้า Schema
-\c solar_dashboard
-\i backend/src/models/database-schema.sql
-\i backend/src/models/seed-data.sql
-```
-
----
-
-## โครงสร้างโปรเจกต์
-
-```
-Dashboard/
-├── backend/                 # 🔧 API Server
-│   ├── src/
-│   │   ├── index.js        # 📌 จุดเริ่มต้นเซิร์ฟเวอร์
-│   │   ├── database.js     # 🗄️ การเชื่อมต่อ Database
-│   │   ├── routes/         # 🛣️ API Routes
-│   │   │   ├── auth.js     # 🔐 การเข้าสู่ระบบ
-│   │   │   ├── projects.js # 📊 โครงการ
-│   │   │   ├── users.js    # 👥 ผู้ใช้งาน
-│   │   │   └── ... (อื่นๆ)
-│   │   ├── middleware/     # 🛡️ Middleware
-│   │   │   └── auth.js     # ✅ ตรวจสอบ JWT Token
-│   │   └── models/         # 📁 Schema & Data
-│   └── package.json
-│
-├── frontend/               # 🎨 Web Application
-│   ├── src/
-│   │   ├── App.jsx        # 📌 Component หลัก
-│   │   ├── pages/         # 📄 หน้าต่างๆ
-│   │   │   ├── Login.jsx      # 🔓 หน้าเข้าสู่ระบบ
-│   │   │   ├── Dashboard.jsx  # 📊 แดชบอร์ด
-│   │   │   ├── Projects.jsx   # 📋 โครงการ
-│   │   │   └── ... (อื่นๆ)
-│   │   ├── components/    # 🧩 Reusable Components
-│   │   │   ├── Header.jsx     # 🔝 ส่วนหัวหน้า
-│   │   │   ├── Sidebar.jsx    # 📍 เมนูด้านข้าง
-│   │   │   └── ... (อื่นๆ)
-│   │   ├── utils/         # 🔧 Helper Functions
-│   │   │   └── api.js     # 🌐 API Calls
-│   │   └── styles/        # 🎨 CSS Styles
-│   └── package.json
-│
-└── docker-compose.yml    # 🐳 Docker Configuration
+docker compose up -d --build
 ```
 
 ---
 
 ## การเข้าสู่ระบบ
 
-### ข้อมูลการเข้าสู่ระบบทดลอง (Demo Account)
+เปิด http://localhost:3000
+
 ```
-👤 ชื่อผู้ใช้: admin
-🔑 รหัสผ่าน: admin
+Username: admin
+Password: admin
 ```
 
-### ขั้นตอนการเข้าสู่ระบบ
-1. เปิดหน้าเว็บ `http://localhost:3000`
-2. ป้อนชื่อผู้ใช้ (username)
-3. ป้อนรหัสผ่าน (password)
-4. คลิกปุ่ม "เข้าสู่ระบบ"
+### บทบาทผู้ใช้
+- **Admin** - สิทธิ์เต็ม: CRUD ทุกอย่าง, จัดการผู้ใช้, ดู activity logs
+- **Engineer** - ดูข้อมูล, สร้าง/แก้ไขโครงการ, อัปโหลดเอกสาร
 
 ---
 
-## การใช้งานระบบ
+## การใช้งานแต่ละหน้า
 
-### 🏠 หน้าแรก (Dashboard)
-- **ที่ตั้ง**: ที่เมนู "แดชบอร์ด"
-- **ความสำคัญ**: แสดงสรุปข้อมูลทั้งระบบ
-- **ส่วนประกอบ**:
-  - 📊 KPI Cards: แสดงสถิติสำคัญ
-  - 📈 Pipeline Chart: แสดงแบบไลน์
-  - 📍 ตำแหน่งเซ็นเซอร์: แสดงแผนที่
+### หน้าแรก (Dashboard)
+- KPI Cards: จำนวนโครงการทั้งหมด, ยกเว้น, อนุญาต, เสร็จ, ติดปัญหา
+- Pipeline: แสดงขั้นตอน 7 ขั้น + กราฟโดนัท
+- ตารางโครงการ: ค้นหา, กรอง, ดู/แก้ไข/อัปเดต/ลบ
 
-### 📋 โครงการ (Projects)
-- **ที่ตั้ง**: ที่เมนู "โครงการ"
-- **ฟังก์ชัน**:
-  - ✅ ดูรายชื่อโครงการทั้งหมด
-  - ➕ เพิ่มโครงการใหม่
-  - ✏️ แก้ไขข้อมูลโครงการ
-  - 🗑️ ลบโครงการ
+### โครงการ (Projects)
+- รายการโครงการทั้งหมดพร้อม filter (จังหวัด, สถานะ, ขั้นตอน)
+- คลิกชื่อโครงการเพื่อดูรายละเอียด
 
-### 👥 ผู้ใช้งาน (Users)
-- **ที่ตั้ง**: ที่เมนู "ผู้ใช้งาน"
-- **ฟังก์ชัน**:
-  - ✅ ดูรายชื่อผู้ใช้ทั้งหมด
-  - ➕ เพิ่มผู้ใช้ใหม่
-  - ✏️ แก้ไขข้อมูลผู้ใช้
-  - 🗑️ ลบผู้ใช้
+### รายละเอียดโครงการ (ProjectDetail)
+- ข้อมูลโครงการ + ผู้รับผิดชอบ
+- Progress Bar 7 ขั้นตอน
+- จัดการหน่วยงานที่เกี่ยวข้อง
+- Timeline ประวัติการเปลี่ยนแปลง
 
-### 📊 รายงาน (Reports)
-- **ที่ตั้ง**: ที่เมนู "รายงาน"
-- **ประเภท**:
-  - 📈 รายงานรายเดือน
-  - 📊 รายงานตามสถานี
-  - 📉 รายงานตามช่วงเวลา
+### หน่วยงาน (Organizations)
+- รายการหน่วยงาน (กกพ., PEA, MEA, ฯลฯ)
+- ดูโครงการที่เชื่อมโยง
+- เพิ่ม/แก้ไข/ลบหน่วยงาน
 
----
+### เอกสาร (Documents)
+- **อัปโหลดไฟล์จริง** รองรับ PDF, Word, Excel, รูปภาพ, ZIP
+- ลากไฟล์มาวาง (drag-and-drop) หรือเลือกไฟล์
+- ดาวน์โหลดไฟล์จากตาราง
+- สรุปจำนวนเอกสารตามประเภท
 
-## การปรับเปลี่ยนแก้ไข
+### รายงาน (Reports)
+- กราฟแท่ง + กราฟวงกลม
+- สรุปตามสถานะ/ขนาด/จังหวัด/ขั้นตอน
+- Export เป็น Excel (4 sheets) หรือ PDF
 
-### 🖋️ แก้ไขข้อความในเมนู
+### ผู้ใช้งาน (Users) - Admin only
+- รายการผู้ใช้ทั้งหมด
+- เพิ่ม/แก้ไข/ลบผู้ใช้
+- กำหนดบทบาท (Admin/Engineer)
 
-#### ไฟล์ที่ต้องแก้ไข:
-```
-frontend/src/components/Sidebar.jsx
-```
-
-#### วิธีการแก้ไข:
-```javascript
-// ค้นหาส่วนต่อไปนี้:
-const menuItems = [
-  { id: 'dashboard', label: 'แดชบอร์ด', icon: LayoutDashboard, path: '/' },
-  { id: 'projects', label: 'โครงการ', icon: Zap, path: '/projects' },
-  // ...
-];
-
-// เปลี่ยนค่า label เป็นข้อความที่ต้องการ
-// ตัวอย่าง:
-{ id: 'dashboard', label: 'หน้าแรก', icon: LayoutDashboard, path: '/' },
-```
-
-### 🎨 เปลี่ยนสีและหน้าตา
-
-#### ไฟล์สไตล์:
-```
-frontend/src/styles/index.css         # CSS ทั่วไป
-frontend/tailwind.config.js           # Tailwind Configuration
-frontend/postcss.config.js            # PostCSS Configuration
-```
-
-#### ตัวอย่างการแก้ไข:
-```css
-/* ในไฟล์ index.css ให้หาส่วน primary color */
-:root {
-  --primary-600: #... /* เปลี่ยนรหัสสีที่นี่ */
-}
-```
-
-### 🔌 เพิ่ม API Endpoint ใหม่
-
-#### ขั้นตอน:
-1. **สร้างไฟล์ Route** ใน `backend/src/routes/` เช่น `new-feature.js`
-2. **เพิ่มโค้ด** ตัวอย่าง:
-```javascript
-// backend/src/routes/new-feature.js
-const express = require('express');
-const router = express.Router();
-
-// 📌 ตัวอย่าง: ดึงข้อมูลทั้งหมด
-router.get('/', async (req, res) => {
-  try {
-    // 🔧 เขียนโค้ด Query ที่นี่
-    res.json({ data: [] });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-module.exports = router;
-```
-
-3. **ลงทะเบียน Route** ใน `backend/src/index.js`:
-```javascript
-app.use('/api/new-feature', require('./routes/new-feature'));
-```
-
-### 🎯 เพิ่มหน้าใหม่ในระบบ
-
-#### ขั้นตอน:
-1. **สร้างไฟล์ Page** ใน `frontend/src/pages/` เช่น `NewPage.jsx`
-2. **สร้าง Component**:
-```javascript
-// frontend/src/pages/NewPage.jsx
-import React from 'react';
-
-export default function NewPage() {
-  return (
-    <div>
-      <h1>📄 หน้าใหม่ของฉัน</h1>
-      {/* เขียนอะไรที่นี่ */}
-    </div>
-  );
-}
-```
-
-3. **เพิ่มเข้าเมนู** ใน `frontend/src/components/Sidebar.jsx`:
-```javascript
-const menuItems = [
-  // ...
-  { 
-    id: 'new-page', 
-    label: 'หน้าใหม่', 
-    icon: YourIcon, 
-    path: '/new-page' 
-  },
-];
-```
-
-4. **เพิ่ม Route** ใน `frontend/src/App.jsx`:
-```javascript
-<Route path="/new-page" element={<NewPage />} />
-```
-
-### 🔐 เปลี่ยนข้อมูลผู้ใช้ทดลอง
-
-#### ไฟล์ที่ต้องแก้ไข:
-```
-backend/src/models/seed-data.sql
-```
-
-#### ตัวอย่าง:
-```sql
--- ค้นหาส่วน INSERT INTO users และแก้ไขข้อมูล
-INSERT INTO users (id, username, email, password, full_name, role) 
-VALUES (
-  '...', 
-  'admin',              -- 🔧 เปลี่ยนชื่อผู้ใช้
-  'admin@example.com',  -- 🔧 เปลี่ยน Email
-  '...',                -- รหัสผ่าน (Hashed)
-  'ผู้ดูแลระบบ',        -- 🔧 เปลี่ยนชื่อจริง
-  'admin'               -- 🔧 เปลี่ยนบทบาท
-);
-```
+### ตั้งค่า (Settings)
+- ดูข้อมูลผู้ใช้ปัจจุบัน
+- เปลี่ยนรหัสผ่าน (อย่างน้อย 8 ตัวอักษร)
+- ตั้งค่าการแจ้งเตือน
 
 ---
 
-## ⚠️ ข้อควรระวัง
+## การอัปเดตสถานะโครงการ
 
-### 🛡️ ความปลอดภัย
-- ❌ **ห้าม** ใส่รหัสผ่านลงใน Git
-- ✅ ใช้ไฟล์ `.env` แทน
-- ✅ เปลี่ยน JWT_SECRET ให้เป็นค่าที่ปลอดภัย
+### วิธีที่ 1: จากตาราง
+1. ไปหน้า Dashboard หรือ Projects
+2. หาโครงการ -> คลิกปุ่ม "อัปเดตสถานะ" (ไอคอนธง)
+3. เลือกขั้นตอนและสถานะ
+4. บันทึก
 
-### 📊 การแก้ไข Database
-- ✅ ทำ Backup ก่อนแก้ไข Schema
-- ✅ ทดสอบในสภาพแวดล้อม Development ก่อน
-- ✅ รันคำสั่ง `npm run lint` เพื่อตรวจสอบโค้ด
+### วิธีที่ 2: จากหน้ารายละเอียด
+1. คลิกชื่อโครงการ
+2. ดู Progress Bar 7 ขั้นตอน
+3. อัปเดตจากขั้นตอนที่ active
 
-### 🐛 Debug
+### ขั้นตอนทั้ง 7
+```
+1. Survey (สำรวจพื้นที่)
+2. Design (ออกแบบ)
+3. ERC (ขอใบอนุญาต กกพ.)
+4. Grid (ขอเชื่อมต่อไฟฟ้า)
+5. Construction (ก่อสร้าง)
+6. Testing (ทดสอบระบบ)
+7. COD (จ่ายไฟเชิงพาณิชย์) -> สถานะ "เสร็จสิ้น" อัตโนมัติ
+```
+
+### สถานะ
+- **รอดำเนินการ** - ยังไม่เริ่ม
+- **กำลังดำเนินการ** - ทำงานอยู่
+- **ติดปัญหา** - ต้องระบุเหตุผล
+- **เสร็จสิ้น** - งานเสร็จ
+
+### สิ่งที่ระบบทำอัตโนมัติ
+- บันทึก Timeline ทุกครั้งที่เปลี่ยนสถานะ
+- ส่ง Notification ให้ผู้รับผิดชอบ
+- บันทึก Activity Log
+- ถ้าขั้นตอนเป็น COD -> ล็อกสถานะเป็น "เสร็จสิ้น"
+
+---
+
+## การจัดการเอกสาร
+
+### อัปโหลดไฟล์
+1. ไปหน้า Documents
+2. เลือกโครงการ
+3. ตั้งชื่อเอกสาร (หรือปล่อยว่างให้ใช้ชื่อไฟล์)
+4. เลือกประเภทเอกสาร
+5. **ลากไฟล์มาวาง** หรือคลิก "เลือกไฟล์"
+6. กด "บันทึกเอกสาร"
+
+### ประเภทเอกสาร
+- **SLD** - แผนผังระบบไฟฟ้า
+- **ใบอนุญาต** - เอกสารอนุญาต
+- **Test Report** - รายงานทดสอบ
+- **อื่นๆ** - เอกสารทั่วไป
+
+### ดาวน์โหลด
+- คลิกไอคอนดาวน์โหลดในตารางเอกสาร
+
+---
+
+## การเปลี่ยนรหัสผ่าน
+
+1. ไปหน้า Settings
+2. ส่วน "เปลี่ยนรหัสผ่าน"
+3. กรอกรหัสผ่านปัจจุบัน
+4. กรอกรหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)
+5. ยืนยันรหัสผ่านใหม่
+6. กด "เปลี่ยนรหัสผ่าน"
+
+---
+
+## การติดตั้งในองค์กร
+
+### ตัวเลือก 1: รันบนเครื่องเดียว (LAN)
+1. ติดตั้ง Node.js 18 บนเครื่อง server
+2. copy โปรเจกต์ไป
+3. รัน `npm install` + `node src/init-db.cjs`
+4. แก้ CORS ให้รับทุก IP:
+   ```
+   # backend/.env
+   CORS_ORIGIN=*
+   ```
+5. รัน backend: `npm start`
+6. build frontend: `cd frontend && npm run build`
+7. เปิด browser เข้า `http://IPเครื่อง:5000`
+
+### ตัวเลือก 2: Docker
+1. ติดตั้ง Docker Desktop
+2. copy โปรเจกต์ไป
+3. รัน `docker compose up -d --build`
+4. เปิด `http://IPเครื่อง:3000`
+
+### Backup
 ```bash
-# สำหรับ Backend
-cd backend
-npm run dev  # เรียกใช้ Nodemon สำหรับ Auto Reload
+# ข้อมูลทั้งหมดอยู่ในไฟล์เดียว
+cp backend/solar_dashboard.db backup_$(date +%Y%m%d).db
+```
 
-# สำหรับ Frontend
-cd frontend
-npm start    # เรียกใช้ Dev Server
+### Restore
+```bash
+cp backup_20260101.db backend/solar_dashboard.db
 ```
 
 ---
 
-## 📞 ติดต่อและสนับสนุน
+## การอัปเดตแอป
 
-หากมีปัญหา โปรดตรวจสอบ:
-1. ✅ ว่า Node.js และ PostgreSQL ถูกติดตั้งแล้ว
-2. ✅ ว่า `.env` ถูกตั้งค่าอย่างถูกต้อง
-3. ✅ ว่า Database ถูกสร้างและมีข้อมูลแล้ว
-4. ✅ Log ของ Console สำหรับข้อความ Error
+```bash
+# 1. Backup database
+cp backend/solar_dashboard.db backup.db
+
+# 2. ดึงโค้ดใหม่
+git pull
+
+# 3. ลง dependencies
+cd backend && npm install
+cd ../frontend && npm install
+
+# 4. รัน init-db (ถ้ามีตารางใหม่)
+cd ../backend && node src/init-db.cjs
+
+# 5. รันใหม่
+npm run dev
+```
+
+> ข้อมูลเดิมไม่หาย (CREATE TABLE IF NOT EXISTS + INSERT OR IGNORE)
 
 ---
 
-**✅ ทำเสร็จแล้ว! ลองนำไปใช้งานกันเลยครับ** 🎉
+## แก้ปัญหาเบื้องต้น
+
+| ปัญหา | วิธีแก้ |
+|-------|---------|
+| เปิดหน้าเว็บไม่ได้ | ตรวจสอบ backend รันอยู่หรือไม่ |
+| Login ไม่ได้ | ตรวจสอบ username/password (admin/admin) |
+| CORS error | แก้ `CORS_ORIGIN` ใน `backend/.env` |
+| Upload ไฟล์ไม่ได้ | ตรวจสอบขนาดไฟล์ (สูงสุด 50MB) |
+| Token หมดอายุ | Login ใหม่ |
+| ข้อมูลหาย | ตรวจสอบ `solar_dashboard.db` ยังอยู่หรือไม่ |
+| Port ถูกใช้ | เปลี่ยน `PORT` ใน `.env` |
+
+---
+
+## ติดต่อและสนับสนุน
+
+อ่านเอกสารเพิ่มเติม:
+- [README.md](README.md) - ภาพรวมโปรเจกต์
+- [INSTALLATION.md](INSTALLATION.md) - คู่มือติดตั้ง
+- [DEVELOPMENT.md](DEVELOPMENT.md) - คู่มือพัฒนา

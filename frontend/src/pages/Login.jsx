@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap } from 'lucide-react';
-import { authAPI, setAuthToken } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
+  const { login } = useAuth();
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -20,9 +21,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await authAPI.login(credentials.username, credentials.password);
-      setAuthToken(response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      await login(credentials.username, credentials.password);
       navigate('/');
     } catch (err) {
       setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
@@ -92,9 +91,13 @@ export default function Login() {
 
           {/* Demo info */}
           <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-800">
-              <strong>ทดลองใช้:</strong> username: admin | password: admin
-            </p>
+            <p className="text-sm text-blue-800 font-semibold mb-2">ทดลองใช้ (รหัสผ่าน = ชื่อผู้ใช้):</p>
+            <div className="text-xs text-blue-700 space-y-1">
+              <p><strong>admin</strong> — ผู้ดูแลระบบ (สิทธิ์เต็ม)</p>
+              <p><strong>engineer</strong> — วิศวกร (จัดการโครงการ/งาน)</p>
+              <p><strong>staff</strong> — เจ้าหน้าที่ (ดู/สร้างโครงการ)</p>
+              <p><strong>client</strong> — ลูกค้า (ดูรายงาน)</p>
+            </div>
           </div>
         </div>
       </div>

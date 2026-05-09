@@ -7,11 +7,13 @@ import { reportsAPI } from '../utils/api';
 const STATUS_COLORS = {
   completed: '#34c759',
   in_progress: '#3b82f6',
-  pending: '#f59e0b',
-  blocked: '#ef4444'
+  not_started: '#94a3b8',
+  waiting: '#a855f7',
+  blocked: '#ef4444',
+  rejected: '#f97316',
 };
 
-const piePalette = ['#34c759', '#3b82f6', '#f59e0b', '#ef4444', '#cbd5e1'];
+const piePalette = ['#34c759', '#3b82f6', '#94a3b8', '#a855f7', '#ef4444', '#f97316'];
 
 // รับ props:
 // - refreshKey: เมื่อค่าเปลี่ยน (จาก Dashboard) จะดึงข้อมูล Pipeline ใหม่ทันที
@@ -31,30 +33,40 @@ export default function Pipeline({ refreshKey = 0 }) {
         reportsAPI.getSummaryByStatus()
       ]);
 
+      // Handle response ที่อาจเป็น array ตรงๆ หรือถูก wrap ใน { data: [...] }
+      const stepStatusData = Array.isArray(stepStatusResponse)
+        ? stepStatusResponse
+        : (stepStatusResponse?.data || []);
+      const statusData = Array.isArray(statusResponse)
+        ? statusResponse
+        : (statusResponse?.data || []);
+
       // สร้าง stats object จาก API response
       const stats = {};
       STEP_ORDER.forEach((step) => {
         stats[step] = {
           count: 0,
-          statuses: { completed: 0, in_progress: 0, pending: 0, blocked: 0 }
+          statuses: { completed: 0, in_progress: 0, not_started: 0, waiting: 0, blocked: 0, rejected: 0 }
         };
       });
 
-      (stepStatusResponse || []).forEach((row) => {
+      stepStatusData.forEach((row) => {
         if (!stats[row.step]) return;
         stats[row.step] = {
           count: Number(row.count) || 0,
           statuses: {
             completed: Number(row.completed) || 0,
             in_progress: Number(row.in_progress) || 0,
-            pending: Number(row.pending) || 0,
+            not_started: Number(row.not_started) || 0,
+            waiting: Number(row.waiting) || 0,
             blocked: Number(row.blocked) || 0,
+            rejected: Number(row.rejected) || 0,
           }
         };
       });
 
       setStepStats(stats);
-      setStatusSummary(statusResponse || []);
+      setStatusSummary(statusData);
     } catch (error) {
       console.error('Failed to load pipeline data:', error);
     }
@@ -75,24 +87,24 @@ export default function Pipeline({ refreshKey = 0 }) {
   }, [statusSummary, totalProjects]);
 
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[2fr_1.3fr]">
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[2.5fr_1fr]">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-6">
           <h2 className="text-xl font-bold text-slate-900">สถานะตามขั้นตอน (Pipeline)</h2>
           <p className="mt-1 text-sm text-slate-500">แสดงโครงการตามขั้นตอนปัจจุบันใน workflow</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
-          {STEP_ORDER.slice(0, 4).map((step, index) => {
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+          {STEP_ORDER.map((step, index) => {
             const stepData = stepStats[step] || {
               count: 0,
-              statuses: { completed: 0, in_progress: 0, pending: 0, blocked: 0 }
+              statuses: { completed: 0, in_progress: 0, not_started: 0, waiting: 0, blocked: 0, rejected: 0 }
             };
 
             return (
-              <div key={step} className="relative rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+              <div key={step} className="relative rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                <div className="mb-3 flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
                     {index + 1}
                   </div>
                   <div>

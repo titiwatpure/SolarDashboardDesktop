@@ -1,13 +1,40 @@
-const jwt = require('jsonwebtoken'); // ใช้สำหรับสร้างและตรวจสอบ JWT Token
+const jwt = require('jsonwebtoken');
 
-// บังคับตั้งค่า JWT_SECRET — ไม่ใช้ fallback เพื่อความปลอดภัย
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error('FATAL: JWT_SECRET is not set. Add it to .env file.');
   process.exit(1);
 }
 
-// ฟังก์ชันตรวจสอบว่าผู้ใช้มี Token ที่ถูกต้องก่อนเข้าถึง API
+// Role-Permission Matrix
+const PERMISSIONS = {
+  admin: [
+    'project.create', 'project.update.own', 'project.update.all', 'project.delete',
+    'task.create', 'task.assign', 'task.delete',
+    'document.upload', 'document.delete',
+    'checkpoint.approve',
+    'report.view', 'report.export',
+    'user.manage', 'org.manage', 'audit.view',
+    'approval.manage',
+  ],
+  engineer: [
+    'project.create', 'project.update.own',
+    'task.create', 'task.assign',
+    'document.upload',
+    'checkpoint.approve',
+    'report.view', 'report.export',
+  ],
+  staff: [
+    'project.create',
+    'task.create',
+    'document.upload',
+    'report.view', 'report.export',
+  ],
+  client: [
+    'report.view',
+  ],
+};
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -25,20 +52,40 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// ฟังก์ชันตรวจสอบสิทธิ์ตาม Role ของผู้ใช้
-// ใช้ต่อจาก authenticateToken เพื่อกำหนดว่า Role ไหนเข้าถึงได้
-// ตัวอย่างการใช้: authorizeRole(['admin']) หมายความว่า เฉพาะ admin เท่านั้น
+// Legacy role check (backward compatible)
 const authorizeRole = (allowedRoles) => {
   return (req, res, next) => {
     if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึง' }); // ถ้า Role ไม่ตรง ให้ตอบ 403 Forbidden
+      return res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึง' });
     }
-    next(); // ผ่านไปยัง route ถัดไปได้
+    next();
   };
+};
+
+// Permission-based authorization
+const authorizePermission = (...requiredPermissions) => {
+  return (req, res, next) => {
+    const userRole = req.user.role;
+    const userPermissions = PERMISSIONS[userRole] || [];
+
+    const hasPermission = requiredPermissions.every(p => userPermissions.includes(p));
+    if (!hasPermission) {
+      return res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึง', required: requiredPermissions });
+    }
+    next();
+  };
+};
+
+// Check if user has a specific permission (non-middleware helper)
+const hasPermission = (role, permission) => {
+  return (PERMISSIONS[role] || []).includes(permission);
 };
 
 module.exports = {
   JWT_SECRET,
+  PERMISSIONS,
   authenticateToken,
-  authorizeRole
+  authorizeRole,
+  authorizePermission,
+  hasPermission,
 };

@@ -3,342 +3,218 @@
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Frontend (React)                          │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Pages:                                               │   │
-│  │  - Dashboard (KPI, Pipeline, Projects Table)          │   │
-│  │  - Projects (CRUD operations)                         │   │
-│  │  - Organizations                                      │   │
-│  │  - Documents                                          │   │
-│  │  - Reports                                            │   │
-│  │  - Users                                              │   │
-│  │  - Settings                                           │   │
-│  │  - Steps/Pipeline                                     │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-                  (REST API via Axios)
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    Backend (Express.js)                       │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Routes:                                              │   │
-│  │  - /api/auth (login, register)                        │   │
-│  │  - /api/projects (CRUD + KPI + stats)                 │   │
-│  │  - /api/users (manage users)                          │   │
-│  │  - /api/documents (manage files)                      │   │
-│  │  - /api/organizations (manage orgs)                   │   │
-│  │  - /api/reports (analytics)                           │   │
-│  │                                                        │   │
-│  │  Middleware:                                          │   │
-│  │  - Authentication (JWT)                               │   │
-│  │  - Authorization (Role-based)                         │   │
-│  │  - Error handling                                     │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                   PostgreSQL Database                        │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Tables:                                              │   │
-│  │  - users                                              │   │
-│  │  - projects                                           │   │
-│  │  - project_steps                                      │   │
-│  │  - organizations                                      │   │
-│  │  - documents                                          │   │
-│  │  - project_organizations                              │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+Frontend (React 18 + Tailwind)
+    |
+    | REST API (Axios)
+    v
+Backend (Express.js + SQLite)
+    |
+    v
+solar_dashboard.db (file-based)
 ```
 
 ## Code Structure
 
-### Frontend Structure
+### Frontend
 ```
-frontend/
-├── public/
-│   └── index.html           # HTML main file
-├── src/
-│   ├── pages/               # Page components
-│   │   ├── Dashboard.jsx
-│   │   ├── Projects.jsx
-│   │   ├── Organizations.jsx
-│   │   ├── Documents.jsx
-│   │   ├── Reports.jsx
-│   │   ├── Users.jsx
-│   │   ├── Settings.jsx
-│   │   ├── Steps.jsx
-│   │   └── Login.jsx
-│   ├── components/          # Reusable components
-│   │   ├── Header.jsx
-│   │   ├── Sidebar.jsx
-│   │   ├── KPICards.jsx
-│   │   ├── Pipeline.jsx
-│   │   ├── ProjectsTable.jsx
-│   │   ├── FilterPanel.jsx
-│   │   └── ProjectModal.jsx
-│   ├── utils/               # Utility functions
-│   │   ├── api.js          # API calls
-│   │   └── constants.js    # Constants and labels
-│   ├── styles/              # CSS files
-│   │   └── index.css
-│   ├── App.jsx             # Main app component
-│   └── index.js            # Entry point
-├── package.json
-├── tailwind.config.js
-└── postcss.config.js
+frontend/src/
+├── context/
+│   └── AuthContext.jsx      # Global auth state (useAuth hook)
+├── components/
+│   ├── Header.jsx           # Top header + notification badge
+│   ├── Sidebar.jsx          # Navigation sidebar (dark theme)
+│   ├── KPICards.jsx         # Dashboard KPI cards
+│   ├── Pipeline.jsx         # Step pipeline + pie chart
+│   ├── ProjectsTable.jsx    # Paginated project list
+│   ├── ProjectModal.jsx     # Create/edit project form
+│   ├── StatusModal.jsx      # Update project step/status
+│   └── ErrorBoundary        # Inline in App.jsx (crash recovery)
+├── pages/
+│   ├── Login.jsx            # Login page
+│   ├── Dashboard.jsx        # Main dashboard
+│   ├── Projects.jsx         # Projects list
+│   ├── ProjectDetail.jsx    # Single project detail
+│   ├── Organizations.jsx    # Organization CRUD
+│   ├── Documents.jsx        # Document upload/management
+│   ├── Reports.jsx          # Charts + Excel/PDF export
+│   ├── Users.jsx            # User management (Admin)
+│   ├── Steps.jsx            # Workflow visualization
+│   └── Settings.jsx         # Profile + password change
+├── utils/
+│   ├── api.js               # Axios wrapper + API clients
+│   └── constants.js         # Labels, provinces, enums
+├── styles/
+│   └── index.css            # Tailwind imports
+├── App.jsx                  # Router + AuthProvider
+└── index.js                 # Entry point
 ```
 
-### Backend Structure
+### Backend
 ```
 backend/
 ├── src/
-│   ├── routes/              # API route handlers
-│   │   ├── auth.js
-│   │   ├── projects.js
-│   │   ├── users.js
-│   │   ├── documents.js
-│   │   ├── organizations.js
-│   │   └── reports.js
-│   ├── models/              # Data models & database
-│   │   └── database-schema.sql
-│   ├── middleware/          # Middleware functions
-│   │   └── auth.js
-│   ├── controllers/         # Business logic (future use)
-│   ├── database.js         # Database connection
-│   └── index.js            # Server entry point
-├── package.json
-└── .env.example
+│   ├── routes/
+│   │   ├── auth.js          # Login + Register + Refresh Token
+│   │   ├── projects.js      # Projects CRUD + KPI + Timeline
+│   │   ├── users.js         # Users CRUD + Change Password
+│   │   ├── documents.js     # Documents + File Upload (multer)
+│   │   ├── organizations.js # Organizations CRUD
+│   │   ├── reports.js       # Aggregation reports
+│   │   ├── tasks.js         # Task management
+│   │   ├── notifications.js # Notification system
+│   │   └── activity_logs.js # Audit logging
+│   ├── middleware/
+│   │   └── auth.js          # JWT authenticateToken + authorizeRole
+│   ├── models/
+│   │   ├── database-schema.sql  # Schema reference (SQLite)
+│   │   └── seed-data.sql        # Seed organizations
+│   ├── database.js          # SQLite connection + pool.query()
+│   ├── init-db.cjs          # DB init + seed script
+│   └── index.js             # Express server entry
+├── uploads/                 # Uploaded files (auto-created)
+├── __tests__/               # Jest + Supertest tests
+│   ├── health.test.js
+│   ├── auth.test.js
+│   ├── projects.test.js
+│   └── organizations.test.js
+├── Dockerfile
+└── package.json
 ```
 
 ## Key Features Implementation
 
 ### 1. Authentication System
-```javascript
-// JWT Token Flow:
-// 1. User login with credentials
-// 2. Backend validates and generates JWT
-// 3. Frontend stores token in localStorage
-// 4. Token sent with every API request in Authorization header
-// 5. Backend verifies token before processing request
+```
+Login Flow:
+1. POST /api/auth/login { username, password }
+2. Backend validates -> bcrypt compare -> generate JWT (15min) + refresh token (30 days)
+3. Frontend stores tokens
+4. Every request: Authorization: Bearer <accessToken>
+5. On 401: use refresh token to get new access token
+6. On logout: invalidate refresh token
 ```
 
-### 2. Project Status Logic
-```javascript
-// Automatic status determination:
-const determineStatus = (project) => {
-  if (project.current_step === 'cod' && project.actual_cod_date) {
-    return 'completed';
-  }
-  
-  const daysSinceUpdate = (Date.now() - project.updated_at) / (1000 * 60 * 60 * 24);
-  if (daysSinceUpdate > 14) {
-    return 'blocked';
-  }
-  
-  return project.status;
-};
+### 2. File Upload (multer)
+```
+POST /api/documents
+Content-Type: multipart/form-data
+
+Fields: file, project_id, document_name, document_type, description
+
+- Files stored in backend/uploads/{project_id}/
+- Max size: 50MB
+- Allowed: PDF, Word, Excel, PowerPoint, images, ZIP
+- Download: GET /api/documents/download/:id
 ```
 
-### 3. Permit Type Determination
-```javascript
-// Based on size and power selling:
-const determinePermitType = (sizeKva, hasPowerSelling) => {
-  if (hasPowerSelling || sizeKva > 1000) {
-    return 'permit';        // ขอใบอนุญาต
-  }
-  return 'exemption';       // แจ้งยกเว้น
-};
+### 3. Notification System
+```
+- Auto-created on: project status change, task assignment
+- Header polls GET /api/notifications/unread-count every 30s
+- Badge shows unread count (hides when 0)
+- Mark as read: PUT /api/notifications/:id/read
 ```
 
-### 4. Role-Based Access Control
+### 4. Global State (AuthContext)
 ```javascript
-// Admin can:
-// - View all projects
-// - Edit all projects
-// - Manage users
-// - Manage organizations
-// - Generate reports
-
-// Engineer can:
-// - View projects
-// - Edit assigned projects
-// - Upload documents
-// - View reports
+const { user, login, logout, changePassword, isAdmin } = useAuth();
 ```
 
-## Database Design
+### 5. Refresh Token
+```
+- Access token: 15 minutes
+- Refresh token: 30 days (stored in DB)
+- Token rotation: old refresh token invalidated on use
+- Auto-cleanup of expired tokens
+```
 
-### Key Tables
+## Database Schema
 
-**users**
-- id (UUID, PK)
-- username (VARCHAR, UNIQUE)
-- email (VARCHAR, UNIQUE)
-- password (VARCHAR, hashed)
-- full_name (VARCHAR)
-- role (VARCHAR) - 'admin' or 'engineer'
-- status (VARCHAR) - 'active' or 'inactive'
+### Tables (12)
+- `users` - System users (admin/engineer)
+- `projects` - Solar installation projects
+- `organizations` - Government/utility entities
+- `project_steps` - Individual step tracking
+- `documents` - Document metadata
+- `project_organizations` - Many-to-many links
+- `project_timeline` - Step/status change history
+- `reports` - Saved reports
+- `activity_logs` - System audit log
+- `tasks` - Per-project tasks
+- `notifications` - In-app notifications
+- `refresh_tokens` - JWT refresh tokens
 
-**projects**
-- id (UUID, PK)
-- project_name (VARCHAR)
-- project_code (VARCHAR, UNIQUE)
-- size_kw (DECIMAL)
-- size_kva (DECIMAL)
-- province (VARCHAR)
-- status (VARCHAR) - 'pending', 'in_progress', 'blocked', 'completed'
-- current_step (VARCHAR) - 'survey', 'design', 'erc', 'grid', 'construction', 'testing', 'cod'
-- has_power_selling (BOOLEAN)
-- permit_type (VARCHAR) - 'exemption' or 'permit'
-
-**organizations**
-- id (UUID, PK)
-- org_name (VARCHAR, UNIQUE)
-- org_type (VARCHAR) - organization type
-- status (VARCHAR)
-
-**documents**
-- id (UUID, PK)
-- project_id (UUID, FK)
-- document_name (VARCHAR)
-- document_type (VARCHAR) - 'sld', 'permit', 'test_report', etc
-- file_path (VARCHAR)
+### Indexes (18+)
+Covering all foreign keys and frequently queried columns.
 
 ## API Response Format
 
-### Success Response
+### Success
 ```json
 {
-  "data": {},
+  "data": [],
   "pagination": {
     "page": 1,
-    "limit": 10,
+    "limit": 20,
     "total": 100,
-    "pages": 10
+    "pages": 5
   }
 }
 ```
 
-### Error Response
+### Error
 ```json
 {
-  "error": "Error message",
-  "message": "Detailed error message"
+  "error": "ข้อความ error ภาษาไทย"
 }
 ```
 
 ## Testing
 
-### Unit Tests (Future)
 ```bash
-npm test
+cd backend
+npm test                    # Run all tests
+npm run test:watch          # Watch mode
 ```
 
-### API Testing with Postman
-- Import API collection
-- Set environment variables
-- Run tests
-
-## Performance Optimization
-
-### Frontend
-- Implement React.memo for components
-- Use useCallback for functions
-- Implement lazy loading
-- Code split with React.lazy()
-
-### Backend
-- Add database indexes on frequently queried columns
-- Implement caching with Redis
-- Use connection pooling
-- Optimize queries
-
-## Security Best Practices
-
-1. **Input Validation**
-   - Validate all user inputs
-   - Sanitize file uploads
-
-2. **SQL Injection Prevention**
-   - Use parameterized queries (already implemented)
-
-3. **XSS Prevention**
-   - Escape user input
-   - Use Content Security Policy
-
-4. **CSRF Protection**
-   - Implement CSRF tokens
-
-5. **Authentication**
-   - Use JWT with expiration
-   - Store secure tokens only
-
-6. **Authorization**
-   - Implement role-based access control
-   - Check permissions on backend
+Tests use Jest + Supertest against the real SQLite database.
 
 ## Adding New Features
 
-### Example: Adding a new page
+### New Page
+1. Create `frontend/src/pages/NewPage.jsx`
+2. Add route in `App.jsx`: `<Route path="/new" element={<NewPage />} />`
+3. Add menu item in `Sidebar.jsx`
 
-1. **Create page component**
-   ```javascript
-   // frontend/src/pages/NewPage.jsx
-   export default function NewPage() {
-     return <div>New Page</div>;
-   }
-   ```
+### New API Endpoint
+1. Create `backend/src/routes/newfeature.js`
+2. Register in `backend/src/index.js`: `app.use('/api/newfeature', require('./routes/newfeature'))`
+3. Add client in `frontend/src/utils/api.js`
 
-2. **Add route to Sidebar**
-   ```javascript
-   // frontend/src/components/Sidebar.jsx
-   const menuItems = [
-     // ...
-     { id: 'new', label: 'New Page', icon: Icon, path: '/new' },
-   ];
-   ```
+### New Context
+1. Create `frontend/src/context/NewContext.jsx`
+2. Wrap in `App.jsx` with `<NewProvider>`
 
-3. **Add API endpoint**
-   ```javascript
-   // backend/src/routes/newfeature.js
-   router.get('/', authenticateToken, async (req, res) => {
-     // Handle request
-   });
-   ```
+## Security
 
-4. **Create API call in frontend**
-   ```javascript
-   // frontend/src/utils/api.js
-   export const newFeatureAPI = {
-     getAll: () => apiCall('GET', '/newfeature'),
-   };
-   ```
+- JWT HS256, access token 15min, refresh token 30 days
+- bcrypt 12 rounds
+- Rate limiting: 200 req/min general, 20 req/15min login
+- Helmet security headers
+- CORS restricted to configured origin
+- Parameterized SQL queries (no injection)
+- File upload: type filter + size limit (50MB)
+- Role-based access: admin (full), engineer (read + create/update)
 
-## Debugging Tips
+## Debugging
 
 ### Frontend
-- Use React DevTools browser extension
-- Check Network tab in Developer Tools
-- Use console.log() for debugging
+- React DevTools browser extension
+- Network tab for API calls
 - Check localStorage for tokens
 
 ### Backend
-- Use `console.log()` for logging
+- `console.log()` for logging
 - Check error stack traces
-- Use Postman for API testing
-- Monitor database with psql
-
-## Common Issues & Solutions
-
-| Issue | Solution |
-|-------|----------|
-| Token expired | Re-login or refresh token |
-| CORS error | Check CORS_ORIGIN in .env |
-| Database connection failed | Check DB credentials and connection |
-| Port already in use | Kill process or use different port |
-
----
-
-**Happy Coding! 🚀**
+- Use Postman or curl for API testing
+- SQLite browser for database inspection
