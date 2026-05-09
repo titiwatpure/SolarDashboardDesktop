@@ -139,7 +139,7 @@ Dashboard/
 
 ### Backend
 - Node.js + Express.js
-- PostgreSQL Database
+- SQLite3 Database
 - JWT Authentication
 - CORS enabled
 

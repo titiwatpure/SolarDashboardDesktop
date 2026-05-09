@@ -1,199 +1,117 @@
-# Solar Dashboard - Installation & Setup Guide
+# Solar Dashboard - คู่มือการติดตั้ง
 
-## ข้อกำหนดระบบ (System Requirements)
+## ข้อกำหนดระบบ
 
 - Node.js >= 16.0.0
-- npm >= 8.0.0 หรือ yarn
-- PostgreSQL >= 12.0
+- npm >= 8.0.0
 - Git
 
-## ขั้นตอนการติดตั้ง (Installation Steps)
+> ✅ **ระบบนี้ใช้ SQLite** เป็นฐานข้อมูล ไม่ต้องติดตั้ง PostgreSQL
 
-### 1. Database Setup
+---
+
+## ขั้นตอนการติดตั้ง
+
+### 1. ติดตั้ง Backend
 
 ```bash
-# สร้าง database
-createdb solar_dashboard
-
-# หรือใช้ psql
-psql -U postgres
-CREATE DATABASE solar_dashboard;
-\q
-
-# Import schema
-psql -U postgres -d solar_dashboard -f backend/src/models/database-schema.sql
-
-# (Optional) เพิ่มข้อมูลตัวอย่าง
-psql -U postgres -d solar_dashboard -f backend/src/models/seed-data.sql
+cd backend
+npm install
 ```
 
-### 2. Backend Setup
+สร้างไฟล์ `.env` ในโฟลเดอร์ `backend/`:
+
+```env
+PORT=5000
+NODE_ENV=development
+JWT_SECRET=your_secret_key_here
+JWT_EXPIRATION=7d
+CORS_ORIGIN=http://localhost:3000
+```
+
+สร้างฐานข้อมูลและ seed ข้อมูลตัวอย่าง:
 
 ```bash
-# เข้าไปในโฟลเดอร์ backend
-cd backend
+node src/init-db.cjs
+```
 
-# ติดตั้ง dependencies
-npm install
+รัน Backend:
 
-# สร้างไฟล์ .env
-cp .env.example .env
-
-# แก้ไข .env ตามสภาพแวดล้อม
-# DB_HOST=localhost
-# DB_USER=postgres
-# DB_PASSWORD=your_password
-# DB_NAME=solar_dashboard
-
-# รันเซิร์ฟเวอร์
+```bash
 npm run dev
 # Server จะเริ่มที่ http://localhost:5000
 ```
 
-### 3. Frontend Setup
+### 2. ติดตั้ง Frontend
 
 ```bash
-# เข้าไปในโฟลเดอร์ frontend
 cd frontend
-
-# ติดตั้ง dependencies
 npm install
-
-# สร้างไฟล์ .env
-cp .env.example .env
-
-# รัน development server
 npm start
 # Application จะเปิดที่ http://localhost:3000
 ```
 
-## ข้อมูลเข้าสู่ระบบทดลอง (Demo Credentials)
+---
+
+## ข้อมูลเข้าสู่ระบบทดลอง
 
 ```
 Username: admin
 Password: admin
-Role: Admin
 ```
 
-## การสร้างผู้ใช้ใหม่ (Create New User)
+---
 
-### ผ่าน API
-```bash
-curl -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "engineer1",
-    "email": "engineer@example.com",
-    "password": "password123",
-    "full_name": "John Engineer",
-    "role": "engineer"
-  }'
-```
+## ตั้งค่า Environment Variables
 
-### ผ่าน Database
-```sql
--- Insert user directly (password must be hashed)
-INSERT INTO users (id, username, email, password, full_name, role)
-VALUES (gen_random_uuid(), 'engineer1', 'engineer@example.com', '$2b$10$...hashed_password...', 'John Engineer', 'engineer');
-```
-
-## ปัญหาทั่วไป (Troubleshooting)
-
-### ✗ Connection refused to PostgreSQL
-**วิธีแก้:**
-```bash
-# ตรวจสอบว่า PostgreSQL ทำงานอยู่
-psql -U postgres -d postgres -c "SELECT 1;"
-
-# หรือเริ่ม PostgreSQL service
-# macOS
-brew services start postgresql
-
-# Ubuntu
-sudo systemctl start postgresql
-
-# Windows
-# ใช้ Services app เพื่อเริ่ม PostgreSQL
-```
-
-### ✗ Port 5000 already in use
-**วิธีแก้:**
-```bash
-# ค้นหา process ที่ใช้ port
-lsof -i :5000
-
-# หรือใช้ port อื่น
-PORT=5001 npm run dev
-```
-
-### ✗ npm modules not found
-**วิธีแก้:**
-```bash
-# ลบ node_modules และ lock file
-rm -rf node_modules package-lock.json
-
-# ติดตั้งใหม่
-npm install
-```
-
-### ✗ CORS error
-**วิธีแก้:**
-```bash
-# แก้ไขไฟล์ backend/src/index.js
-# ตรวจสอบ CORS_ORIGIN ใน .env
+### Backend (`backend/.env`)
+```env
+PORT=5000
+NODE_ENV=development
+JWT_SECRET=เปลี่ยนเป็นค่าที่ปลอดภัย
+JWT_EXPIRATION=7d
 CORS_ORIGIN=http://localhost:3000
 ```
 
-## การพัฒนา (Development)
+### Frontend (`frontend/.env`) — ถ้ามี
+```env
+REACT_APP_API_URL=http://localhost:5000/api
+```
 
-### เริ่มทำงาน (Running in Development)
+---
 
-**Terminal 1 - Backend:**
+## ฐานข้อมูล SQLite
+
+ไฟล์ฐานข้อมูลจะถูกสร้างที่ `backend/solar_dashboard.db` อัตโนมัติเมื่อรัน `init-db.cjs`
+
+### สร้างฐานข้อมูลใหม่
 ```bash
 cd backend
-npm run dev
+node src/init-db.cjs
 ```
 
-**Terminal 2 - Frontend:**
+### เพิ่มตารางใหม่
+แก้ไขไฟล์ `backend/src/init-db.cjs` ในส่วน `const tables = [...]`
+แล้วรัน `node src/init-db.cjs` อีกครั้ง
+
+---
+
+## การสร้างผู้ใช้ใหม่
+
+### ผ่าน API (ต้อง Login เป็น Admin ก่อน)
 ```bash
-cd frontend
-npm start
+curl -X POST http://localhost:5000/api/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"username":"engineer1","email":"eng@example.com","password":"pass123","role":"engineer"}'
 ```
 
-### Build for Production
+### ผ่านหน้า Users ในระบบ
+เข้าเมนู **ผู้ใช้งาน** → กดปุ่ม **เพิ่มผู้ใช้**
 
-**Backend:**
-```bash
-cd backend
-# Build ตามที่ต้องการ หรือใช้เป็น Node.js app โดยตรง
-```
+---
 
-**Frontend:**
-```bash
-cd frontend
-npm run build
-# สร้างไฟล์ใน build/ folder
-```
-
-## Database Migrations
-
-### การเพิ่มตารางใหม่
-```bash
-# แก้ไข backend/src/models/database-schema.sql
-# รันคำสั่ง
-psql -U postgres -d solar_dashboard -c "CREATE TABLE ...;"
-```
-
-### การเปลี่ยนแปลงโครงสร้าง
-```bash
-# สร้างไฟล์ migration ใหม่
-# หรือ execute SQL directly
-psql -U postgres -d solar_dashboard -f migration-file.sql
-```
-
-## API Testing
-
-### ใช้ Postman หรือ curl
+## ทดสอบ API
 
 ```bash
 # Login
@@ -201,93 +119,60 @@ curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}'
 
-# Get Projects (ต้องส่ง token)
+# ดึงรายชื่อโครงการ (ต้องส่ง token)
 curl -X GET http://localhost:5000/api/projects \
   -H "Authorization: Bearer YOUR_TOKEN"
+
+# Health Check
+curl http://localhost:5000/api/health
 ```
-
-## ตั้งค่า Environment Variables
-
-### Backend (.env)
-```
-# Server
-PORT=5000
-NODE_ENV=development
-
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=solar_dashboard
-DB_USER=postgres
-DB_PASSWORD=password
-
-# JWT
-JWT_SECRET=your_secret_key_here
-JWT_EXPIRATION=7d
-
-# CORS
-CORS_ORIGIN=http://localhost:3000
-```
-
-### Frontend (.env)
-```
-REACT_APP_API_URL=http://localhost:5000/api
-```
-
-## Performance Tips
-
-### Backend
-- ใช้ connection pooling
-- Add database indexes
-- Cache frequently accessed data
-
-### Frontend
-- Lazy load components
-- Optimize images
-- Code splitting with React.lazy()
-
-## Security Considerations
-
-1. **Never commit .env files** - ใช้ .env.example
-2. **Use HTTPS in production**
-3. **Validate input** - ทั้ง frontend และ backend
-4. **Sanitize output** - ป้องกัน XSS
-5. **SQL injection protection** - ใช้ parameterized queries
-6. **Rate limiting** - ระบุการร้องขอมากเกินไป
-7. **CSRF protection** - ใช้ tokens
-
-## Deployment
-
-### Deploy to Heroku
-
-```bash
-# Backend
-heroku login
-heroku create your-app-name-api
-git push heroku main
-
-# Frontend
-npm run build
-# Deploy build/ folder to Netlify หรือ Vercel
-```
-
-### Deploy to AWS/Azure
-ดูรายละเอียดในเอกสารของแต่ละ platform
-
-## Monitoring & Logging
-
-```javascript
-// ตัวอย่างการ log
-console.log('User logged in:', userId);
-console.error('Database error:', err);
-```
-
-## Support & Documentation
-
-- Database Schema: [backend/src/models/database-schema.sql](backend/src/models/database-schema.sql)
-- API Endpoints: [README.md](README.md#-api-endpoints)
-- UI Components: [frontend/src/components/](frontend/src/components/)
 
 ---
 
-**สำหรับข้อมูลเพิ่มเติม ดูไฟล์ README.md หลัก**
+## วิธีรันพร้อมกัน (Development)
+
+**Terminal 1 — Backend:**
+```bash
+cd backend && npm run dev
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend && npm start
+```
+
+---
+
+## Build สำหรับ Production
+
+```bash
+# Frontend
+cd frontend
+npm run build
+# ไฟล์จะอยู่ที่ frontend/build/
+
+# Backend — รันตรงๆ ด้วย Node.js
+cd backend
+npm start
+```
+
+---
+
+## ปัญหาทั่วไป
+
+| ปัญหา | วิธีแก้ |
+|-------|---------|
+| Port 5000 ถูกใช้อยู่ | แก้ `PORT=5001` ใน `.env` |
+| CORS error | ตรวจสอบ `CORS_ORIGIN` ใน `.env` |
+| npm modules not found | ลบ `node_modules` แล้วรัน `npm install` ใหม่ |
+| Token หมดอายุ | Login ใหม่ หรือปรับ `JWT_EXPIRATION` |
+| ฐานข้อมูลว่างเปล่า | รัน `node src/init-db.cjs` ใหม่ |
+
+---
+
+## ความปลอดภัย
+
+1. ❌ **ห้าม** commit ไฟล์ `.env` ขึ้น Git
+2. ✅ เปลี่ยน `JWT_SECRET` ให้เป็นค่าที่ปลอดภัย
+3. ✅ ใช้ HTTPS ใน production
+4. ✅ ระบบใช้ parameterized queries ป้องกัน SQL Injection อยู่แล้ว

@@ -1,15 +1,26 @@
 const express = require('express');
-const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
 const pool = require('../database');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
-const { v4: uuidv4 } = require('uuid');
+const { logActivity } = require('./activity_logs');
 
-// Get all organizations
-router.get('/', authenticateToken, async (req, res) => {
+const router = express.Router();
+
+const getOrganizationById = async (id) => {
+  const result = await pool.query('SELECT * FROM organizations WHERE id = ?', [id]);
+  return result.rows[0] || null;
+};
+
+// GET /api/organizations — ดึงหน่วยงานทั้งหมด (พร้อมจำนวนโครงการ)
+router.get('/', authenticateToken, async (_req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM organizations ORDER BY org_name'
-    );
+    const result = await pool.query(`
+      SELECT o.*, COUNT(po.id) as project_count
+      FROM organizations o
+      LEFT JOIN project_organizations po ON po.org_id = o.id
+      GROUP BY o.id
+      ORDER BY o.org_name
+    `);
     res.json(result.rows);
   } catch (error) {
     console.error(error);
@@ -17,15 +28,15 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Get organization with project status
+// GET /api/organizations/:id/projects — ดึงโครงการที่เกี่ยวข้อง
 router.get('/:id/projects', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT po.*, p.project_name, p.current_step 
+      `SELECT po.*, p.project_name, p.current_step, p.status as project_status
        FROM project_organizations po
        JOIN projects p ON po.project_id = p.id
-       WHERE po.organization_id = $1
-       ORDER BY po.submitted_date DESC`,
+       WHERE po.org_id = ?
+       ORDER BY po.created_at DESC`,
       [req.params.id]
     );
     res.json(result.rows);
@@ -35,23 +46,89 @@ router.get('/:id/projects', authenticateToken, async (req, res) => {
   }
 });
 
-// Create organization (Admin only)
+// POST /api/organizations — สร้างหน่วยงานใหม่ (Admin only)
 router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
     const { org_name, org_type } = req.body;
-    const id = uuidv4();
 
-    const result = await pool.query(
-      'INSERT INTO organizations (id, org_name, org_type) VALUES ($1, $2, $3) RETURNING *',
-      [id, org_name, org_type]
-    );
+    if (!org_name || !org_type) {
+      return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
+    }
 
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error(error);
-    if (error.code === '23505') {
+    const duplicate = await pool.query('SELECT id FROM organizations WHERE org_name = ?', [org_name]);
+    if (duplicate.rows.length > 0) {
       return res.status(400).json({ error: 'ชื่อหน่วยงานมีอยู่แล้ว' });
     }
+
+    const id = uuidv4();
+    await pool.query('INSERT INTO organizations (id, org_name, org_type) VALUES (?, ?, ?)', [id, org_name, org_type]);
+
+    const organization = await getOrganizationById(id);
+    logActivity(req.user.id, 'create', 'organization', id, { org_name, org_type });
+    res.status(201).json(organization);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// PUT /api/organizations/:id — แก้ไขหน่วยงาน (Admin only)
+router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+  try {
+    const { org_name, org_type } = req.body;
+    const { id } = req.params;
+
+    const existing = await getOrganizationById(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'ไม่พบหน่วยงาน' });
+    }
+
+    if (org_name && org_name !== existing.org_name) {
+      const duplicate = await pool.query('SELECT id FROM organizations WHERE org_name = ? AND id != ?', [org_name, id]);
+      if (duplicate.rows.length > 0) {
+        return res.status(400).json({ error: 'ชื่อหน่วยงานมีอยู่แล้ว' });
+      }
+    }
+
+    await pool.query(
+      'UPDATE organizations SET org_name = ?, org_type = ? WHERE id = ?',
+      [org_name ?? existing.org_name, org_type ?? existing.org_type, id]
+    );
+
+    const organization = await getOrganizationById(id);
+    logActivity(req.user.id, 'update', 'organization', id, { org_name, org_type });
+    res.json(organization);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// DELETE /api/organizations/:id — ลบหน่วยงาน (Admin only)
+router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+  try {
+    const existing = await getOrganizationById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: 'ไม่พบหน่วยงาน' });
+    }
+
+    // ตรวจสอบว่ามีโครงการเชื่อมอยู่หรือไม่
+    const linkedProjects = await pool.query(
+      'SELECT COUNT(*) as count FROM project_organizations WHERE org_id = ?',
+      [req.params.id]
+    );
+    const projectCount = parseInt(linkedProjects.rows[0]?.count || '0', 10);
+
+    // ลบการเชื่อมต่อก่อน แล้วค่อยลบหน่วยงาน
+    if (projectCount > 0) {
+      await pool.query('DELETE FROM project_organizations WHERE org_id = ?', [req.params.id]);
+    }
+
+    await pool.query('DELETE FROM organizations WHERE id = ?', [req.params.id]);
+    logActivity(req.user.id, 'delete', 'organization', req.params.id, { org_name: existing.org_name, linked_projects_removed: projectCount });
+    res.json({ message: 'ลบหน่วยงานสำเร็จ', removed_links: projectCount });
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
   }
 });

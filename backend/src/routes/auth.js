@@ -1,11 +1,14 @@
 const express = require('express');
-const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../database');
+const { authenticateToken, authorizeRole, JWT_SECRET } = require('../middleware/auth');
+const { logActivity } = require('./activity_logs');
 
-// Login
+const router = express.Router();
+
+// POST /api/auth/login — เข้าสู่ระบบ
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -15,7 +18,7 @@ router.post('/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1',
+      'SELECT * FROM users WHERE username = ?',
       [username]
     );
 
@@ -31,15 +34,18 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { 
-        id: user.id, 
-        username: user.username, 
+      {
+        id: user.id,
+        username: user.username,
         role: user.role,
-        full_name: user.full_name 
+        full_name: user.full_name
       },
-      process.env.JWT_SECRET || 'secret',
-      { expiresIn: process.env.JWT_EXPIRATION || '7d' }
+      JWT_SECRET,
+      { algorithm: 'HS256', expiresIn: process.env.JWT_EXPIRATION || '24h' }
     );
+
+    const ipAddress = req.ip || req.socket?.remoteAddress;
+    logActivity(user.id, 'login', 'user', user.id, { username: user.username }, ipAddress);
 
     res.json({
       token,
@@ -57,34 +63,50 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Register (Admin only)
-router.post('/register', async (req, res) => {
-  try {
-    const { username, email, password, full_name, role } = req.body;
+// POST /api/auth/register — สร้างผู้ใช้ใหม่ (เฉพาะ Admin)
+router.post(
+  '/register',
+  authenticateToken,
+  authorizeRole(['admin']),
+  async (req, res) => {
+    try {
+      const { username, email, password, full_name, role } = req.body;
 
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
+      if (!username || !email || !password) {
+        return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
+      }
+
+      const validRoles = ['admin', 'engineer'];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ error: 'บทบาทไม่ถูกต้อง' });
+      }
+
+      const existingUser = await pool.query(
+        'SELECT id FROM users WHERE username = ? OR email = ?',
+        [username, email]
+      );
+
+      if (existingUser.rows.length > 0) {
+        return res.status(400).json({ error: 'ชื่อผู้ใช้หรือ email มีอยู่แล้ว' });
+      }
+
+      const id = uuidv4();
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      await pool.query(
+        'INSERT INTO users (id, username, email, password, full_name, role) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, username, email, hashedPassword, full_name || null, role || 'engineer']
+      );
+
+      const ipAddress = req.ip || req.socket?.remoteAddress;
+      logActivity(req.user.id, 'create', 'user', id, { username, role: role || 'engineer' }, ipAddress);
+
+      res.status(201).json({ message: 'สร้างผู้ใช้สำเร็จ', userId: id });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
     }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const id = uuidv4();
-
-    await pool.query(
-      'INSERT INTO users (id, username, email, password, full_name, role) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, username, email, hashedPassword, full_name, role || 'engineer']
-    );
-
-    res.status(201).json({ 
-      message: 'สร้างผู้ใช้สำเร็จ',
-      userId: id 
-    });
-  } catch (error) {
-    console.error(error);
-    if (error.code === '23505') {
-      return res.status(400).json({ error: 'ชื่อผู้ใช้หรือ email มีอยู่แล้ว' });
-    }
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
   }
-});
+);
 
 module.exports = router;

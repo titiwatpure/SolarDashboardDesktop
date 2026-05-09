@@ -22,13 +22,11 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api
  */
 export const setAuthToken = (token) => {
   if (token) {
-    // ถ้ามี token ให้เพิ่มไปในทุกคำขอ
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    localStorage.setItem('token', token);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`; // เพิ่ม Token เข้า header สำหรับทุก request
+    localStorage.setItem('token', token);                                // บันทึก Token ลง localStorage
   } else {
-    // ถ้าไม่มี token ให้ลบออก
-    delete axios.defaults.headers.common['Authorization'];
-    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];               // ลบ Token ออกจาก header
+    localStorage.removeItem('token');                                    // ลบ Token จาก localStorage
   }
 };
 
@@ -54,32 +52,31 @@ const getToken = () => localStorage.getItem('token');
  * const updated = await apiCall('PUT', '/projects/123', { name: 'ชื่อใหม่' });
  */
 export const apiCall = async (method, url, data = null) => {
-  const token = getToken();
+  const token = getToken(); // ดึง Token จาก localStorage
   if (token) {
-    // ตั้งค่า token ในทุกคำขอ
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`; // ตั้งค่า Token ในทุก request
   }
 
   try {
     const config = {
-      method,
-      url: `${API_BASE_URL}${url}`,
+      method,                          // GET, POST, PUT, DELETE
+      url: `${API_BASE_URL}${url}`,   // URL เต็ม (base + path)
     };
 
     if (data) {
-      config.data = data;
+      config.data = data; // ใส่ข้อมูลถ้าเป็น POST/PUT
     }
 
     const response = await axios(config);
-    return response.data;
+    return response.data; // คืนเฉพาะ data
   } catch (error) {
     console.error('❌ API Error:', error);
-    // ถ้าได้รับ 401 Unauthorized ให้ออกจากระบบ
     if (error.response?.status === 401) {
+      // ถ้าได้รับ 401 แสดงว่า Token หมดอายุ ให้ลบ Token แล้วไปหน้า Login
       setAuthToken(null);
       window.location.href = '/login';
     }
-    throw error;
+    throw error; // โยน error ให้ส่วนที่เรียกใช้จัดการต่อ
   }
 };
 
@@ -94,10 +91,15 @@ export const projectsAPI = {
   update: (id, data) => apiCall('PUT', `/projects/${id}`, data),
   delete: (id) => apiCall('DELETE', `/projects/${id}`),
   getKPIs: () => apiCall('GET', '/projects/stats/kpis'),
+  getTimeline: (id) => apiCall('GET', `/projects/${id}/timeline`),
+  deleteTimeline: (projectId, timelineId) => apiCall('DELETE', `/projects/${projectId}/timeline/${timelineId}`),
+  getOrganizations: (id) => apiCall('GET', `/projects/${id}/organizations`),
+  addOrganization: (id, orgId) => apiCall('POST', `/projects/${id}/organizations`, { org_id: orgId }),
+  removeOrganization: (id, orgId) => apiCall('DELETE', `/projects/${id}/organizations/${orgId}`),
 };
 
 export const usersAPI = {
-  getAll: () => apiCall('GET', '/users'),
+  getAll: (params) => apiCall('GET', `/users?${new URLSearchParams(params || {})}`),
   getProfile: () => apiCall('GET', '/users/profile'),
   update: (id, data) => apiCall('PUT', `/users/${id}`, data),
   create: (data) => apiCall('POST', '/users', data),
@@ -105,6 +107,7 @@ export const usersAPI = {
 };
 
 export const documentsAPI = {
+  getAll: (params) => apiCall('GET', `/documents?${new URLSearchParams(params || {})}`),
   getByProject: (projectId) => apiCall('GET', `/documents/project/${projectId}`),
   upload: (data) => apiCall('POST', '/documents', data),
   delete: (id) => apiCall('DELETE', `/documents/${id}`),
@@ -114,6 +117,8 @@ export const organizationsAPI = {
   getAll: () => apiCall('GET', '/organizations'),
   getProjects: (id) => apiCall('GET', `/organizations/${id}/projects`),
   create: (data) => apiCall('POST', '/organizations', data),
+  update: (id, data) => apiCall('PUT', `/organizations/${id}`, data),
+  delete: (id) => apiCall('DELETE', `/organizations/${id}`),
 };
 
 export const reportsAPI = {
@@ -121,4 +126,5 @@ export const reportsAPI = {
   getSummaryBySize: () => apiCall('GET', '/reports/summary/size'),
   getSummaryByProvince: () => apiCall('GET', '/reports/summary/province'),
   getSummaryByStep: () => apiCall('GET', '/reports/summary/step'),
+  getSummaryByStepStatus: () => apiCall('GET', '/reports/summary/step-status'),
 };

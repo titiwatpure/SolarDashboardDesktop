@@ -3,7 +3,7 @@
 
 -- Insert demo organizations
 INSERT INTO organizations (id, org_name, org_type, status) VALUES
-(gen_random_uuid(), 'สำนักกลั่นกำลังไฟฟ้า (กกพ.)', 'erc', 'active'),
+(gen_random_uuid(), 'สำนักกำกับกิจการพลังงาน (กกพ.)', 'erc', 'active'),
 (gen_random_uuid(), 'บริษัท การไฟฟ้าส่วนภูมิภาค (PEA)', 'pea', 'active'),
 (gen_random_uuid(), 'บริษัท การไฟฟ้านครหลวง (MEA)', 'mea', 'active'),
 (gen_random_uuid(), 'องค์การบริหารส่วนตำบล (อบต.)', 'tambon', 'active'),

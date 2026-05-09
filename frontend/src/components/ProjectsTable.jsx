@@ -1,29 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2, Eye } from 'lucide-react';
+import { Edit2, Eye, RefreshCw, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { projectsAPI } from '../utils/api';
-import { STATUS_LABELS, STATUS_COLORS, STEP_LABELS, PROVINCES } from '../utils/constants';
+import { PERMIT_TYPES, STATUS_COLORS, STATUS_LABELS, STEP_LABELS } from '../utils/constants';
+import StatusModal from './StatusModal';
 
-export default function ProjectsTable({ filters }) {
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+const permitClassNames = {
+  exemption: 'bg-emerald-50 text-emerald-700',
+  permit: 'bg-rose-50 text-rose-700'
+};
 
-  useEffect(() => {
-    loadProjects();
-  }, [filters, page]);
+const formatDate = (value) => {
+  if (!value) {
+    return '-';
+  }
 
-  const loadProjects = async () => {
+  return new Date(value).toLocaleDateString('th-TH');
+};
+
+// รับ props:
+// - filters: object ตัวกรองจาก Dashboard (province, status, current_step, search)
+// - refreshKey: เพิ่มค่านี้จากภายนอกเพื่อบังคับให้ตารางโหลดใหม่
+// - onEditProject: callback เมื่อกดปุ่มแก้ไขโครงการ
+// - onStatusUpdated: callback เมื่ออัปเดตสถานะสำเร็จ (ส่งจาก Dashboard)
+export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, onStatusUpdated }) {
+  const navigate = useNavigate();
+  const [projects, setProjects] = useState([]);    // รายการโครงการในหน้าปัจจุบัน
+  const [loading, setLoading] = useState(true);    // สถานะกำลังโหลด
+  const [page, setPage] = useState(1);             // หน้าปัจจุบัน
+  const [totalPages, setTotalPages] = useState(1); // จำนวนหน้าทั้งหมด
+  const [totalItems, setTotalItems] = useState(0); // จำนวนรายการทั้งหมด
+
+  // State สำหรับ StatusModal
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [statusProject, setStatusProject] = useState(null); // โครงการที่กำลังอัปเดต
+
+  // ฟังก์ชันกลางสำหรับโหลดข้อมูล (ใช้ร่วมกันทุกจุด)
+  const fetchProjects = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const params = {
-        page,
-        limit: 10,
-        ...filters,
-      };
-      const data = await projectsAPI.getAll(params);
+      const data = await projectsAPI.getAll({ page, limit: 10, ...filters });
       setProjects(data.data || []);
       setTotalPages(data.pagination?.pages || 1);
+      setTotalItems(data.pagination?.total || 0);
     } catch (error) {
       console.error('Failed to load projects:', error);
     } finally {
@@ -31,65 +50,130 @@ export default function ProjectsTable({ filters }) {
     }
   };
 
+  // เมื่อ filter เปลี่ยน ให้กลับไปหน้าแรกเสมอ
+  useEffect(() => {
+    setPage(1);
+  }, [filters, refreshKey]);
+
+  // โหลดข้อมูลโครงการเมื่อ filter หรือ page เปลี่ยน
+  useEffect(() => {
+    fetchProjects();
+  }, [filters, page, refreshKey]);
+
+  // เปิด StatusModal พร้อมส่งข้อมูลโครงการที่เลือก
+  const handleOpenStatusModal = (project) => {
+    setStatusProject(project);
+    setIsStatusModalOpen(true);
+  };
+
+  // เมื่ออัปเดตสถานะสำเร็จ ให้ปิด Modal → refreshKey จะ trigger useEffect โหลดใหม่เอง
+  const handleStatusUpdated = () => {
+    setIsStatusModalOpen(false);
+    onStatusUpdated?.();
+  };
+
+  // ลบโครงการ - ถามยืนยันก่อนเสมอ
   const handleDelete = async (id) => {
-    if (window.confirm('คุณแน่ใจหรือว่าต้องการลบโครงการนี้?')) {
-      try {
-        await projectsAPI.delete(id);
-        loadProjects();
-      } catch (error) {
-        console.error('Failed to delete project:', error);
-      }
+    if (!window.confirm('คุณแน่ใจหรือว่าต้องการลบโครงการนี้?')) return;
+
+    try {
+      await projectsAPI.delete(id);
+      await fetchProjects();
+    } catch (error) {
+      console.error('Failed to delete project:', error);
     }
   };
 
-  if (loading) {
-    return <div className="text-center py-8">กำลังโหลด...</div>;
-  }
-
   return (
-    <div className="bg-white rounded-lg shadow-card overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+        <table className="min-w-full">
+          <thead className="bg-slate-50 text-sm text-slate-500">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">ชื่อโครงการ</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">ขนาด (kW)</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">จังหวัด</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">สถานะ</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">ขั้นตอน</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">ผู้รับผิดชอบ</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">การดำเนินการ</th>
+              <th className="px-5 py-4 text-left font-semibold">รหัสโครงการ</th>
+              <th className="px-5 py-4 text-left font-semibold">ชื่อโครงการ</th>
+              <th className="px-5 py-4 text-left font-semibold">ประเภทโครงการ</th>
+              <th className="px-5 py-4 text-left font-semibold">ขนาด (kVA)</th>
+              <th className="px-5 py-4 text-left font-semibold">จังหวัด</th>
+              <th className="px-5 py-4 text-left font-semibold">ขั้นตอนปัจจุบัน</th>
+              <th className="px-5 py-4 text-left font-semibold">สถานะ</th>
+              <th className="px-5 py-4 text-left font-semibold">หน่วยงาน</th>
+              <th className="px-5 py-4 text-left font-semibold">ผู้รับผิดชอบ</th>
+              <th className="px-5 py-4 text-left font-semibold">อัปเดตล่าสุด</th>
+              <th className="px-5 py-4 text-center font-semibold">จัดการ</th>
+              {/* เพิ่มคอลัมน์ใหม่ได้ตรงนี้ */}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-slate-100 text-sm">
+            {!loading && projects.length === 0 && (
+              <tr>
+                <td colSpan="11" className="px-5 py-10 text-center text-slate-500">
+                  ยังไม่มีข้อมูลโครงการ
+                </td>
+              </tr>
+            )}
+
             {projects.map((project) => (
-              <tr key={project.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{project.project_name}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{project.size_kw}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{project.province}</td>
-                <td className="px-6 py-4 text-sm">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[project.status]}`}>
-                    {STATUS_LABELS[project.status]}
+              <tr key={project.id} className="hover:bg-slate-50/80">
+                <td className="px-5 py-4 font-medium text-slate-700">{project.project_code}</td>
+                <td className="px-5 py-4 text-slate-900">{project.project_name}</td>
+                <td className="px-5 py-4">
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${permitClassNames[project.permit_type] || 'bg-slate-100 text-slate-600'}`}
+                  >
+                    {PERMIT_TYPES[project.permit_type] || '-'}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-700">
-                  {STEP_LABELS[project.current_step]}
+                <td className="px-5 py-4 text-slate-700">{project.size_kva || '-'}</td>
+                <td className="px-5 py-4 text-slate-700">{project.province}</td>
+                <td className="px-5 py-4">
+                  <span className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600">
+                    {STEP_LABELS[project.current_step] || project.current_step}
+                  </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-700">-</td>
-                <td className="px-6 py-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <button className="p-1 hover:bg-gray-100 rounded" title="ดู">
-                      <Eye size={16} className="text-gray-600" />
-                    </button>
-                    <button className="p-1 hover:bg-gray-100 rounded" title="แก้ไข">
-                      <Edit2 size={16} className="text-blue-600" />
-                    </button>
+                <td className="px-5 py-4">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[project.status]}`}>
+                    {STATUS_LABELS[project.status] || project.status}
+                  </span>
+                </td>
+                <td className="px-5 py-4 text-slate-700 max-w-[200px] truncate" title={project.organizations || ''}>
+                  {project.organizations || '-'}
+                </td>
+                <td className="px-5 py-4 text-slate-700">{project.responsible_user_name || '-'}</td>
+                <td className="px-5 py-4 text-slate-700">{formatDate(project.updated_at || project.created_at)}</td>
+                <td className="px-5 py-4">
+                  <div className="flex items-center justify-center gap-1">
+                    {/* ดูรายละเอียด */}
                     <button
-                      onClick={() => handleDelete(project.id)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                      title="ลบ"
+                      className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                      title="ดูรายละเอียด"
+                      onClick={() => navigate(`/projects/${project.id}`)}
                     >
-                      <Trash2 size={16} className="text-red-600" />
+                      <Eye size={16} />
+                    </button>
+                    {/* แก้ไขข้อมูลโครงการ */}
+                    <button
+                      className="rounded-full p-2 text-blue-600 transition-colors hover:bg-blue-50"
+                      title="แก้ไขข้อมูล"
+                      onClick={() => onEditProject?.(project)}
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    {/* อัปเดตสถานะ - ปุ่มใหม่ */}
+                    <button
+                      className="rounded-full p-2 text-emerald-600 transition-colors hover:bg-emerald-50"
+                      title="อัปเดตสถานะ"
+                      onClick={() => handleOpenStatusModal(project)}
+                    >
+                      <RefreshCw size={16} />
+                    </button>
+                    {/* ลบโครงการ */}
+                    <button
+                      className="rounded-full p-2 text-red-500 transition-colors hover:bg-red-50"
+                      title="ลบ"
+                      onClick={() => handleDelete(project.id)}
+                    >
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </td>
@@ -99,26 +183,38 @@ export default function ProjectsTable({ filters }) {
         </table>
       </div>
 
-      {/* Pagination */}
-      <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-        <button
-          onClick={() => setPage(Math.max(1, page - 1))}
-          disabled={page === 1}
-          className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          ก่อนหน้า
-        </button>
-        <span className="text-sm text-gray-700">
-          หน้า {page} จาก {totalPages}
+      <div className="flex flex-col gap-4 border-t border-slate-200 px-5 py-4 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
+        <span>
+          แสดง {projects.length === 0 ? 0 : (page - 1) * 10 + 1} - {(page - 1) * 10 + projects.length} จาก {totalItems} รายการ
         </span>
-        <button
-          onClick={() => setPage(Math.min(totalPages, page + 1))}
-          disabled={page === totalPages}
-          className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          ถัดไป
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page === 1}
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ก่อนหน้า
+          </button>
+          <span className="rounded-lg bg-blue-600 px-3 py-1.5 font-semibold text-white">{page}</span>
+          <span>จาก {totalPages}</span>
+          <button
+            onClick={() => setPage(Math.min(totalPages, page + 1))}
+            disabled={page === totalPages}
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ถัดไป
+          </button>
+        </div>
       </div>
+
+      {/* StatusModal - แสดงเมื่อกดปุ่มอัปเดตสถานะ */}
+      <StatusModal
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
+        onUpdated={handleStatusUpdated}
+        project={statusProject}
+      />
     </div>
   );
 }

@@ -1,51 +1,74 @@
-# Solar Dashboard - Quick Start Guide
+# Solar Dashboard - Quick Start
 
-## 🚀 เริ่มต้นอย่างรวดเร็ว (Quick Start)
-
-### ความต้องการพื้นฐาน
+## ความต้องการ
 - Node.js 16+
-- PostgreSQL 12+
-- npm หรือ yarn
+- npm
 
-### 1. Clone & Setup Database
+> ✅ ไม่ต้องติดตั้ง PostgreSQL — ระบบใช้ **SQLite** (ไฟล์ `.db` ในเครื่องเลย)
 
-```bash
-# สร้าง database
-createdb solar_dashboard
+---
 
-# Import schema
-psql -d solar_dashboard -f backend/src/models/database-schema.sql
+## เริ่มต้นใน 3 ขั้นตอน
 
-# (Optional) Import sample data
-psql -d solar_dashboard -f backend/src/models/seed-data.sql
-```
-
-### 2. ตั้งค่า Backend
-
+### 1️⃣ Backend
 ```bash
 cd backend
-cp .env.example .env
 npm install
+# สร้าง .env แล้วใส่ JWT_SECRET=mysecret เป็นอย่างน้อย
+node src/init-db.cjs
 npm run dev
-# Server จะเริ่มที่ localhost:5000
 ```
 
-### 3. ตั้งค่า Frontend
-
+### 2️⃣ Frontend
 ```bash
 cd frontend
-cp .env.example .env
 npm install
 npm start
-# Application จะเปิดที่ localhost:3000
 ```
 
-## 📋 เข้าสู่ระบบทดลอง
-
+### 3️⃣ เข้าสู่ระบบ
+เปิด [http://localhost:3000](http://localhost:3000)
 ```
 Username: admin
 Password: admin
 ```
+
+---
+
+## คุณสมบัติหลัก
+
+| เมนู | หน้าที่ |
+|------|--------|
+| ภาพรวม | KPI, Pipeline, ตารางโครงการ |
+| โครงการ | เพิ่ม/แก้ไข/ลบ, Workflow 7 ขั้นตอน |
+| หน่วยงาน | จัดการ กกพ., PEA, MEA และอื่นๆ |
+| รายงาน | สรุปตามสถานะ/ขนาด/จังหวัด/ขั้นตอน |
+| ผู้ใช้งาน | Admin / Engineer |
+
+## API Endpoints
+
+```
+POST   /api/auth/login
+GET    /api/projects
+POST   /api/projects
+PUT    /api/projects/:id
+DELETE /api/projects/:id
+GET    /api/projects/stats/kpis
+GET    /api/users
+GET    /api/reports/summary/status
+GET    /api/reports/summary/size
+GET    /api/reports/summary/province
+GET    /api/reports/summary/step
+GET    /api/health
+```
+
+## แก้ไขปัญหาเบื้องต้น
+
+| ปัญหา | วิธีแก้ |
+|-------|---------|
+| CORS error | ตรวจสอบ `CORS_ORIGIN` ใน `.env` |
+| Port ถูกใช้อยู่ | เปลี่ยน `PORT` ใน `.env` |
+| ข้อมูลขาดหาย | รัน `node src/init-db.cjs` ใหม่ |
 
 ## 🎯 คุณสมบัติหลักที่ได้รับ
 

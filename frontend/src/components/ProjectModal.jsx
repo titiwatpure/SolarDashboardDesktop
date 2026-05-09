@@ -1,46 +1,69 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { projectsAPI } from '../utils/api';
-import { PROVINCES, determinePermitType } from '../utils/constants';
+import { PROVINCES } from '../utils/constants';
 
+// ค่าเริ่มต้นของ form เมื่อสร้างโครงการใหม่
+// หากต้องการเพิ่มเขตใหม่ในฟอร์ม เพิ่มตรงนี้และในส่วน input ด้านล่าง
+const emptyForm = {
+  project_name: '',      // ชื่อโครงการ
+  project_code: '',      // รหัสโครงการ
+  size_kw: '',           // ขนาด kW
+  size_kva: '',          // ขนาด kVA
+  province: '',          // จังหวัด
+  description: '',       // รายละเอียด
+  has_power_selling: false // มีการขายไฟหรือไม่
+};
+
+// รับ props:
+// - isOpen: แสดง/ซ่อน modal
+// - onClose: ปิด modal
+// - onProjectCreated: callback เมื่อบันทึกสำเร็จ เพื่อโหลดตารางใหม่
+// - project: object สำหรับแก้ไข (ถ้า null = สร้างใหม่)
 export default function ProjectModal({ isOpen, onClose, onProjectCreated, project }) {
-  const [formData, setFormData] = useState(
-    project || {
-      project_name: '',
-      project_code: '',
-      size_kw: '',
-      size_kva: '',
-      province: '',
-      description: '',
-      has_power_selling: false,
-    }
-  );
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState(project || emptyForm); // เก็บข้อมูลฟอร์ม
+  const [loading, setLoading] = useState(false);                  // สถานะกำลังบันทึก
 
+  // เมื่อเปิด modal ใหม่ ให้โหลดข้อมูลโครงการเข้า form (ถ้าแก้ไข) หรือ reset form (ถ้าสร้างใหม่)
+  useEffect(() => {
+    if (project) {
+      setFormData({
+        ...emptyForm,
+        ...project,
+        has_power_selling: Boolean(project.has_power_selling) // แปลง 0/1 เป็น true/false
+      });
+      return;
+    }
+
+    setFormData(emptyForm); // reset form ถ้าไม่มี project
+  }, [project, isOpen]);
+
+  // อัปเดต formData เมื่อผู้ใช้พิมพ์ข้อมูลใน input
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? checked : value, // checkbox ใช้ checked, input อื่นๆ ใช้ value
     }));
   };
 
+  // ส่งข้อมูลไปยัง API
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // ป้องกัน page reload
     try {
       setLoading(true);
       if (project) {
-        await projectsAPI.update(project.id, formData);
+        await projectsAPI.update(project.id, formData); // แก้ไขโครงการที่มีอยู่
       } else {
-        await projectsAPI.create(formData);
+        await projectsAPI.create(formData);             // สร้างโครงการใหม่
       }
-      onProjectCreated?.();
-      onClose();
+      onProjectCreated?.(); // เรียก callback เพื่อโหลดตารางใหม่
+      onClose();            // ปิด modal
     } catch (error) {
       console.error('Failed to save project:', error);
       alert('เกิดข้อผิดพลาด');
     } finally {
-      setLoading(false);
+      setLoading(false); // รีเซ็ตสถานะโหลด
     }
   };
 
@@ -84,6 +107,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, projec
                 value={formData.project_code}
                 onChange={handleChange}
                 required
+                disabled={Boolean(project)}
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
