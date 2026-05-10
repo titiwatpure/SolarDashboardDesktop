@@ -1,0 +1,26 @@
+services:
+  # Backend API
+  - type: web
+    name: solar-dashboard-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 5000
+      - key: CORS_ORIGIN
+        value: https://solar-dashboard-frontend.onrender.com
+    healthCheckPath: /api/health
+
+  # Frontend
+  - type: static_site
+    name: solar-dashboard-frontend
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://solar-dashboard-backend.onrender.com/api
