@@ -23,10 +23,13 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Static files - uploads directory (removed: use authenticated /api/documents/download/:id endpoint instead)
 
-// Serve frontend in production
+// Serve frontend in production (only if frontend build exists)
 if (isProduction) {
   const frontendBuild = path.join(__dirname, '..', '..', 'frontend', 'build');
-  app.use(express.static(frontendBuild));
+  const fs = require('fs');
+  if (fs.existsSync(frontendBuild)) {
+    app.use(express.static(frontendBuild));
+  }
 }
 
 // ========================
@@ -101,9 +104,17 @@ app.get('/api/health', async (req, res) => {
 
 // SPA fallback - serve frontend for non-API routes in production
 if (isProduction) {
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', '..', 'frontend', 'build', 'index.html'));
-  });
+  const frontendIndex = path.join(__dirname, '..', '..', 'frontend', 'build', 'index.html');
+  const fs = require('fs');
+  if (fs.existsSync(frontendIndex)) {
+    app.get('*', (req, res) => {
+      res.sendFile(frontendIndex);
+    });
+  } else {
+    app.get('*', (req, res) => {
+      res.json({ message: 'API is running. Frontend is deployed separately.' });
+    });
+  }
 }
 
 // Structured error handling

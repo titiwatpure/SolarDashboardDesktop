@@ -12,4 +12,5 @@ ENV NODE_ENV=production
 
 EXPOSE 5000
 
-CMD ["node", "src/index.js"]
+# Init DB then start server
+CMD ["sh", "-c", "node src/init-db.cjs && node src/index.js"]
