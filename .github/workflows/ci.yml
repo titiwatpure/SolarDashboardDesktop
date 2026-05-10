@@ -29,6 +29,9 @@ jobs:
 
       - name: Run tests
         run: npm test
+        env:
+          JWT_SECRET: ci-test-secret-key
+          NODE_ENV: test
 
   frontend-test:
     name: Frontend Build
