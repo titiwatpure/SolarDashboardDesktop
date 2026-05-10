@@ -305,10 +305,16 @@ const initDB = async () => {
     const adminId = uuidv4();
     const hashedPassword = await bcrypt.hash('admin', 12);
 
+    // สร้าง admin user หรือ reset password ถ้ามีอยู่แล้ว
     await runInsert(
       `INSERT OR IGNORE INTO users (id, username, email, password, full_name, role, status)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [adminId, 'admin', 'admin@solardashboard.com', hashedPassword, 'Admin User', 'admin', 'active']
+    );
+    // Reset password ทุกครั้งที่ container เริ่มต้น
+    await runInsert(
+      `UPDATE users SET password = ? WHERE username = 'admin'`,
+      [hashedPassword]
     );
     console.log('✅ เพิ่ม admin user สำเร็จ');
 
