@@ -37,7 +37,7 @@ describe('Projects API', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('total_projects');
     });
   });
 

@@ -13,9 +13,9 @@ export default [
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'no-console': 'off',
-      'semi': ['error', 'always'],
-      'quotes': ['error', 'single'],
-      'comma-dangle': ['error', 'never']
+      'semi': ['warn', 'always'],
+      'quotes': ['warn', 'single'],
+      'comma-dangle': 'off'
     }
   }
 ];
