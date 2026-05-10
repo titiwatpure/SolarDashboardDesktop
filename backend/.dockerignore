@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+*.db
+uploads/
+.git
+.gitignore
+.eslintrc*
+eslint.config.js
+jest.config.*
+__tests__
+*.test.js
+*.md

@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+build/
+.git
+.gitignore
+.eslintrc*
+eslint.config.js
+*.test.js
+*.test.jsx
+*.md

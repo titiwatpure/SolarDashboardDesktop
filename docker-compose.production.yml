@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  backend:
+    image: ghcr.io/titiwatpure/solar-dashboard-backend:latest
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - JWT_SECRET=${JWT_SECRET}
+      - ACCESS_TOKEN_EXPIRY=15m
+      - REFRESH_TOKEN_EXPIRY_DAYS=30
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+    volumes:
+      - db-data:/app
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/titiwatpure/solar-dashboard-frontend:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db-data:
