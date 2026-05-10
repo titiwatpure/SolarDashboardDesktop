@@ -14,7 +14,9 @@ import Users from './pages/Users';
 import Settings from './pages/Settings';
 import Steps from './pages/Steps';
 import Documents from './pages/Documents';
+import Tasks from './pages/Tasks';
 import ProjectDetail from './pages/ProjectDetail';
+import ProjectReport from './pages/ProjectReport';
 import { Component, useState } from 'react';
 
 class ErrorBoundary extends Component {
@@ -98,9 +100,11 @@ function AppContent() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/users" element={<Users />} />
             <Route path="/documents" element={<Documents />} />
+            <Route path="/tasks" element={<Tasks />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/steps" element={<Steps />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
+            <Route path="/projects/:id/report" element={<ProjectReport />} />
           </Routes>
         </main>
       </div>

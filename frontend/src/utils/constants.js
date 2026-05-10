@@ -100,6 +100,14 @@ export const PERMIT_TYPES = {
   permit: 'ขอใบอนุญาต',
 };
 
+// ระดับความสำคัญของ Task
+export const PRIORITY_LABELS = {
+  urgent: 'เร่งด่วน',
+  high: 'สูง',
+  medium: 'ปานกลาง',
+  low: 'ต่ำ',
+};
+
 // สถานะ checkpoint
 export const CHECKPOINT_STATUSES = {
   pending: { label: 'รอดำเนินการ', color: 'bg-gray-100 text-gray-800' },

@@ -225,6 +225,11 @@ export const reportsAPI = {
   getSummaryByProvince: () => apiCall('GET', '/reports/summary/province'),
   getSummaryByStep: () => apiCall('GET', '/reports/summary/step'),
   getSummaryByStepStatus: () => apiCall('GET', '/reports/summary/step-status'),
+  getSummaryByTimeline: () => apiCall('GET', '/reports/summary/timeline'),
+  getSummaryByRisk: () => apiCall('GET', '/reports/summary/risk'),
+  getSummaryByLeadTime: () => apiCall('GET', '/reports/summary/lead-time'),
+  getSummaryByPerformance: () => apiCall('GET', '/reports/summary/performance'),
+  getSummaryByTasks: () => apiCall('GET', '/reports/summary/tasks'),
 };
 
 export const notificationsAPI = {

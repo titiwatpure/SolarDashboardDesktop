@@ -1,4 +1,4 @@
-import { Edit2, Eye, RefreshCw, Trash2 } from 'lucide-react';
+import { Edit2, Eye, FileText, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { projectsAPI } from '../utils/api';
@@ -183,7 +183,15 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
                     >
                       <Edit2 size={16} />
                     </button>
-                    {/* อัปเดตสถานะ - ปุ่มใหม่ */}
+                    {/* ดูรายงาน */}
+                    <button
+                      className="rounded-full p-2 text-violet-600 transition-colors hover:bg-violet-50"
+                      title="ดูรายงาน"
+                      onClick={() => navigate(`/projects/${project.id}/report`)}
+                    >
+                      <FileText size={16} />
+                    </button>
+                    {/* อัปเดตสถานะ */}
                     <button
                       className="rounded-full p-2 text-emerald-600 transition-colors hover:bg-emerald-50"
                       title="อัปเดตสถานะ"
