@@ -1,4 +1,4 @@
-import { Bell, LogOut, Menu, Settings, User } from 'lucide-react';
+import { Bell, LogOut, Menu, Settings, User, Check, Trash2, CheckCheck, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { notificationsAPI } from '../utils/api';
@@ -19,7 +19,11 @@ export default function Header({ onToggleSidebar }) {
   const { user, logout } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
   const profileRef = useRef(null);
+  const notifRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -35,19 +39,22 @@ export default function Header({ onToggleSidebar }) {
   useEffect(() => {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+    const handleRefresh = () => fetchUnreadCount();
+    window.addEventListener('refresh-notifications', handleRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('refresh-notifications', handleRefresh);
+    };
   }, [fetchUnreadCount]);
 
   useEffect(() => {
-    if (!isProfileOpen) return;
     const handleClickOutside = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) {
-        setIsProfileOpen(false);
-      }
+      if (profileRef.current && !profileRef.current.contains(e.target)) setIsProfileOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setIsNotifOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isProfileOpen]);
+  }, []);
 
   const todayLabel = useMemo(
     () =>
@@ -61,6 +68,49 @@ export default function Header({ onToggleSidebar }) {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const loadNotifications = async () => {
+    try {
+      setLoadingNotifs(true);
+      const res = await notificationsAPI.getAll({ limit: 20 });
+      setNotifications(res?.data || []);
+    } catch {
+      // เงียบไว้
+    } finally {
+      setLoadingNotifs(false);
+    }
+  };
+
+  const toggleNotif = () => {
+    const next = !isNotifOpen;
+    setIsNotifOpen(next);
+    if (next) loadNotifications();
+  };
+
+  const handleMarkRead = async (notifId) => {
+    try {
+      await notificationsAPI.markAsRead(notifId);
+      setNotifications((prev) => prev.map((n) => n.id === notifId ? { ...n, is_read: 1 } : n));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {}
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationsAPI.markAllAsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: 1 })));
+      setUnreadCount(0);
+    } catch {}
+  };
+
+  const handleDeleteNotif = async (notifId) => {
+    try {
+      await notificationsAPI.delete(notifId);
+      const wasUnread = notifications.find((n) => n.id === notifId && !n.is_read);
+      setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+      if (wasUnread) setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {}
   };
 
   return (
@@ -89,17 +139,86 @@ export default function Header({ onToggleSidebar }) {
             วันที่ {todayLabel} น.
           </div>
 
-          <button
-            onClick={() => navigate('/settings')}
-            className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-          >
-            <Bell size={18} />
-            {unreadCount > 0 && (
-              <span className="absolute right-2 top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={toggleNotif}
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute right-2 top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {isNotifOpen && (
+              <div className="absolute right-0 mt-3 w-96 max-h-[480px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl flex flex-col z-50">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-900">การแจ้งเตือน</h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                    >
+                      <CheckCheck size={14} />
+                      อ่านทั้งหมด
+                    </button>
+                  )}
+                </div>
+
+                <div className="overflow-y-auto flex-1">
+                  {loadingNotifs ? (
+                    <div className="flex items-center justify-center py-8 text-slate-400 text-sm">กำลังโหลด...</div>
+                  ) : notifications.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-slate-400">ไม่มีการแจ้งเตือน</div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        onClick={() => {
+                          if (!n.is_read) handleMarkRead(n.id);
+                          if (n.entity_type === 'project' && n.entity_id) {
+                            navigate(`/projects/${n.entity_id}`);
+                            setIsNotifOpen(false);
+                          }
+                        }}
+                        className={`flex items-start gap-3 px-4 py-3 border-b border-slate-50 transition cursor-pointer hover:bg-slate-50 ${
+                          n.is_read ? 'bg-white' : 'bg-blue-50/50'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800">{n.title}</p>
+                          <p className="text-xs text-slate-600 mt-0.5 line-clamp-2">{n.message}</p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {new Date(n.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {!n.is_read && (
+                            <button
+                              onClick={() => handleMarkRead(n.id)}
+                              className="rounded-full p-1.5 text-blue-500 hover:bg-blue-50 transition-colors"
+                              title="อ่านแล้ว"
+                            >
+                              <Check size={14} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteNotif(n.id)}
+                            className="rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                            title="ลบ"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             )}
-          </button>
+          </div>
 
           <div className="relative" ref={profileRef}>
             <button

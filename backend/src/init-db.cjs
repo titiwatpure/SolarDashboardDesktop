@@ -39,6 +39,8 @@ const initDB = async () => {
       province TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'not_started',
       current_step TEXT NOT NULL DEFAULT 'survey',
+      scope_start TEXT NOT NULL DEFAULT 'survey',
+      scope_end TEXT NOT NULL DEFAULT 'cod',
       responsible_user TEXT REFERENCES users(id) ON DELETE SET NULL,
       description TEXT,
       has_power_selling INTEGER DEFAULT 0,
@@ -205,6 +207,15 @@ const initDB = async () => {
       reason TEXT,
       performed_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Timeline Comments Table — คอมเมนต์แต่ละ Timeline
+    `CREATE TABLE IF NOT EXISTS timeline_comments (
+      id TEXT PRIMARY KEY,
+      timeline_id TEXT NOT NULL REFERENCES project_timeline(id) ON DELETE CASCADE,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      comment TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );`
   ];
 
@@ -236,7 +247,8 @@ const initDB = async () => {
     'CREATE INDEX IF NOT EXISTS idx_checkpoint_logs_checkpoint_id ON checkpoint_logs(checkpoint_id);',
     'CREATE INDEX IF NOT EXISTS idx_projects_risk_level ON projects(risk_level);',
     'CREATE INDEX IF NOT EXISTS idx_activity_logs_severity ON activity_logs(severity);',
-    'CREATE INDEX IF NOT EXISTS idx_project_organizations_approval ON project_organizations(approval_status);'
+    'CREATE INDEX IF NOT EXISTS idx_project_organizations_approval ON project_organizations(approval_status);',
+    'CREATE INDEX IF NOT EXISTS idx_timeline_comments_timeline_id ON timeline_comments(timeline_id);'
   ];
 
   // Helper: wrap db.run ใน Promise
@@ -253,6 +265,19 @@ const initDB = async () => {
       await runSql(sql);
     } catch (err) {
       console.error('❌ Error:', err);
+    }
+  }
+
+  // Migration: เพิ่มคอลัมน์ scope_start/scope_end สำหรับ database ที่มีอยู่แล้ว
+  const migrations = [
+    "ALTER TABLE projects ADD COLUMN scope_start TEXT NOT NULL DEFAULT 'survey'",
+    "ALTER TABLE projects ADD COLUMN scope_end TEXT NOT NULL DEFAULT 'cod'",
+  ];
+  for (const sql of migrations) {
+    try {
+      await runSql(sql);
+    } catch {
+      // คอลัมน์มีอยู่แล้ว — ข้าม
     }
   }
 

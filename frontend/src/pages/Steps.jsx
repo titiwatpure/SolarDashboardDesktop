@@ -100,7 +100,7 @@ export default function Steps() {
               const count = data?.count || 0;
               const completed = data?.completed || 0;
               const inProgress = data?.in_progress || 0;
-              const pending = data?.pending || 0;
+              const notStarted = data?.not_started || 0;
               const blocked = data?.blocked || 0;
 
               return (
@@ -115,9 +115,9 @@ export default function Steps() {
 
                   {count > 0 ? (
                     <div className="flex flex-wrap gap-3">
-                      {pending > 0 && (
+                      {notStarted > 0 && (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                          {STATUS_LABELS.pending}: {pending}
+                          {STATUS_LABELS.not_started}: {notStarted}
                         </span>
                       )}
                       {inProgress > 0 && (

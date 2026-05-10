@@ -98,6 +98,7 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
               <th className="px-5 py-4 text-left font-semibold">จังหวัด</th>
               <th className="px-5 py-4 text-left font-semibold">ขั้นตอนปัจจุบัน</th>
               <th className="px-5 py-4 text-left font-semibold">สถานะ</th>
+              <th className="px-5 py-4 text-left font-semibold">ความคืบหน้า</th>
               <th className="px-5 py-4 text-left font-semibold">ความเสี่ยง</th>
               <th className="px-5 py-4 text-left font-semibold">หน่วยงาน</th>
               <th className="px-5 py-4 text-left font-semibold">ผู้รับผิดชอบ</th>
@@ -109,7 +110,7 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
           <tbody className="divide-y divide-slate-100 text-sm">
             {!loading && projects.length === 0 && (
               <tr>
-                <td colSpan="12" className="px-5 py-10 text-center text-slate-500">
+                <td colSpan="13" className="px-5 py-10 text-center text-slate-500">
                   ยังไม่มีข้อมูลโครงการ
                 </td>
               </tr>
@@ -137,6 +138,21 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[project.status]}`}>
                     {STATUS_LABELS[project.status] || project.status}
                   </span>
+                </td>
+                <td className="px-5 py-4">
+                  <div className="flex items-center gap-2 min-w-[100px]">
+                    <div className="flex-1 bg-slate-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          project.progress >= 100 ? 'bg-emerald-500' :
+                          project.progress >= 60 ? 'bg-blue-500' :
+                          project.progress >= 30 ? 'bg-amber-500' : 'bg-slate-400'
+                        }`}
+                        style={{ width: `${project.progress || 0}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700 w-9 text-right">{project.progress || 0}%</span>
+                  </div>
                 </td>
                 <td className="px-5 py-4">
                   <RiskBadge level={project.risk_level} />

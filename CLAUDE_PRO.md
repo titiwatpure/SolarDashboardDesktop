@@ -72,7 +72,7 @@ Core tables:
 - checkpoint_logs
 - tasks
 - documents
-- agencies
+- organizations
 - users
 
 ---

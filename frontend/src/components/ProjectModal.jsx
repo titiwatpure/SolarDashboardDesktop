@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { projectsAPI, usersAPI } from '../utils/api';
-import { PROVINCES } from '../utils/constants';
+import { PROVINCES, STEP_LABELS, STEP_ORDER } from '../utils/constants';
 
 const emptyForm = {
   project_name: '',
@@ -12,6 +12,8 @@ const emptyForm = {
   responsible_user: '',
   description: '',
   has_power_selling: false,
+  scope_start: 'survey',
+  scope_end: 'cod',
 };
 
 export default function ProjectModal({ isOpen, onClose, onProjectCreated, project }) {
@@ -124,6 +126,23 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, projec
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                 <option value="">ไม่ระบุ</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ขอบเขตงาน: เริ่มต้น</label>
+              <select name="scope_start" value={formData.scope_start} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                {STEP_ORDER.map((s) => <option key={s} value={s}>{STEP_LABELS[s]}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ขอบเขตงาน: สิ้นสุด</label>
+              <select name="scope_end" value={formData.scope_end} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                {STEP_ORDER.filter((s) => STEP_ORDER.indexOf(s) >= STEP_ORDER.indexOf(formData.scope_start))
+                  .map((s) => <option key={s} value={s}>{STEP_LABELS[s]}</option>)}
               </select>
             </div>
           </div>

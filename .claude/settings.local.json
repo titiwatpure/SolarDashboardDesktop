@@ -38,7 +38,10 @@
       "Bash(taskkill //F //PID 4812)",
       "Bash(C:\\\\Program Files\\\\nodejs\\\\node.exe *)",
       "PowerShell([Environment]::SetEnvironmentVariable\\(\"Path\", [Environment]::GetEnvironmentVariable\\(\"Path\", \"User\"\\) + \";C:\\\\Program Files\\\\nodejs\", \"User\"\\))",
-      "Bash(curl -s -o /dev/null -w \"Frontend: %{http_code}\" http://localhost:3000)"
+      "Bash(curl -s -o /dev/null -w \"Frontend: %{http_code}\" http://localhost:3000)",
+      "Bash(node -e ' *)",
+      "Bash(curl *)",
+      "Bash(tasklist)"
     ]
   }
 }

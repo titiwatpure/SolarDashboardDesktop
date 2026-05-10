@@ -33,7 +33,11 @@ CORS_ORIGIN=http://localhost:3000
 สร้างฐานข้อมูลและ seed ข้อมูลตัวอย่าง:
 
 ```bash
+# สร้างตาราง + seed ผู้ใช้และหน่วยงาน
 node src/init-db.cjs
+
+# (ทางเลือก) seed ข้อมูลโครงการตัวอย่าง 4 โครงการ
+node src/seed-projects.cjs
 ```
 
 รัน Backend:

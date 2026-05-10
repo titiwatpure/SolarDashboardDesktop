@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { setAuthToken, authAPI, usersAPI } from '../utils/api';
+import { setAuthToken, setRefreshToken, authAPI, usersAPI } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -27,9 +27,10 @@ export function AuthProvider({ children }) {
   // Login
   const login = useCallback(async (username, password) => {
     const res = await authAPI.login(username, password);
-    const { token, user: userData } = res;
+    const { token, accessToken, refreshToken: refresh, user: userData } = res;
 
-    setAuthToken(token);
+    setAuthToken(token || accessToken);
+    if (refresh) setRefreshToken(refresh);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     return userData;
@@ -39,9 +40,11 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     try { await authAPI.logout(); } catch { /* ล้าง local เสมอ */ }
     setAuthToken(null);
+    setRefreshToken(null);
     setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
   }, []);
 
   // Refresh user profile

@@ -12,7 +12,7 @@
 ### การจัดการโครงการ
 - เพิ่ม / แก้ไข / ลบ โครงการ
 - ระบบ Workflow 7 ขั้นตอน: Survey -> Design -> ERC -> Grid -> Construction -> Testing -> COD
-- สถานะโครงการ: Pending, In Progress, Blocked, Completed
+- สถานะโครงการ: ยังไม่เริ่ม, กำลังดำเนินการ, รอตรวจสอบ, ติดปัญหา, ถูกปฏิเสธ, เสร็จสิ้น
 - Logic อัตโนมัติ: Step = COD -> Completed
 
 ### ระบบกฎหมายและใบอนุญาต
@@ -39,7 +39,7 @@
 - Export Excel / PDF
 
 ### ผู้ใช้งาน
-- สิทธิ์ระดับ Admin และ Engineer
+- สิทธิ์ 4 ระดับ: Admin (เต็ม), Engineer (อ่าน/สร้าง/แก้ไข), Staff (จำกัด), Client (อ่านอย่างเดียว)
 - ระบบ JWT Authentication + Refresh Token
 - เปลี่ยนรหัสผ่านได้
 - ระบบแจ้งเตือนอัตโนมัติ
@@ -76,8 +76,14 @@ npm start
 
 ### Docker (ทั้งระบบ)
 ```bash
+# Build และ start ทั้ง backend + frontend
+docker compose up -d --build
 
+# ดู logs
+docker compose logs -f
 
+# หยุด
+docker compose down
 ```
 
 ### Database
@@ -119,7 +125,9 @@ Dashboard/
 │   │   │   ├── reports.js
 │   │   │   ├── tasks.js
 │   │   │   ├── notifications.js
-│   │   │   └── activity_logs.js
+│   │   │   ├── activity_logs.js
+│   │   │   ├── checkpoints.js   # Checkpoint CRUD + Approve + Logs
+│   │   │   └── backup.js        # Database backup/restore (Admin)
 │   │   ├── models/
 │   │   ├── middleware/       # JWT Auth + Role Authorization
 │   │   ├── database.js      # SQLite connection
@@ -180,7 +188,12 @@ Dashboard/
 - `DELETE /api/projects/:id` - ลบโครงการ (Admin)
 - `GET /api/projects/stats/kpis` - KPI stats
 - `GET /api/projects/:id/timeline` - Timeline
+- `DELETE /api/projects/:id/timeline/:timelineId` - ลบ timeline entry (Admin)
 - `GET /api/projects/:id/organizations` - หน่วยงานที่เกี่ยวข้อง
+- `POST /api/projects/:id/organizations` - เพิ่มหน่วยงานเข้าโครงการ
+- `POST /api/projects/:id/organizations/:orgId/approve` - อนุมัติหน่วยงาน
+- `POST /api/projects/:id/organizations/:orgId/reject` - ปฏิเสธหน่วยงาน
+- `DELETE /api/projects/:id/organizations/:orgId` - ลบหน่วยงานออกจากโครงการ
 
 ### Users
 - `GET /api/users` - รายชื่อผู้ใช้ (Admin)
@@ -220,10 +233,26 @@ Dashboard/
 - `GET /api/reports/summary/size` - สรุปตามขนาด
 - `GET /api/reports/summary/province` - สรุปตามจังหวัด
 - `GET /api/reports/summary/step` - สรุปตามขั้นตอน
+- `GET /api/reports/summary/step-status` - สรุปสถานะตามขั้นตอน
 
 ### Activity Logs (Admin)
 - `GET /api/activity-logs` - บันทึกกิจกรรม
 - `GET /api/activity-logs/recent` - กิจกรรมล่าสุด
+
+### Checkpoints
+- `GET /api/projects/:projectId/checkpoints` - รายการ Checkpoint ตามโครงการ
+- `POST /api/projects/:projectId/checkpoints` - สร้าง Checkpoint
+- `PUT /api/checkpoints/:id` - อัปเดต Checkpoint
+- `POST /api/checkpoints/:id/approve` - อนุมัติ Checkpoint
+- `GET /api/checkpoints/:id/logs` - ประวัติการเปลี่ยนแปลง
+- `DELETE /api/checkpoints/:id` - ลบ Checkpoint
+
+### Backup (Admin)
+- `POST /api/backup` - สำรองฐานข้อมูล
+- `GET /api/backup` - รายการ backup
+- `GET /api/backup/download/:name` - ดาวน์โหลดไฟล์ backup
+- `POST /api/backup/restore/:name` - กู้คืนฐานข้อมูล
+- `DELETE /api/backup/:name` - ลบไฟล์ backup
 
 ### System
 - `GET /api/health` - สถานะเซิร์ฟเวอร์

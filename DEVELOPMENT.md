@@ -62,7 +62,9 @@ backend/
 │   │   ├── reports.js       # Aggregation reports
 │   │   ├── tasks.js         # Task management
 │   │   ├── notifications.js # Notification system
-│   │   └── activity_logs.js # Audit logging
+│   │   ├── activity_logs.js # Audit logging
+│   │   ├── checkpoints.js   # Checkpoint CRUD + Approve + Logs
+│   │   └── backup.js        # Database backup/restore (Admin)
 │   ├── middleware/
 │   │   └── auth.js          # JWT authenticateToken + authorizeRole
 │   ├── models/
@@ -130,22 +132,24 @@ const { user, login, logout, changePassword, isAdmin } = useAuth();
 
 ## Database Schema
 
-### Tables (12)
-- `users` - System users (admin/engineer)
-- `projects` - Solar installation projects
+### Tables (14)
+- `users` - System users (admin/engineer/staff/client)
+- `projects` - Solar installation projects with risk tracking
 - `organizations` - Government/utility entities
 - `project_steps` - Individual step tracking
 - `documents` - Document metadata
-- `project_organizations` - Many-to-many links
+- `project_organizations` - Many-to-many links with approval status
 - `project_timeline` - Step/status change history
 - `reports` - Saved reports
-- `activity_logs` - System audit log
+- `activity_logs` - System audit log with severity levels
 - `tasks` - Per-project tasks
 - `notifications` - In-app notifications
 - `refresh_tokens` - JWT refresh tokens
+- `checkpoints` - Verification checkpoints per workflow step
+- `checkpoint_logs` - Checkpoint change history
 
-### Indexes (18+)
-Covering all foreign keys and frequently queried columns.
+### Indexes (27)
+Covering all foreign keys and frequently queried columns including risk_level, severity, approval_status, and checkpoint fields.
 
 ## API Response Format
 
@@ -204,7 +208,8 @@ Tests use Jest + Supertest against the real SQLite database.
 - CORS restricted to configured origin
 - Parameterized SQL queries (no injection)
 - File upload: type filter + size limit (50MB)
-- Role-based access: admin (full), engineer (read + create/update)
+- Role-based access: admin (full), engineer (read + create/update), staff (limited), client (read-only)
+- Permission-based authorization with granular permissions (e.g., project.create, checkpoint.approve, approval.manage)
 
 ## Debugging
 

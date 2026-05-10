@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, MapPin, Zap, FileText, Clock,
-  Loader, User, Building2, AlertTriangle, Trash2, Plus, X, Save
+  Loader, User, Building2, AlertTriangle, Trash2, Plus, X, Save,
+  MessageSquare, Send, Check, Minus, RefreshCw
 } from 'lucide-react';
 import { projectsAPI, usersAPI, organizationsAPI } from '../utils/api';
 import {
@@ -54,6 +55,19 @@ export default function ProjectDetail() {
   const [showUserPicker, setShowUserPicker] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
 
+  // สำหรับจัดการคอมเมนต์ timeline
+  const [expandedComments, setExpandedComments] = useState({});
+  const [commentsMap, setCommentsMap] = useState({});
+  const [commentTexts, setCommentTexts] = useState({});
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  // สำหรับจัดการ checkpoints
+  const [checkpoints, setCheckpoints] = useState([]);
+  const [selectedStep, setSelectedStep] = useState(null);
+  const [showCpForm, setShowCpForm] = useState(false);
+  const [cpForm, setCpForm] = useState({ checkpoint_name: '', notes: '', required: true });
+  const [editingCp, setEditingCp] = useState(null);
+
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -64,17 +78,19 @@ export default function ProjectDetail() {
   const loadAll = async (reqId) => {
     try {
       setLoading(true);
-      const [proj, tl, orgs, usersResult] = await Promise.all([
+      const [proj, tl, orgs, usersResult, cps] = await Promise.all([
         projectsAPI.getById(id),
         projectsAPI.getTimeline(id),
         projectsAPI.getOrganizations(id),
-        usersAPI.getAll()
+        usersAPI.getAll(),
+        projectsAPI.getCheckpoints(id)
       ]);
       if (reqId !== requestIdRef.current) return;
       setProject(proj);
       setTimeline(tl);
       setProjectOrgs(Array.isArray(orgs) ? orgs : (orgs.data || []));
       setAllUsers(Array.isArray(usersResult) ? usersResult : (usersResult.data || []));
+      setCheckpoints(Array.isArray(cps) ? cps : (cps.data || []));
     } catch (error) {
       if (reqId === requestIdRef.current) console.error('Failed to load:', error);
     } finally {
@@ -143,6 +159,133 @@ export default function ProjectDetail() {
     }
   };
 
+  // โหลดคอมเมนต์ของ timeline entry
+  const loadComments = async (timelineId) => {
+    try {
+      const result = await projectsAPI.getTimelineComments(id, timelineId);
+      setCommentsMap((prev) => ({ ...prev, [timelineId]: Array.isArray(result) ? result : (result.data || []) }));
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+    }
+  };
+
+  // toggle แสดง/ซ่อนคอมเมนต์
+  const toggleComments = (timelineId) => {
+    const isExpanding = !expandedComments[timelineId];
+    setExpandedComments((prev) => ({ ...prev, [timelineId]: !prev[timelineId] }));
+    if (isExpanding && !commentsMap[timelineId]) {
+      loadComments(timelineId);
+    }
+  };
+
+  // เพิ่มคอมเมนต์
+  const handleAddComment = async (timelineId) => {
+    const text = (commentTexts[timelineId] || '').trim();
+    if (!text) return;
+    try {
+      setSubmittingComment(true);
+      await projectsAPI.addTimelineComment(id, timelineId, { comment: text });
+      setCommentTexts((prev) => ({ ...prev, [timelineId]: '' }));
+      await loadComments(timelineId);
+      setTimeline((prev) => prev.map((t) => t.id === timelineId ? { ...t, comment_count: (t.comment_count || 0) + 1 } : t));
+      window.dispatchEvent(new Event('refresh-notifications'));
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  // ลบคอมเมนต์
+  const handleDeleteComment = async (timelineId, commentId) => {
+    if (!window.confirm('ต้องการลบคอมเมนต์นี้หรือไม่?')) return;
+    try {
+      await projectsAPI.deleteTimelineComment(id, timelineId, commentId);
+      await loadComments(timelineId);
+      setTimeline((prev) => prev.map((t) => t.id === timelineId ? { ...t, comment_count: Math.max(0, (t.comment_count || 0) - 1) } : t));
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+    }
+  };
+
+  // Checkpoint functions
+  const loadCheckpoints = async (step) => {
+    try {
+      const cps = await projectsAPI.getCheckpoints(id, step);
+      setCheckpoints(Array.isArray(cps) ? cps : (cps.data || []));
+    } catch (error) {
+      console.error('Failed to load checkpoints:', error);
+    }
+  };
+
+  const handleStepClick = (step) => {
+    console.log('Step clicked:', step);
+    if (selectedStep === step) {
+      setSelectedStep(null);
+      loadCheckpoints();
+    } else {
+      setSelectedStep(step);
+      loadCheckpoints(step);
+    }
+  };
+
+  const handleCreateCheckpoint = async () => {
+    if (!cpForm.checkpoint_name.trim()) return;
+    try {
+      await projectsAPI.createCheckpoint(id, {
+        step: selectedStep || project.current_step,
+        checkpoint_name: cpForm.checkpoint_name.trim(),
+        notes: cpForm.notes.trim() || null,
+        required: cpForm.required ? 1 : 0
+      });
+      setCpForm({ checkpoint_name: '', notes: '', required: true });
+      setShowCpForm(false);
+      await loadCheckpoints(selectedStep);
+    } catch (error) {
+      console.error('Failed to create checkpoint:', error);
+    }
+  };
+
+  const handleUpdateCheckpointStatus = async (cpId, status) => {
+    try {
+      await projectsAPI.updateCheckpoint(cpId, { status });
+      await loadCheckpoints(selectedStep);
+      window.dispatchEvent(new Event('refresh-notifications'));
+    } catch (error) {
+      console.error('Failed to update checkpoint:', error);
+    }
+  };
+
+  const handleApproveCheckpoint = async (cpId) => {
+    try {
+      await projectsAPI.approveCheckpoint(cpId, { reason: 'อนุมัติ' });
+      await loadCheckpoints(selectedStep);
+      window.dispatchEvent(new Event('refresh-notifications'));
+    } catch (error) {
+      console.error('Failed to approve checkpoint:', error);
+    }
+  };
+
+  const handleDeleteCheckpoint = async (cpId) => {
+    if (!window.confirm('ต้องการลบจุดตรวจสอบนี้หรือไม่?')) return;
+    try {
+      await projectsAPI.deleteCheckpoint(cpId);
+      await loadCheckpoints(selectedStep);
+    } catch (error) {
+      console.error('Failed to delete checkpoint:', error);
+    }
+  };
+
+  const handleUpdateCheckpointNotes = async (cpId, notes) => {
+    try {
+      await projectsAPI.updateCheckpoint(cpId, { notes });
+      setEditingCp(null);
+      await loadCheckpoints(selectedStep);
+    } catch (error) {
+      console.error('Failed to update checkpoint notes:', error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-500">
@@ -198,6 +341,26 @@ export default function ProjectDetail() {
                     {PERMIT_TYPES[project.permit_type]}
                   </span>
                 )}
+              </div>
+              <div className="mt-4 max-w-md">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-medium text-slate-600">ความคืบหน้า</span>
+                  <span className="text-sm font-bold text-slate-900">{project.progress || 0}%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-3">
+                  <div
+                    className={`h-3 rounded-full transition-all duration-500 ${
+                      project.progress >= 100 ? 'bg-emerald-500' :
+                      project.progress >= 60 ? 'bg-blue-500' :
+                      project.progress >= 30 ? 'bg-amber-500' : 'bg-slate-400'
+                    }`}
+                    style={{ width: `${project.progress || 0}%` }}
+                  />
+                </div>
+                <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                  <span>{STEP_LABELS[project.scope_start] || 'สำรวจ'}</span>
+                  <span>{STEP_LABELS[project.scope_end] || 'COD'}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -361,26 +524,216 @@ export default function ProjectDetail() {
           <h2 className="text-xl font-bold text-slate-900 mb-5">ความคืบหน้า</h2>
 
           {/* Step Progress Bar */}
-          <div className="flex items-center gap-1 mb-8">
+          <div className="grid grid-cols-7 gap-2 mb-6">
             {stepOrder.map((step, index) => {
               const meta = stepMeta[step];
               const isCompleted = index < currentStepIndex;
               const isCurrent = index === currentStepIndex;
+              const scopeStartIdx = stepOrder.indexOf(project.scope_start || 'survey');
+              const scopeEndIdx = stepOrder.indexOf(project.scope_end || 'cod');
+              const inScope = index >= scopeStartIdx && index <= scopeEndIdx;
+              const isSelected = selectedStep === step;
+              const stepCheckpoints = checkpoints.filter(cp => cp.step === step);
+              const passedCount = stepCheckpoints.filter(c => c.status === 'passed').length;
 
               return (
-                <div key={step} className="flex-1 flex flex-col items-center gap-2">
-                  <div className={`w-full h-3 rounded-full transition-all duration-500 ${
+                <div
+                  key={step}
+                  onClick={() => handleStepClick(step)}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-xl cursor-pointer transition-all select-none ${
+                    isSelected ? 'bg-blue-50 ring-2 ring-blue-400 shadow-sm' :
+                    'hover:bg-slate-100 active:bg-slate-200'
+                  }`}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleStepClick(step); }}
+                >
+                  <div className={`w-full h-3 rounded-full transition-all duration-300 ${
+                    !inScope ? 'bg-slate-100 border-2 border-dashed border-slate-300' :
+                    isSelected ? `${meta.color} ring-4 ring-blue-200` :
                     isCompleted ? meta.color :
                     isCurrent ? `${meta.color} ring-4 ${meta.ring}` :
                     'bg-slate-200'
                   }`} />
-                  <span className={`text-[10px] font-medium ${isCurrent ? meta.text : 'text-slate-400'}`}>
-                    {STEP_LABELS[step]}
-                  </span>
+                  <div className="flex flex-col items-center">
+                    <span className={`text-xs font-semibold ${
+                      !inScope ? 'text-slate-300' :
+                      isSelected ? 'text-blue-700' :
+                      isCurrent ? meta.text : 'text-slate-500'
+                    }`}>
+                      {STEP_LABELS[step]}
+                    </span>
+                    {stepCheckpoints.length > 0 && (
+                      <span className={`text-[10px] font-medium mt-0.5 ${
+                        isSelected ? 'text-blue-600' : 'text-slate-400'
+                      }`}>
+                        {passedCount}/{stepCheckpoints.length}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
+
+          {/* Checkpoints Section */}
+          {selectedStep && (
+            <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    จุดตรวจสอบ: {STEP_LABELS[selectedStep]}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {checkpoints.filter(c => c.step === selectedStep).length} รายการ
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCpForm(!showCpForm)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
+                >
+                  {showCpForm ? <X size={14} /> : <Plus size={14} />}
+                  {showCpForm ? 'ยกเลิก' : 'เพิ่ม'}
+                </button>
+              </div>
+
+              {/* Checkpoint Form */}
+              {showCpForm && (
+                <div className="mb-4 rounded-xl border border-blue-200 bg-white p-3">
+                  <input
+                    type="text"
+                    value={cpForm.checkpoint_name}
+                    onChange={(e) => setCpForm(prev => ({ ...prev, checkpoint_name: e.target.value }))}
+                    placeholder="ชื่อจุดตรวจสอบ (เช่น ยื่น COP)"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm mb-2 focus:border-blue-400 outline-none"
+                  />
+                  <textarea
+                    value={cpForm.notes}
+                    onChange={(e) => setCpForm(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="หมายเหตุ (ถ้ามี)"
+                    rows="2"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm mb-2 focus:border-blue-400 outline-none"
+                  />
+                  <label className="flex items-center gap-2 mb-3">
+                    <input
+                      type="checkbox"
+                      checked={cpForm.required}
+                      onChange={(e) => setCpForm(prev => ({ ...prev, required: e.target.checked }))}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <span className="text-xs text-slate-600">จำเป็นต้องผ่าน</span>
+                  </label>
+                  <button
+                    onClick={handleCreateCheckpoint}
+                    disabled={!cpForm.checkpoint_name.trim()}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                  >
+                    บันทึก
+                  </button>
+                </div>
+              )}
+
+              {/* Checkpoint List */}
+              {checkpoints.filter(c => c.step === selectedStep).length === 0 ? (
+                <p className="text-xs text-slate-400 py-2 text-center">ยังไม่มีจุดตรวจสอบในขั้นตอนนี้</p>
+              ) : (
+                <div className="space-y-2">
+                  {checkpoints.filter(c => c.step === selectedStep).map((cp) => (
+                    <div key={cp.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-slate-900">{cp.checkpoint_name}</span>
+                            {cp.required ? (
+                              <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full font-medium">จำเป็น</span>
+                            ) : (
+                              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-medium">ไม่บังคับ</span>
+                            )}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                              cp.status === 'passed' ? 'bg-emerald-50 text-emerald-700' :
+                              cp.status === 'failed' ? 'bg-red-50 text-red-700' :
+                              cp.status === 'skipped' ? 'bg-slate-100 text-slate-500' :
+                              'bg-amber-50 text-amber-700'
+                            }`}>
+                              {cp.status === 'passed' ? 'ผ่าน' :
+                               cp.status === 'failed' ? 'ไม่ผ่าน' :
+                               cp.status === 'skipped' ? 'ข้าม' : 'รอดำเนินการ'}
+                            </span>
+                          </div>
+                          {cp.assigned_to_name && (
+                            <p className="text-xs text-slate-500 mt-1">ผู้รับผิดชอบ: {cp.assigned_to_name}</p>
+                          )}
+                          {editingCp === cp.id ? (
+                            <div className="mt-2 flex gap-2">
+                              <input
+                                type="text"
+                                defaultValue={cp.notes || ''}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleUpdateCheckpointNotes(cp.id, e.target.value);
+                                  if (e.key === 'Escape') setEditingCp(null);
+                                }}
+                                className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-blue-400 outline-none"
+                                autoFocus
+                              />
+                              <button onClick={() => setEditingCp(null)} className="text-xs text-slate-400 hover:text-slate-600">ยกเลิก</button>
+                            </div>
+                          ) : cp.notes ? (
+                            <p className="text-xs text-slate-600 mt-1 cursor-pointer hover:text-blue-600" onClick={() => setEditingCp(cp.id)}>
+                              {cp.notes}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          {cp.status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => handleApproveCheckpoint(cp.id)}
+                                className="rounded-full p-1.5 text-emerald-500 hover:bg-emerald-50 transition-colors"
+                                title="อนุมัติ"
+                              >
+                                <Check size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleUpdateCheckpointStatus(cp.id, 'failed')}
+                                className="rounded-full p-1.5 text-red-500 hover:bg-red-50 transition-colors"
+                                title="ไม่ผ่าน"
+                              >
+                                <X size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleUpdateCheckpointStatus(cp.id, 'skipped')}
+                                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 transition-colors"
+                                title="ข้าม"
+                              >
+                                <Minus size={14} />
+                              </button>
+                            </>
+                          )}
+                          {cp.status === 'failed' && (
+                            <button
+                              onClick={() => handleUpdateCheckpointStatus(cp.id, 'pending')}
+                              className="rounded-full p-1.5 text-amber-500 hover:bg-amber-50 transition-colors"
+                              title="รีเซ็ต"
+                            >
+                              <RefreshCw size={14} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteCheckpoint(cp.id)}
+                            className="rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                            title="ลบ"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Timeline */}
           <h3 className="text-lg font-bold text-slate-900 mb-4">Timeline</h3>
@@ -393,25 +746,61 @@ export default function ProjectDetail() {
 
               <div className="space-y-6">
                 {timeline.map((entry) => {
+                  const isCheckpoint = entry.status?.startsWith('checkpoint_');
                   const meta = stepMeta[entry.step] || { color: 'bg-slate-500', text: 'text-slate-600' };
+
+                  const checkpointIcon = {
+                    checkpoint_created: <Plus size={14} />,
+                    checkpoint_passed: <Check size={14} />,
+                    checkpoint_failed: <X size={14} />,
+                    checkpoint_skipped: <Minus size={14} />,
+                  };
+
+                  const checkpointColors = {
+                    checkpoint_created: 'bg-cyan-500',
+                    checkpoint_passed: 'bg-emerald-500',
+                    checkpoint_failed: 'bg-rose-500',
+                    checkpoint_skipped: 'bg-amber-500',
+                  };
 
                   return (
                     <div key={entry.id} className="relative flex items-start gap-4 pl-2">
-                      <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${meta.color} text-white text-xs font-bold`}>
-                        {STEP_LABELS[entry.step]?.charAt(0) || '?'}
+                      <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isCheckpoint ? checkpointColors[entry.status] || 'bg-slate-400' : meta.color} text-white text-xs font-bold`}>
+                        {isCheckpoint ? (checkpointIcon[entry.status] || '?') : (STEP_LABELS[entry.step]?.charAt(0) || '?')}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-slate-900">
-                            {STEP_LABELS[entry.step]}
+                            {isCheckpoint ? entry.note?.match(/\[จุดตรวจสอบ\]\s*(.+?):/)?.[1] || 'จุดตรวจสอบ' : STEP_LABELS[entry.step]}
                           </span>
+                          {isCheckpoint && (
+                            <span className="text-[10px] text-slate-400">
+                              ({STEP_LABELS[entry.step]})
+                            </span>
+                          )}
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[entry.status] || 'bg-slate-100 text-slate-600'}`}>
                             {STATUS_LABELS[entry.status] || entry.status}
                           </span>
                           <button
+                            onClick={() => toggleComments(entry.id)}
+                            className={`relative rounded-full p-1.5 transition-colors ${
+                              expandedComments[entry.id]
+                                ? 'bg-blue-50 text-blue-600'
+                                : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                            }`}
+                            title="คอมเมนต์"
+                          >
+                            <MessageSquare size={14} />
+                            {entry.comment_count > 0 && (
+                              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white">
+                                {entry.comment_count > 99 ? '99+' : entry.comment_count}
+                              </span>
+                            )}
+                          </button>
+                          <button
                             onClick={() => handleDeleteTimeline(entry.id)}
-                            className="ml-auto rounded-full p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                            className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                             title="ลบรายการนี้"
                           >
                             <Trash2 size={14} />
@@ -432,6 +821,59 @@ export default function ProjectDetail() {
 
                         {entry.note && (
                           <p className="mt-1 text-sm text-slate-600">{entry.note}</p>
+                        )}
+
+                        {/* Comment Section */}
+                        {expandedComments[entry.id] && (
+                          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            {/* รายการคอมเมนต์ */}
+                            {(commentsMap[entry.id] || []).length === 0 ? (
+                              <p className="text-xs text-slate-400 py-1">ยังไม่มีคอมเมนต์</p>
+                            ) : (
+                              <div className="space-y-2 mb-3">
+                                {(commentsMap[entry.id] || []).map((c) => (
+                                  <div key={c.id} className="flex items-start gap-2">
+                                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold mt-0.5">
+                                      {(c.user_name || c.username || '?').charAt(0)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold text-slate-800">{c.user_name || c.username || 'ไม่ทราบ'}</span>
+                                        <span className="text-[10px] text-slate-400">{formatDateTime(c.created_at)}</span>
+                                        <button
+                                          onClick={() => handleDeleteComment(entry.id, c.id)}
+                                          className="ml-auto rounded p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                                          title="ลบ"
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </div>
+                                      <p className="text-xs text-slate-700 mt-0.5 whitespace-pre-wrap">{c.comment}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* ช่องเพิ่มคอมเมนต์ */}
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={commentTexts[entry.id] || ''}
+                                onChange={(e) => setCommentTexts((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleAddComment(entry.id); }}
+                                placeholder="เพิ่มคอมเมนต์..."
+                                className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400"
+                              />
+                              <button
+                                onClick={() => handleAddComment(entry.id)}
+                                disabled={submittingComment || !(commentTexts[entry.id] || '').trim()}
+                                className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-white transition-colors hover:bg-blue-700 disabled:opacity-40"
+                              >
+                                <Send size={12} />
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>

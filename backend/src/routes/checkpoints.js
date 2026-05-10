@@ -56,6 +56,14 @@ router.post('/projects/:projectId/checkpoints', authenticateToken, authorizePerm
 
     logActivity(req.user.id, 'create', 'checkpoint', id, { step, checkpoint_name });
 
+    // Add to project timeline
+    const createTimelineNote = `[จุดตรวจสอบ] สร้างจุดตรวจสอบใหม่: ${checkpoint_name}`;
+    await pool.query(
+      `INSERT INTO project_timeline (id, project_id, step, status, note, changed_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), req.params.projectId, step, 'checkpoint_created', createTimelineNote, req.user.id]
+    );
+
     const result = await pool.query('SELECT * FROM checkpoints WHERE id = ?', [id]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -65,7 +73,7 @@ router.post('/projects/:projectId/checkpoints', authenticateToken, authorizePerm
 });
 
 // PUT /api/checkpoints/:id — update checkpoint
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/checkpoints/:id', authenticateToken, async (req, res) => {
   try {
     const { status, notes, assigned_to } = req.body;
     const existing = await pool.query('SELECT * FROM checkpoints WHERE id = ?', [req.params.id]);
@@ -111,6 +119,15 @@ router.put('/:id', authenticateToken, async (req, res) => {
         [uuidv4(), req.params.id, 'updated', prevStatus, status, notes || null, req.user.id]
       );
 
+      // Add to project timeline
+      const timelineStatus = `checkpoint_${status}`;
+      const timelineNote = `[จุดตรวจสอบ] ${checkpoint.checkpoint_name}: ${status === 'passed' ? 'ผ่าน' : status === 'failed' ? 'ไม่ผ่าน' : status === 'skipped' ? 'ข้าม' : 'รอดำเนินการ'}${notes ? ' - ' + notes : ''}`;
+      await pool.query(
+        `INSERT INTO project_timeline (id, project_id, step, status, note, changed_by)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [uuidv4(), checkpoint.project_id, checkpoint.step, timelineStatus, timelineNote, req.user.id]
+      );
+
       // Notify assigned user if checkpoint failed
       if (status === 'failed' && checkpoint.assigned_to && checkpoint.assigned_to !== req.user.id) {
         createNotification(
@@ -135,7 +152,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // POST /api/checkpoints/:id/approve — approve checkpoint (shortcut for setting status to passed)
-router.post('/:id/approve', authenticateToken, authorizePermission('checkpoint.approve'), async (req, res) => {
+router.post('/checkpoints/:id/approve', authenticateToken, authorizePermission('checkpoint.approve'), async (req, res) => {
   try {
     const { reason } = req.body;
     const existing = await pool.query('SELECT * FROM checkpoints WHERE id = ?', [req.params.id]);
@@ -155,6 +172,14 @@ router.post('/:id/approve', authenticateToken, authorizePermission('checkpoint.a
       [uuidv4(), req.params.id, prevStatus, reason || 'อนุมัติ', req.user.id]
     );
 
+    // Add to project timeline
+    const timelineNote = `[จุดตรวจสอบ] ${checkpoint.checkpoint_name}: อนุมัติ${reason ? ' - ' + reason : ''}`;
+    await pool.query(
+      `INSERT INTO project_timeline (id, project_id, step, status, note, changed_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), checkpoint.project_id, checkpoint.step, 'checkpoint_passed', timelineNote, req.user.id]
+    );
+
     logActivity(req.user.id, 'approve', 'checkpoint', req.params.id, { reason });
     await calculateRisk(checkpoint.project_id);
 
@@ -167,7 +192,7 @@ router.post('/:id/approve', authenticateToken, authorizePermission('checkpoint.a
 });
 
 // GET /api/checkpoints/:id/logs — get checkpoint history
-router.get('/:id/logs', authenticateToken, async (req, res) => {
+router.get('/checkpoints/:id/logs', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT cl.*, u.full_name as performed_by_name
@@ -185,7 +210,7 @@ router.get('/:id/logs', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/checkpoints/:id
-router.delete('/:id', authenticateToken, authorizePermission('checkpoint.approve'), async (req, res) => {
+router.delete('/checkpoints/:id', authenticateToken, authorizePermission('checkpoint.approve'), async (req, res) => {
   try {
     const existing = await pool.query('SELECT * FROM checkpoints WHERE id = ?', [req.params.id]);
     if (existing.rows.length === 0) return res.status(404).json({ error: 'ไม่พบจุดตรวจสอบ' });

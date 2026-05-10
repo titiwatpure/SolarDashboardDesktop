@@ -137,9 +137,11 @@ export default function Projects() {
                   className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-10 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white"
                 >
                   <option value="">สถานะ</option>
-                  <option value="pending">{STATUS_LABELS.pending}</option>
+                  <option value="not_started">{STATUS_LABELS.not_started}</option>
                   <option value="in_progress">{STATUS_LABELS.in_progress}</option>
+                  <option value="waiting">{STATUS_LABELS.waiting}</option>
                   <option value="blocked">{STATUS_LABELS.blocked}</option>
+                  <option value="rejected">{STATUS_LABELS.rejected}</option>
                   <option value="completed">{STATUS_LABELS.completed}</option>
                 </select>
                 <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />

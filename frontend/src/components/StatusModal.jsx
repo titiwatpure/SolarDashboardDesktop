@@ -106,6 +106,7 @@ export default function StatusModal({ isOpen, onClose, onUpdated, project }) {
       };
 
       await projectsAPI.update(project.id, payload);
+      window.dispatchEvent(new Event('refresh-notifications'));
       onUpdated?.();
       onClose();
     } catch (err) {

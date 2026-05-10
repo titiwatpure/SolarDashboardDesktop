@@ -8,6 +8,11 @@ export const STATUS_LABELS = {
   blocked: 'ติดปัญหา',
   rejected: 'ถูกปฏิเสธ',
   completed: 'เสร็จแล้ว',
+  // Checkpoint timeline statuses
+  checkpoint_created: 'สร้างจุดตรวจสอบ',
+  checkpoint_passed: 'จุดตรวจสอบผ่าน',
+  checkpoint_failed: 'จุดตรวจสอบไม่ผ่าน',
+  checkpoint_skipped: 'ข้ามจุดตรวจสอบ',
 };
 
 // สีของ badge แต่ละสถานะ (Tailwind class)
@@ -18,6 +23,11 @@ export const STATUS_COLORS = {
   blocked: 'bg-red-100 text-red-800',
   rejected: 'bg-orange-100 text-orange-800',
   completed: 'bg-green-100 text-green-800',
+  // Checkpoint timeline statuses
+  checkpoint_created: 'bg-cyan-100 text-cyan-800',
+  checkpoint_passed: 'bg-emerald-100 text-emerald-800',
+  checkpoint_failed: 'bg-rose-100 text-rose-800',
+  checkpoint_skipped: 'bg-amber-100 text-amber-800',
 };
 
 // ระดับความเสี่ยง

@@ -104,8 +104,10 @@ router.get('/summary/step-status', authenticateToken, async (_req, res) => {
         COUNT(*) as count,
         COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
         COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-        COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked
+        COUNT(CASE WHEN status = 'not_started' THEN 1 END) as not_started,
+        COUNT(CASE WHEN status = 'waiting' THEN 1 END) as waiting,
+        COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked,
+        COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected
       FROM projects
       GROUP BY current_step
       ORDER BY

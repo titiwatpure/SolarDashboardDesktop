@@ -8,6 +8,22 @@ const { calculateRisk } = require('../services/riskDetection');
 
 const router = express.Router();
 
+// Step order for progress calculation
+const STEP_ORDER = { survey: 0, design: 1, erc: 2, grid: 3, construction: 4, testing: 5, cod: 6 };
+const STEP_LABELS = { survey: 'สำรวจ', design: 'ออกแบบ', erc: 'ERC', grid: 'Grid', construction: 'ก่อสร้าง', testing: 'ทดสอบ', cod: 'COD' };
+const STATUS_LABELS = { not_started: 'ยังไม่เริ่ม', in_progress: 'กำลังดำเนินการ', waiting: 'รอข้อมูล', blocked: 'ติดปัญหา', rejected: 'ถูกปฏิเสธ', completed: 'เสร็จสิ้น' };
+
+function calcProgress(currentStep, status, scopeStart = 'survey', scopeEnd = 'cod') {
+  if (status === 'completed') return 100;
+  const start = STEP_ORDER[scopeStart] ?? 0;
+  const end = STEP_ORDER[scopeEnd] ?? 6;
+  const current = STEP_ORDER[currentStep] ?? 0;
+  const scopeSize = end - start;
+  if (scopeSize <= 0) return status === 'completed' ? 100 : 0;
+  const pos = Math.max(0, Math.min(current - start, scopeSize));
+  return Math.round((pos / scopeSize) * 100);
+}
+
 // Valid status transitions
 const STATUS_TRANSITIONS = {
   not_started: ['in_progress', 'blocked'],
@@ -20,7 +36,11 @@ const STATUS_TRANSITIONS = {
 
 const getProjectById = async (id) => {
   const result = await pool.query('SELECT * FROM projects WHERE id = ?', [id]);
-  return result.rows[0] || null;
+  const row = result.rows[0];
+  if (row) {
+    row.progress = calcProgress(row.current_step, row.status, row.scope_start, row.scope_end);
+  }
+  return row || null;
 };
 
 // Auto-create default checkpoints for a step
@@ -118,6 +138,10 @@ router.get('/', authenticateToken, async (req, res) => {
       ORDER BY p.created_at DESC
       LIMIT ? OFFSET ?`;
     const result = await pool.query(query, [...params, limit, (page - 1) * limit]);
+    result.rows = result.rows.map(r => ({
+      ...r,
+      progress: calcProgress(r.current_step, r.status, r.scope_start, r.scope_end),
+    }));
 
     const countQuery = `SELECT COUNT(*) as count FROM projects WHERE 1=1${clause}`;
     const countResult = await pool.query(countQuery, params);
@@ -270,7 +294,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
       [req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'ไม่พบโครงการ' });
-    res.json(result.rows[0]);
+    const project = result.rows[0];
+    project.progress = calcProgress(project.current_step, project.status, project.scope_start, project.scope_end);
+    res.json(project);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
@@ -283,6 +309,7 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
     const {
       project_name, project_code, size_kw, size_kva, province,
       responsible_user, description, has_power_selling, start_date,
+      scope_start, scope_end,
     } = req.body;
 
     if (!project_name || !project_code || !size_kw || !province) {
@@ -320,18 +347,24 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
     }
 
     const id = uuidv4();
+    const validSteps = Object.keys(STEP_ORDER);
+    const scopeStartVal = validSteps.includes(scope_start) ? scope_start : 'survey';
+    const scopeEndVal = validSteps.includes(scope_end) ? scope_end : 'cod';
+
     await pool.query(
       `INSERT INTO projects (
         id, project_name, project_code, size_kw, size_kva, province,
         responsible_user, description, has_power_selling, requires_permit,
-        permit_type, start_date, status, current_step, risk_level, risk_factors
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        permit_type, start_date, status, current_step, scope_start, scope_end,
+        risk_level, risk_factors
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, project_name, project_code, Number(size_kw),
         size_kva ? Number(size_kva) : null, province,
         responsible_user || null, description || null,
         has_power_selling ? 1 : 0, requiresPermit ? 1 : 0,
         permitType, start_date || null, 'not_started', 'survey',
+        scopeStartVal, scopeEndVal,
         'low', '{}',
       ]
     );
@@ -353,7 +386,8 @@ router.get('/:id/timeline', authenticateToken, async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 200);
     const result = await pool.query(
-      `SELECT t.*, u.full_name as changed_by_name
+      `SELECT t.*, u.full_name as changed_by_name,
+        (SELECT COUNT(*) FROM timeline_comments tc WHERE tc.timeline_id = t.id) as comment_count
        FROM project_timeline t
        LEFT JOIN users u ON t.changed_by = u.id
        WHERE t.project_id = ?
@@ -385,6 +419,113 @@ router.delete('/:id/timeline/:timelineId', authenticateToken, authorizeRole(['ad
   }
 });
 
+// GET /api/projects/:id/timeline/:timelineId/comments
+router.get('/:id/timeline/:timelineId/comments', authenticateToken, async (req, res) => {
+  try {
+    const { timelineId } = req.params;
+    const result = await pool.query(
+      `SELECT tc.*, u.full_name as user_name, u.username
+       FROM timeline_comments tc
+       LEFT JOIN users u ON tc.user_id = u.id
+       WHERE tc.timeline_id = ?
+       ORDER BY tc.created_at ASC`,
+      [timelineId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// POST /api/projects/:id/timeline/:timelineId/comments
+router.post('/:id/timeline/:timelineId/comments', authenticateToken, async (req, res) => {
+  try {
+    const { timelineId } = req.params;
+    const { comment } = req.body;
+    if (!comment || !comment.trim()) return res.status(400).json({ error: 'กรุณาใส่ข้อความ' });
+
+    const existing = await pool.query(
+      'SELECT id FROM project_timeline WHERE id = ?', [timelineId]
+    );
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'ไม่พบรายการ timeline' });
+
+    const commentId = uuidv4();
+    await pool.query(
+      'INSERT INTO timeline_comments (id, timeline_id, user_id, comment) VALUES (?, ?, ?, ?)',
+      [commentId, timelineId, req.user.id, comment.trim()]
+    );
+
+    const result = await pool.query(
+      `SELECT tc.*, u.full_name as user_name, u.username
+       FROM timeline_comments tc
+       LEFT JOIN users u ON tc.user_id = u.id
+       WHERE tc.id = ?`,
+      [commentId]
+    );
+
+    // ส่งแจ้งเตือน
+    try {
+      const tlEntry = await pool.query(
+        'SELECT pt.changed_by, pt.step, pt.status, p.project_name, p.responsible_user FROM project_timeline pt JOIN projects p ON pt.project_id = p.id WHERE pt.id = ?',
+        [timelineId]
+      );
+      const tl = tlEntry.rows[0];
+      if (tl) {
+        const commenterName = result.rows[0]?.user_name || req.user.username;
+        const stepLabel = STEP_LABELS[tl.step] || tl.step;
+        const notifyUsers = new Set();
+        if (tl.changed_by && tl.changed_by !== req.user.id) notifyUsers.add(tl.changed_by);
+        if (tl.responsible_user && tl.responsible_user !== req.user.id) notifyUsers.add(tl.responsible_user);
+
+        const prevComments = await pool.query(
+          'SELECT DISTINCT user_id FROM timeline_comments WHERE timeline_id = ? AND user_id IS NOT NULL AND user_id != ?',
+          [timelineId, req.user.id]
+        );
+        prevComments.rows.forEach(r => notifyUsers.add(r.user_id));
+
+        for (const uid of notifyUsers) {
+          createNotification(
+            uid, 'timeline_comment', 'คอมเมนต์ใหม่',
+            `${commenterName} คอมเมนต์บน Timeline "${stepLabel}": ${comment.text.slice(0, 80)}`,
+            'project', req.params.id
+          );
+        }
+      }
+    } catch (notifErr) {
+      console.error('Notification error:', notifErr);
+    }
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// DELETE /api/projects/:id/timeline/:timelineId/comments/:commentId
+router.delete('/:id/timeline/:timelineId/comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const existing = await pool.query(
+      'SELECT tc.*, p.responsible_user FROM timeline_comments tc JOIN project_timeline pt ON tc.timeline_id = pt.id JOIN projects p ON pt.project_id = p.id WHERE tc.id = ?',
+      [commentId]
+    );
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'ไม่พบคอมเมนต์' });
+
+    const comment = existing.rows[0];
+    const isAdmin = req.user.role === 'admin';
+    const isOwner = comment.user_id === req.user.id;
+    if (!isAdmin && !isOwner) return res.status(403).json({ error: 'ไม่มีสิทธิ์ลบ' });
+
+    await pool.query('DELETE FROM timeline_comments WHERE id = ?', [commentId]);
+    res.json({ message: 'ลบคอมเมนต์สำเร็จ' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
 // PUT /api/projects/:id
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
@@ -395,6 +536,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       'responsible_user', 'description', 'has_power_selling',
       'blocked_reason', 'blocked_by', 'actual_cod_date', 'expected_cod_date',
       'size_kw', 'size_kva', 'start_date',
+      'scope_start', 'scope_end',
     ];
 
     const existing = await getProjectById(id);
@@ -499,12 +641,35 @@ router.put('/:id', authenticateToken, async (req, res) => {
     logActivity(req.user.id, 'update', 'project', id, { fields: Object.keys(updates) });
 
     // Notification
-    if (statusChanged && existing.responsible_user && existing.responsible_user !== req.user.id) {
-      createNotification(
-        existing.responsible_user, 'status_change', 'สถานะโครงการเปลี่ยน',
-        `โครงการ "${existing.project_name}" เปลี่ยนสถานะเป็น "${newStatus}"`,
-        'project', id
-      );
+    if (statusChanged || stepChanged) {
+      const notifyUsers = new Set();
+      // แจ้ง responsible_user (ถ้าไม่ใช่คนแก้)
+      if (existing.responsible_user && existing.responsible_user !== req.user.id) notifyUsers.add(existing.responsible_user);
+
+      // แจ้ง admin ทุกคน (รวมตัวเองถ้าเป็น admin เพื่อให้แน่ใจว่ามีคนได้รับ)
+      try {
+        const admins = await pool.query("SELECT id FROM users WHERE role = 'admin'");
+        admins.rows.forEach(a => {
+          if (a.id !== req.user.id) notifyUsers.add(a.id);
+        });
+      } catch {}
+
+      // ถ้าไม่มีใครต้องแจ้ง (เช่น admin แก้เอง + เป็น responsible_user) → แจ้งตัวเอง
+      if (notifyUsers.size === 0) {
+        notifyUsers.add(req.user.id);
+      }
+
+      const stepLabel = STEP_LABELS[newStep] || newStep;
+      const statusLabel = STATUS_LABELS[newStatus] || newStatus;
+      const notifType = statusChanged ? 'status_change' : 'step_change';
+      const notifTitle = statusChanged ? 'สถานะโครงการเปลี่ยน' : 'ขั้นตอนโครงการเปลี่ยน';
+      const notifMsg = statusChanged
+        ? `โครงการ "${existing.project_name}" เปลี่ยนสถานะเป็น "${statusLabel}"`
+        : `โครงการ "${existing.project_name}" เปลี่ยนขั้นตอนเป็น "${stepLabel}"`;
+
+      for (const uid of notifyUsers) {
+        createNotification(uid, notifType, notifTitle, notifMsg, 'project', id);
+      }
     }
 
     res.json(result.rows[0]);

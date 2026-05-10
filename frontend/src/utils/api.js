@@ -1,10 +1,11 @@
 /**
  * API Utility - ฟังก์ชั่นสำหรับการเชื่อมต่อกับเซิร์ฟเวอร์ Backend
- * 
+ *
  * ใช้สำหรับ:
  * - ตั้งค่า Authorization Token
  * - เรียก API endpoints
  * - จัดการ Error responses
+ * - Auto refresh token เมื่อ access token หมดอายุ
  */
 
 import axios from 'axios';
@@ -15,74 +16,147 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api
 /**
  * ตั้งค่า Authorization Token
  * @param {string} token - JWT token จากการเข้าสู่ระบบ
- * 
- * วิธีการใช้:
- * setAuthToken('your-jwt-token-here');  // ตั้งค่า token
- * setAuthToken(null);                   // ลบ token
  */
 export const setAuthToken = (token) => {
   if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`; // เพิ่ม Token เข้า header สำหรับทุก request
-    localStorage.setItem('token', token);                                // บันทึก Token ลง localStorage
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    localStorage.setItem('token', token);
   } else {
-    delete axios.defaults.headers.common['Authorization'];               // ลบ Token ออกจาก header
-    localStorage.removeItem('token');                                    // ลบ Token จาก localStorage
+    delete axios.defaults.headers.common['Authorization'];
+    localStorage.removeItem('token');
   }
 };
 
 /**
- * ดึง Token จาก Local Storage
+ * ตั้งค่า Refresh Token
  */
+export const setRefreshToken = (refreshToken) => {
+  if (refreshToken) {
+    localStorage.setItem('refreshToken', refreshToken);
+  } else {
+    localStorage.removeItem('refreshToken');
+  }
+};
+
 const getToken = () => localStorage.getItem('token');
+const getRefreshToken = () => localStorage.getItem('refreshToken');
+
+// ========================
+// Token Refresh Logic
+// ========================
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+/**
+ * เรียก refresh token เพื่อขอ access token ใหม่
+ */
+const refreshAccessToken = async () => {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) throw new Error('No refresh token');
+
+  const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+  const { accessToken, refreshToken: newRefreshToken } = response.data;
+
+  setAuthToken(accessToken);
+  if (newRefreshToken) setRefreshToken(newRefreshToken);
+
+  return accessToken;
+};
+
+// ========================
+// Axios Interceptor: Auto Refresh on 401
+// ========================
+axios.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // ถ้าไม่ใช่ 401 หรือ request เคย retry แล้ว ให้ reject ทันที
+    if (error.response?.status !== 401 || originalRequest._retry) {
+      return Promise.reject(error);
+    }
+
+    // ถ้าเป็น request ไปที่ refresh endpoint เอง ให้ reject (ป้องกัน loop)
+    if (originalRequest.url?.includes('/auth/refresh')) {
+      setAuthToken(null);
+      setRefreshToken(null);
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
+
+    // ถ้ากำลัง refresh อยู่แล้ว ให้ queue request นี้รอ
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      }).then((token) => {
+        originalRequest.headers['Authorization'] = `Bearer ${token}`;
+        return axios(originalRequest);
+      });
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      const newToken = await refreshAccessToken();
+      processQueue(null, newToken);
+      originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+      return axios(originalRequest);
+    } catch (refreshError) {
+      processQueue(refreshError, null);
+      setAuthToken(null);
+      setRefreshToken(null);
+      window.location.href = '/login';
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
+  }
+);
 
 /**
  * ฟังก์ชั่นหลักสำหรับเรียก API
- * @param {string} method - HTTP method (GET, POST, PUT, DELETE)
- * @param {string} url - เส้นทาง API (เช่น /projects)
- * @param {object} data - ข้อมูลที่ส่งไป (สำหรับ POST/PUT)
- * 
- * ตัวอย่าง:
- * // GET request
- * const projects = await apiCall('GET', '/projects');
- * 
- * // POST request
- * const newProject = await apiCall('POST', '/projects', { name: 'โครงการใหม่' });
- * 
- * // UPDATE request
- * const updated = await apiCall('PUT', '/projects/123', { name: 'ชื่อใหม่' });
  */
 export const apiCall = async (method, url, data = null) => {
-  const token = getToken(); // ดึง Token จาก localStorage
+  const token = getToken();
   if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`; // ตั้งค่า Token ในทุก request
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   }
 
   try {
     const config = {
-      method,                          // GET, POST, PUT, DELETE
-      url: `${API_BASE_URL}${url}`,   // URL เต็ม (base + path)
+      method,
+      url: `${API_BASE_URL}${url}`,
     };
 
     if (data) {
-      config.data = data; // ใส่ข้อมูลถ้าเป็น POST/PUT
+      config.data = data;
     }
 
     const response = await axios(config);
-    return response.data; // คืนเฉพาะ data
+    return response.data;
   } catch (error) {
-    console.error('❌ API Error:', error);
-    if (error.response?.status === 401) {
-      // ถ้าได้รับ 401 แสดงว่า Token หมดอายุ ให้ลบ Token แล้วไปหน้า Login
-      setAuthToken(null);
-      window.location.href = '/login';
-    }
-    throw error; // โยน error ให้ส่วนที่เรียกใช้จัดการต่อ
+    console.error('API Error:', error);
+    throw error;
   }
 };
 
 export const authAPI = {
   login: (username, password) => apiCall('POST', '/auth/login', { username, password }),
-  logout: () => apiCall('POST', '/auth/logout-all'),
+  logout: () => apiCall('POST', '/auth/logout'),
+  logoutAll: () => apiCall('POST', '/auth/logout-all'),
+  refresh: () => refreshAccessToken(),
 };
 
 export const projectsAPI = {
@@ -94,9 +168,18 @@ export const projectsAPI = {
   getKPIs: () => apiCall('GET', '/projects/stats/kpis'),
   getTimeline: (id) => apiCall('GET', `/projects/${id}/timeline`),
   deleteTimeline: (projectId, timelineId) => apiCall('DELETE', `/projects/${projectId}/timeline/${timelineId}`),
+  getTimelineComments: (projectId, timelineId) => apiCall('GET', `/projects/${projectId}/timeline/${timelineId}/comments`),
+  addTimelineComment: (projectId, timelineId, data) => apiCall('POST', `/projects/${projectId}/timeline/${timelineId}/comments`, data),
+  deleteTimelineComment: (projectId, timelineId, commentId) => apiCall('DELETE', `/projects/${projectId}/timeline/${timelineId}/comments/${commentId}`),
   getOrganizations: (id) => apiCall('GET', `/projects/${id}/organizations`),
   addOrganization: (id, orgId) => apiCall('POST', `/projects/${id}/organizations`, { org_id: orgId }),
   removeOrganization: (id, orgId) => apiCall('DELETE', `/projects/${id}/organizations/${orgId}`),
+  getCheckpoints: (projectId, step) => apiCall('GET', `/projects/${projectId}/checkpoints${step ? '?step=' + step : ''}`),
+  createCheckpoint: (projectId, data) => apiCall('POST', `/projects/${projectId}/checkpoints`, data),
+  updateCheckpoint: (id, data) => apiCall('PUT', `/checkpoints/${id}`, data),
+  approveCheckpoint: (id, data) => apiCall('POST', `/checkpoints/${id}/approve`, data),
+  getCheckpointLogs: (id) => apiCall('GET', `/checkpoints/${id}/logs`),
+  deleteCheckpoint: (id) => apiCall('DELETE', `/checkpoints/${id}`),
 };
 
 export const usersAPI = {
