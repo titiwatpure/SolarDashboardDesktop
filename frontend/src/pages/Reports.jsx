@@ -452,7 +452,7 @@ export default function Reports() {
               className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileSpreadsheet size={18} />
-              Export Excel
+              ส่งออก Excel
             </button>
             <button
               onClick={handleExportPdf}
@@ -460,7 +460,7 @@ export default function Reports() {
               className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download size={18} />
-              Export PDF
+              ส่งออก PDF
             </button>
           </div>
         </div>

@@ -248,7 +248,7 @@ export default function ProjectReport() {
           </div>
           <div className="flex gap-2 print:hidden">
             <button onClick={handleExportPdf} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-              <Download size={16} /> Export PDF
+              <Download size={16} /> ส่งออก PDF
             </button>
             <button onClick={handlePrint} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
               <Printer size={16} /> พิมพ์
@@ -330,7 +330,7 @@ export default function ProjectReport() {
                 </div>
                 {cpForStep.length > 0 && (
                   <div className="text-right">
-                    <p className="text-xs text-slate-500">Checkpoints</p>
+                    <p className="text-xs text-slate-500">จุดตรวจสอบ</p>
                     <p className="text-sm font-semibold text-slate-700">{cpPassed}/{cpForStep.length}</p>
                   </div>
                 )}
