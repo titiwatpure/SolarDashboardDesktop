@@ -105,7 +105,7 @@ export default function ProjectReport() {
         ];
       }),
       theme: 'grid',
-      headStyles: { fillColor: [37, 99, 235] },
+      headStyles: { fillColor: [37, 99, 235], font: 'Sarabun' },
       styles: { font: 'Sarabun', fontSize: 9 },
     });
     y = doc.lastAutoTable.finalY + 10;
@@ -126,7 +126,7 @@ export default function ProjectReport() {
           c.completed_at ? formatDate(c.completed_at) : '-',
         ]),
         theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235] },
+        headStyles: { fillColor: [37, 99, 235], font: 'Sarabun' },
         styles: { font: 'Sarabun', fontSize: 9 },
       });
       y = doc.lastAutoTable.finalY + 10;
@@ -148,7 +148,7 @@ export default function ProjectReport() {
           t.due_date ? formatDate(t.due_date) : '-',
         ]),
         theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235] },
+        headStyles: { fillColor: [37, 99, 235], font: 'Sarabun' },
         styles: { font: 'Sarabun', fontSize: 9 },
       });
       y = doc.lastAutoTable.finalY + 10;
@@ -169,7 +169,7 @@ export default function ProjectReport() {
           formatDate(d.uploaded_at),
         ]),
         theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235] },
+        headStyles: { fillColor: [37, 99, 235], font: 'Sarabun' },
         styles: { font: 'Sarabun', fontSize: 9 },
       });
       y = doc.lastAutoTable.finalY + 10;
@@ -190,7 +190,7 @@ export default function ProjectReport() {
           o.approved_at ? formatDate(o.approved_at) : '-',
         ]),
         theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235] },
+        headStyles: { fillColor: [37, 99, 235], font: 'Sarabun' },
         styles: { font: 'Sarabun', fontSize: 9 },
       });
     }

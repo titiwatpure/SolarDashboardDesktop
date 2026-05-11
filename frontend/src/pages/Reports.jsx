@@ -276,7 +276,7 @@ export default function Reports() {
         head: [headers],
         body: rows,
         theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235] },
+        headStyles: { fillColor: [37, 99, 235], font: 'Sarabun' },
         styles: { font: 'Sarabun', fontSize: 9 },
       });
       y = doc.lastAutoTable.finalY + 10;
