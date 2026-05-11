@@ -44,6 +44,8 @@ export default function Reports() {
   const [tasksData, setTasksData] = useState([]);
   const [timelineData, setTimelineData] = useState([]);
   const [timelineSearch, setTimelineSearch] = useState('');
+  const [timelinePage, setTimelinePage] = useState(1);
+  const TIMELINE_ROWS = 15;
   const [selectedSections, setSelectedSections] = useState(
     () => new Set(SECTIONS.map((s) => s.id))
   );
@@ -821,7 +823,7 @@ export default function Reports() {
               <input
                 type="text"
                 value={timelineSearch}
-                onChange={(e) => setTimelineSearch(e.target.value)}
+                onChange={(e) => { setTimelineSearch(e.target.value); setTimelinePage(1); }}
                 placeholder="ค้นหาชื่อหรือรหัสโครงการ..."
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-400"
               />
@@ -845,24 +847,26 @@ export default function Reports() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredTimeline.slice(0, 50).map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3 font-medium text-slate-900">{row.project_name}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600">
-                        {STEP_LABELS[row.step] || row.step}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">{STATUS_LABELS[row.status] || row.status}</td>
-                    <td className="px-4 py-3 text-slate-700">{row.changed_by_name || '-'}</td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {row.created_at ? new Date(row.created_at).toLocaleString('th-TH') : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 max-w-[250px] truncate" title={row.note || ''}>
-                      {row.note || '-'}
-                    </td>
-                  </tr>
-                ))}
+                {filteredTimeline
+                  .slice((timelinePage - 1) * TIMELINE_ROWS, timelinePage * TIMELINE_ROWS)
+                  .map((row, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3 font-medium text-slate-900">{row.project_name}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600">
+                          {STEP_LABELS[row.step] || row.step}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{STATUS_LABELS[row.status] || row.status}</td>
+                      <td className="px-4 py-3 text-slate-700">{row.changed_by_name || '-'}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {row.created_at ? new Date(row.created_at).toLocaleString('th-TH') : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 max-w-[250px] truncate" title={row.note || ''}>
+                        {row.note || '-'}
+                      </td>
+                    </tr>
+                  ))}
                 {filteredTimeline.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
@@ -873,10 +877,57 @@ export default function Reports() {
               </tbody>
             </table>
           </div>
-          {filteredTimeline.length > 50 && (
-            <p className="mt-3 text-sm text-slate-400 text-center">
-              แสดง 50 รายการล่าสุดจากทั้งหมด {filteredTimeline.length} รายการ (ส่งออก Excel/PDF เพื่อดูทั้งหมด)
-            </p>
+          {filteredTimeline.length > TIMELINE_ROWS && (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-slate-500">
+                แสดง {(timelinePage - 1) * TIMELINE_ROWS + 1}–{Math.min(timelinePage * TIMELINE_ROWS, filteredTimeline.length)} จาก {filteredTimeline.length} รายการ
+              </p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setTimelinePage((p) => Math.max(1, p - 1))}
+                  disabled={timelinePage === 1}
+                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ก่อนหน้า
+                </button>
+                {Array.from({ length: Math.ceil(filteredTimeline.length / TIMELINE_ROWS) }, (_, i) => i + 1)
+                  .filter((p) => {
+                    const total = Math.ceil(filteredTimeline.length / TIMELINE_ROWS);
+                    if (total <= 5) return true;
+                    if (p === 1 || p === total) return true;
+                    return Math.abs(p - timelinePage) <= 1;
+                  })
+                  .reduce((acc, p, i, arr) => {
+                    if (i > 0 && p - arr[i - 1] > 1) acc.push('...');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((item, i) =>
+                    item === '...' ? (
+                      <span key={`dots-${i}`} className="px-2 py-1.5 text-sm text-slate-400">...</span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => setTimelinePage(item)}
+                        className={`min-w-[36px] rounded-lg px-3 py-1.5 text-sm font-medium ${
+                          timelinePage === item
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+                <button
+                  onClick={() => setTimelinePage((p) => Math.min(Math.ceil(filteredTimeline.length / TIMELINE_ROWS), p + 1))}
+                  disabled={timelinePage === Math.ceil(filteredTimeline.length / TIMELINE_ROWS)}
+                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ถัดไป
+                </button>
+              </div>
+            </div>
           )}
         </section>
       )}

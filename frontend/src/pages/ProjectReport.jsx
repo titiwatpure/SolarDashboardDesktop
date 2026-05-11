@@ -63,7 +63,7 @@ export default function ProjectReport() {
   };
 
   const currentIdx = STEP_ORDER.indexOf(project?.current_step);
-  const progress = currentIdx >= 0 ? Math.round(((currentIdx + 1) / STEP_ORDER.length) * 100) : 0;
+  const progress = project?.progress ?? 0;
   const delayDays = daysBetween(project?.expected_cod_date, new Date().toISOString());
   const risk = RISK_LEVELS[project?.risk_level] || RISK_LEVELS.low;
   const overdueTasks = tasks.filter((t) => t.due_date && new Date(t.due_date) < new Date() && !['completed', 'cancelled'].includes(t.status));
