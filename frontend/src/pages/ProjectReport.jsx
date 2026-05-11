@@ -72,6 +72,9 @@ export default function ProjectReport() {
     const doc = new jsPDF('p', 'mm', 'a4');
     doc.addFileToVFS('Sarabun.ttf', SARABUN_BASE64);
     doc.addFont('Sarabun.ttf', 'Sarabun', 'normal');
+    doc.addFont('Sarabun.ttf', 'Sarabun', 'bold');
+    doc.addFont('Sarabun.ttf', 'Sarabun', 'italic');
+    doc.addFont('Sarabun.ttf', 'Sarabun', 'bolditalic');
     doc.setFont('Sarabun');
 
     const w = doc.internal.pageSize.getWidth();

@@ -244,6 +244,9 @@ export default function Reports() {
 
     doc.addFileToVFS('Sarabun.ttf', SARABUN_BASE64);
     doc.addFont('Sarabun.ttf', 'Sarabun', 'normal');
+    doc.addFont('Sarabun.ttf', 'Sarabun', 'bold');
+    doc.addFont('Sarabun.ttf', 'Sarabun', 'italic');
+    doc.addFont('Sarabun.ttf', 'Sarabun', 'bolditalic');
     doc.setFont('Sarabun');
 
     const pageWidth = doc.internal.pageSize.getWidth();
