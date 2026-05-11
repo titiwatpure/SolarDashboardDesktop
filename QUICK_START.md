@@ -24,6 +24,7 @@ npm run dev
 ```bash
 cd frontend
 npm install
+cp .env.example .env
 npm start
 ```
 
@@ -39,7 +40,11 @@ Password: admin
 ## หรือใช้ Docker (ทั้งระบบ)
 
 ```bash
+# Development
 docker compose up -d --build
+
+# Production (ใช้ pre-built images จาก GHCR)
+docker compose -f docker-compose.production.yml up -d
 ```
 เปิด http://localhost:3000
 
@@ -49,13 +54,18 @@ docker compose up -d --build
 
 | เมนู | หน้าที่ |
 |------|--------|
-| ภาพรวม | KPI, Pipeline, ตารางโครงการ |
-| โครงการ | เพิ่ม/แก้ไข/ลบ, Workflow 7 ขั้นตอน |
-| หน่วยงาน | จัดการ กกพ., PEA, MEA และอื่นๆ |
-| เอกสาร | Upload/ดาวน์โหลดไฟล์จริง |
-| รายงาน | สรุปตามสถานะ/ขนาด/จังหวัด + Export |
-| ผู้ใช้งาน | Admin / Engineer |
-| ตั้งค่า | เปลี่ยนรหัสผ่าน, ตั้งค่าแจ้งเตือน |
+| ภาพรวม | KPI Cards, Pipeline Visualization, Pie Chart |
+| โครงการ | เพิ่ม/แก้ไข/ลบ, Workflow 7 ขั้นตอน, Checkpoints, Timeline + ความคิดเห็น |
+| ขั้นตอน | Pipeline แสดงสถานะแยกตามขั้นตอน |
+| งาน | จัดการงาน, Priority, มอบหมาย, ติดตาม Overdue |
+| เอกสาร | Upload/ดาวน์โหลดไฟล์จริง (สูงสุด 50MB) |
+| รายงาน | 10 รายงาน + Export Excel/PDF (ภาษาไทย) |
+| หน่วยงาน | จัดการ กกพ., PEA, MEA + ระบบอนุมัติ |
+| ผู้ใช้งาน | จัดการผู้ใช้ 4 บทบาท (Admin only) |
+| ตั้งค่า | เปลี่ยนรหัสผ่าน |
+
+## รายงานรายโครงการ
+คลิก "ดูรายงาน" ในตารางโครงการ → รายงานละเอียดของแต่ละโครงการ + Export PDF
 
 ## API Endpoints หลัก
 
@@ -63,6 +73,7 @@ docker compose up -d --build
 POST   /api/auth/login              # เข้าสู่ระบบ
 POST   /api/auth/refresh            # ขอ token ใหม่
 POST   /api/auth/logout             # ออกจากระบบ
+POST   /api/auth/logout-all         # ออกทุกอุปกรณ์
 GET    /api/projects                # รายการโครงการ
 POST   /api/projects                # สร้างโครงการ
 GET    /api/projects/stats/kpis     # KPI
@@ -70,7 +81,9 @@ GET    /api/users                   # รายการผู้ใช้
 PUT    /api/users/change-password   # เปลี่ยนรหัสผ่าน
 POST   /api/documents               # เพิ่มเอกสาร (file upload)
 GET    /api/documents/download/:id  # ดาวน์โหลดไฟล์
+GET    /api/tasks                   # รายการงาน
 GET    /api/notifications/unread-count  # แจ้งเตือน
+GET    /api/reports/summary/status  # รายงาน
 GET    /api/health                  # สถานะเซิร์ฟเวอร์
 ```
 

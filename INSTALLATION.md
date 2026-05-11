@@ -60,6 +60,7 @@ npm start
 
 ## ติดตั้งด้วย Docker
 
+### Development
 ```bash
 # ทั้ง backend + frontend
 docker compose up -d --build
@@ -71,14 +72,21 @@ docker compose logs -f
 docker compose down
 ```
 
+### Production (ใช้ pre-built images จาก GHCR)
+```bash
+docker compose -f docker-compose.production.yml up -d
+```
+
 ---
 
 ## ข้อมูลเข้าสู่ระบบทดลอง
 
-```
-Username: admin
-Password: admin
-```
+| Username | Password | บทบาท |
+|----------|----------|-------|
+| admin | admin | Admin |
+| engineer | engineer | Engineer |
+| staff | staff | Staff |
+| client | client | Client |
 
 ---
 
@@ -156,6 +164,29 @@ npm run dev
 ```
 
 > ข้อมูลเดิมใน `solar_dashboard.db` ไม่หาย
+
+---
+
+## Deploy บน Render.com
+
+### Backend (Web Service)
+1. สร้าง Web Service จาก GitHub repo
+2. Build Command: `cd backend && npm install`
+3. Start Command: `cd backend && node src/init-db.cjs && npm start`
+4. Environment Variables:
+   - `PORT` = 10000
+   - `JWT_SECRET` = (ค่าที่ปลอดภัย)
+   - `CORS_ORIGIN` = URL ของ Frontend
+5. **เพิ่ม Persistent Disk** ที่ `/var/data` เพื่อเก็บ SQLite database ไม่ให้หาย
+
+### Frontend (Static Site)
+1. สร้าง Static Site จาก GitHub repo
+2. Build Command: `cd frontend && npm install && npm run build`
+3. Publish Directory: `frontend/build`
+4. Environment Variables:
+   - `REACT_APP_API_URL` = URL ของ Backend + `/api`
+
+> **หมายเหตุ**: SQLite บน Render จะหายทุกครั้งที่ deploy ถ้าไม่ใช้ Persistent Disk
 
 ---
 

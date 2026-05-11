@@ -7,7 +7,7 @@ const { logActivity } = require('./activity_logs');
 
 const router = express.Router();
 
-const dbPath = path.join(__dirname, '..', '..', 'solar_dashboard.db');
+const dbPath = process.env.DB_PATH || path.join(__dirname, '..', '..', 'solar_dashboard.db');
 const backupDir = path.join(__dirname, '..', '..', 'backups');
 
 // สร้าง backups directory ถ้ายังไม่มี

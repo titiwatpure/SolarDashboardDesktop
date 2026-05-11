@@ -41,7 +41,15 @@
       "Bash(curl -s -o /dev/null -w \"Frontend: %{http_code}\" http://localhost:3000)",
       "Bash(node -e ' *)",
       "Bash(curl *)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "WebFetch(domain:github.com)",
+      "Bash(git *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(echo \"---EXIT: $?---\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Backend: {d[\\\\\"status\\\\\"]}'\\)\")",
+      "Bash(node -c \"frontend/src/pages/Reports.jsx\")"
     ]
   }
 }
