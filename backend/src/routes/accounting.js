@@ -548,6 +548,7 @@ router.post('/installments/:id/pay', authenticateToken, authorizeRole(['admin', 
     );
 
     // ตรวจสอบว่าทุกงวดของสัญญาจ่ายครบหรือยัง → อัปเดตสถานะสัญญา
+    if (existing.contract_id) {
     const unpaidResult = await pool.query(
       `SELECT COUNT(*) as count FROM payment_installments
        WHERE contract_id = ? AND status NOT IN ('paid')`,
@@ -565,6 +566,7 @@ router.post('/installments/:id/pay', authenticateToken, authorizeRole(['admin', 
         reason: 'installments_all_paid',
       });
     }
+    } // end if existing.contract_id
 
     const installment = await getInstallmentById(id);
     logActivity(req.user.id, 'pay', 'payment_installment', id, {
@@ -750,11 +752,20 @@ router.get('/company/summary', authenticateToken, async (req, res) => {
        LIMIT 5`
     );
 
-    // ลูกหนี้คงค้าง (งวดที่ยังไม่ชำระ)
+    // ลูกหนี้คงค้าง (งวดที่ยังไม่ชำระ + ชำระบางส่วน)
     const receivableResult = await pool.query(
       `SELECT COALESCE(SUM(amount - paid_amount), 0) as total
        FROM payment_installments
-       WHERE status IN ('pending', 'overdue')`
+       WHERE status IN ('pending', 'overdue', 'partial')`
+    );
+
+    // รายการลูกหนี้ (join ชื่อโครงการ)
+    const receivablesResult = await pool.query(
+      `SELECT pi.*, p.project_name
+       FROM payment_installments pi
+       LEFT JOIN projects p ON pi.project_id = p.id
+       WHERE pi.status IN ('pending', 'overdue', 'partial')
+       ORDER BY pi.due_date ASC, pi.installment_number ASC`
     );
 
     // สรุปตามหมวดหมู่ (ทั้งบริษัท)
@@ -786,6 +797,7 @@ router.get('/company/summary', authenticateToken, async (req, res) => {
         profit: Number(r.profit),
       })),
       total_receivable: Number(receivableResult.rows[0]?.total || 0),
+      receivables: receivablesResult.rows,
       category_breakdown: categoryResult.rows,
     });
   } catch (error) {

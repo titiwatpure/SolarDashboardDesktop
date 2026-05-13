@@ -89,6 +89,21 @@ const INSTALLMENT_TEMPLATES = {
   ],
 };
 
+const STANDALONE_TEMPLATES = {
+  '30-30-40': [
+    { description: 'เงินมัดจำ' },
+    { description: 'งวดระหว่างงาน' },
+    { description: 'งวดส่งมอบ' },
+  ],
+  '50-50': [
+    { description: 'เงินมัดจำ' },
+    { description: 'งวดส่งมอบ' },
+  ],
+  '100': [
+    { description: 'ชำระเต็มจำนวน' },
+  ],
+};
+
 const emptyPayForm = {
   paid_amount: '',
   paid_date: today(),
@@ -163,6 +178,7 @@ export default function Accounting() {
   const [showBulkInstModal, setShowBulkInstModal] = useState(false);
   const [bulkProject, setBulkProject] = useState('');
   const [bulkContract, setBulkContract] = useState('');
+  const [bulkMode, setBulkMode] = useState('contract');
   const [bulkRows, setBulkRows] = useState([emptyBulkRow()]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState('');
@@ -285,7 +301,7 @@ export default function Accounting() {
   const receivables = useMemo(() => {
     const rec = companySummary?.receivables;
     if (Array.isArray(rec)) return rec;
-    return installments.filter((i) => i.status === 'pending' || i.status === 'overdue');
+    return installments.filter((i) => i.status === 'pending' || i.status === 'overdue' || i.status === 'partial');
   }, [companySummary, installments]);
 
   const filteredTransactions = useMemo(() => {
@@ -396,6 +412,7 @@ export default function Accounting() {
   const openCreateInst = async () => {
     setBulkProject('');
     setBulkContract('');
+    setBulkMode('contract');
     setBulkRows([emptyBulkRow()]);
     setBulkError('');
     setShowBulkInstModal(true);
@@ -406,7 +423,8 @@ export default function Accounting() {
   };
 
   const applyTemplate = (key) => {
-    const tpl = INSTALLMENT_TEMPLATES[key];
+    const templates = bulkMode === 'contract' ? INSTALLMENT_TEMPLATES : STANDALONE_TEMPLATES;
+    const tpl = templates[key];
     if (!tpl) return;
     setBulkRows(tpl.map((t) => ({ ...emptyBulkRow(), description: t.description })));
   };
@@ -418,6 +436,7 @@ export default function Accounting() {
   };
 
   const applyAmountPct = (idx, pct) => {
+    if (bulkMode !== 'contract' || !bulkContract) return;
     const contract = contracts.find((c) => c.id === bulkContract);
     if (!contract?.total_amount) return;
     const amt = Math.round((Number(contract.total_amount) * pct) / 100);
@@ -426,6 +445,7 @@ export default function Accounting() {
 
   const handleBulkSave = async () => {
     if (!bulkProject) { setBulkError('กรุณาเลือกโครงการ'); return; }
+    if (bulkMode === 'contract' && !bulkContract) { setBulkError('กรุณาเลือกสัญญา'); return; }
     const validRows = bulkRows.filter((r) => r.amount && Number(r.amount) > 0);
     if (validRows.length === 0) { setBulkError('กรุณากรอกจำนวนเงินอย่างน้อย 1 งวด'); return; }
     setBulkSaving(true);
@@ -433,7 +453,7 @@ export default function Accounting() {
     try {
       await accountingAPI.bulkInstallments({
         project_id: bulkProject,
-        contract_id: bulkContract || null,
+        contract_id: bulkMode === 'contract' ? bulkContract : null,
         installments: validRows.map((r) => ({
           description: r.description || null,
           amount: Number(r.amount),
@@ -797,8 +817,30 @@ export default function Accounting() {
             )}
 
             <div className="space-y-4">
+              {/* Mode Toggle */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setBulkMode('contract'); }}
+                  className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                    bulkMode === 'contract' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  ผูกสัญญา
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setBulkMode('standalone'); setBulkContract(''); }}
+                  className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                    bulkMode === 'standalone' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  ไม่ผูกสัญญา
+                </button>
+              </div>
+
               {/* Project + Contract */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className={`grid gap-3 ${bulkMode === 'contract' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">โครงการ *</label>
                   <select
@@ -812,25 +854,27 @@ export default function Accounting() {
                     ))}
                   </select>
                 </div>
+                {bulkMode === 'contract' && (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">สัญญา (ไม่บังคับ)</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">สัญญา *</label>
                   <select
                     value={bulkContract}
                     onChange={(e) => setBulkContract(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
                   >
-                    <option value="">ไม่ผูกสัญญา</option>
+                    <option value="">เลือกสัญญา</option>
                     {contracts.map((c) => (
                       <option key={c.id} value={c.id}>{c.contract_number || c.id}</option>
                     ))}
                   </select>
                 </div>
+                )}
               </div>
 
               {/* Templates */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-slate-500">แม่แบบ:</span>
-                {Object.entries(INSTALLMENT_TEMPLATES).map(([key]) => (
+                {Object.entries(bulkMode === 'contract' ? INSTALLMENT_TEMPLATES : STANDALONE_TEMPLATES).map(([key]) => (
                   <button
                     key={key}
                     type="button"
@@ -876,7 +920,7 @@ export default function Accounting() {
                           step="0.01"
                           className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
                         />
-                        {bulkContract && (
+                        {bulkMode === 'contract' && bulkContract && (
                           <div className="relative group">
                             <button
                               type="button"
@@ -1086,7 +1130,7 @@ function OverviewTab({ loading, summary, monthlyTrend, topProjects, receivables 
   const totalIncome = summary?.total_income ?? 0;
   const totalExpense = summary?.total_expense ?? 0;
   const netProfit = totalIncome - totalExpense;
-  const totalReceivables = summary?.total_receivables ?? receivables.reduce((s, r) => s + Number(r.amount || 0), 0);
+  const totalReceivables = summary?.total_receivable ?? 0;
 
   return (
     <div className="space-y-6">
