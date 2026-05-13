@@ -317,7 +317,7 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
     const {
       project_name, project_code, size_kw, size_kva, province,
       responsible_user, description, has_power_selling, start_date,
-      scope_start, scope_end,
+      scope_start, scope_end, expected_cod_date, actual_cod_date,
     } = req.body;
 
     if (!project_name || !project_code || !size_kw || !province) {
@@ -362,15 +362,18 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
       `INSERT INTO projects (
         id, project_name, project_code, size_kw, size_kva, province,
         responsible_user, description, has_power_selling, requires_permit,
-        permit_type, start_date, status, current_step, scope_start, scope_end,
+        permit_type, start_date, expected_cod_date, actual_cod_date,
+        status, current_step, scope_start, scope_end,
         risk_level, risk_factors
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, project_name, project_code, Number(size_kw),
         size_kva ? Number(size_kva) : null, province,
         responsible_user || null, description || null,
         has_power_selling ? 1 : 0, requiresPermit ? 1 : 0,
-        permitType, start_date || null, 'not_started', 'survey',
+        permitType, start_date || null,
+        expected_cod_date || null, actual_cod_date || null,
+        'not_started', 'survey',
         scopeStartVal, scopeEndVal,
         'low', '{}',
       ]

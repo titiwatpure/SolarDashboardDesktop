@@ -24,6 +24,9 @@ const emptyForm = {
   contract_value: '',
   contract_date: '',
   budget: '',
+  start_date: '',
+  expected_cod_date: '',
+  actual_cod_date: '',
 };
 
 export default function ProjectModal({ isOpen, onClose, onProjectCreated, project }) {
@@ -192,6 +195,28 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, projec
             <label className="block text-sm font-medium text-gray-700 mb-2">รายละเอียด</label>
             <textarea name="description" value={formData.description} onChange={handleChange} rows="3"
               className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+          </div>
+
+          {/* วันที่สำคัญ */}
+          <div className="border-t border-gray-200 pt-4">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">วันที่สำคัญ</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">วันที่เริ่ม</label>
+                <input type="date" name="start_date" value={formData.start_date || ''} onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">วันที่คาดว่าจะ COD</label>
+                <input type="date" name="expected_cod_date" value={formData.expected_cod_date || ''} onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">วันที่ COD จริง</label>
+                <input type="date" name="actual_cod_date" value={formData.actual_cod_date || ''} onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+              </div>
+            </div>
           </div>
 
           {/* ข้อมูลลูกค้า */}
