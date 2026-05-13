@@ -9,6 +9,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Map,
   Settings,
   Users,
   Zap
@@ -24,6 +25,7 @@ const menuItems = [
   { id: 'documents', label: 'เอกสาร', icon: FileText, path: '/documents' },
   { id: 'tasks', label: 'งานที่มอบหมาย', icon: ClipboardList, path: '/tasks' },
   { id: 'reports', label: 'รายงาน', icon: BarChart3, path: '/reports' },
+  { id: 'network-map', label: 'แผนที่โครง', icon: Map, path: '/network-map' },
   { id: 'users', label: 'ผู้ใช้งาน', icon: Users, path: '/users' },
   { id: 'settings', label: 'ตั้งค่า', icon: Settings, path: '/settings' }
 ];

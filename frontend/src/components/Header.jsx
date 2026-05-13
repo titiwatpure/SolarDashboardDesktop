@@ -11,6 +11,7 @@ const pageTitles = {
   '/organizations': 'หน่วยงาน',
   '/documents': 'เอกสาร',
   '/reports': 'รายงาน',
+  '/network-map': 'แผนที่โครง',
   '/users': 'ผู้ใช้งาน',
   '/settings': 'ตั้งค่า'
 };

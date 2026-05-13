@@ -15,6 +15,7 @@ import Settings from './pages/Settings';
 import Steps from './pages/Steps';
 import Documents from './pages/Documents';
 import Tasks from './pages/Tasks';
+import NetworkMap from './pages/NetworkMap';
 import ProjectDetail from './pages/ProjectDetail';
 import ProjectReport from './pages/ProjectReport';
 import { Component, useState } from 'react';
@@ -103,6 +104,7 @@ function AppContent() {
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/steps" element={<Steps />} />
+            <Route path="/network-map" element={<NetworkMap />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
             <Route path="/projects/:id/report" element={<ProjectReport />} />
           </Routes>

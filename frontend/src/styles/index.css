@@ -2,6 +2,12 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+/* Leaflet map overrides */
+.leaflet-container {
+  font-family: 'Sarabun', sans-serif;
+  z-index: 1;
+}
+
 html {
   scroll-behavior: smooth;
 }
