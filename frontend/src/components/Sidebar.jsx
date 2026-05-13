@@ -12,22 +12,33 @@ import {
   Map,
   Settings,
   Users,
-  Zap
+  UserCircle,
+  Zap,
+  FileSignature,
+  ShieldCheck,
+  LayoutGrid,
+  Wallet
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { ROLES } from '../utils/constants';
 
-const menuItems = [
-  { id: 'dashboard', label: 'หน้าหลัก', icon: LayoutDashboard, path: '/' },
-  { id: 'projects', label: 'โครงการทั้งหมด', icon: Zap, path: '/projects' },
-  { id: 'steps', label: 'ปฏิบัติงาน', icon: CheckSquare, path: '/steps' },
-  { id: 'organizations', label: 'หน่วยงาน', icon: Building2, path: '/organizations' },
-  { id: 'documents', label: 'เอกสาร', icon: FileText, path: '/documents' },
-  { id: 'tasks', label: 'งานที่มอบหมาย', icon: ClipboardList, path: '/tasks' },
-  { id: 'reports', label: 'รายงาน', icon: BarChart3, path: '/reports' },
-  { id: 'network-map', label: 'แผนที่โครง', icon: Map, path: '/network-map' },
-  { id: 'users', label: 'ผู้ใช้งาน', icon: Users, path: '/users' },
-  { id: 'settings', label: 'ตั้งค่า', icon: Settings, path: '/settings' }
+const allMenuItems = [
+  { id: 'dashboard', label: 'หน้าหลัก', icon: LayoutDashboard, path: '/', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'portal', label: 'แดชบอร์ดลูกค้า', icon: LayoutGrid, path: '/portal', roles: ['client'] },
+  { id: 'projects', label: 'โครงการทั้งหมด', icon: Zap, path: '/projects', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'steps', label: 'ปฏิบัติงาน', icon: CheckSquare, path: '/steps', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'customers', label: 'ลูกค้า', icon: UserCircle, path: '/customers', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'quotations', label: 'ใบเสนอราคา', icon: FileSignature, path: '/quotations', roles: ['admin', 'engineer'] },
+  { id: 'contracts', label: 'สัญญา', icon: ShieldCheck, path: '/contracts', roles: ['admin', 'engineer'] },
+  { id: 'accounting', label: 'บัญชี', icon: Wallet, path: '/accounting', roles: ['admin', 'engineer'] },
+  { id: 'organizations', label: 'หน่วยงาน', icon: Building2, path: '/organizations', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'documents', label: 'เอกสาร', icon: FileText, path: '/documents', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'tasks', label: 'งานที่มอบหมาย', icon: ClipboardList, path: '/tasks', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'reports', label: 'รายงาน', icon: BarChart3, path: '/reports', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'network-map', label: 'แผนที่โครง', icon: Map, path: '/network-map', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'users', label: 'ผู้ใช้งาน', icon: Users, path: '/users', roles: ['admin'] },
+  { id: 'settings', label: 'ตั้งค่า', icon: Settings, path: '/settings', roles: ['admin', 'engineer', 'staff', 'client'] }
 ];
 
 function BrandMark() {
@@ -84,7 +95,7 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
 
         <nav className="flex-1 space-y-1.5 px-4">
-          {menuItems.map((item) => {
+          {allMenuItems.filter(item => item.roles.includes(user?.role)).map((item) => {
             const Icon = item.icon;
             const isActive = item.path === '/'
               ? location.pathname === '/'
@@ -119,7 +130,7 @@ export default function Sidebar({ isOpen, onClose }) {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white">{user?.full_name || user?.username}</p>
-                <p className="text-xs text-slate-400">{user?.role === 'admin' ? 'Admin' : 'Engineer'}</p>
+                <p className="text-xs text-slate-400">{ROLES[user?.role] || user?.role}</p>
               </div>
               <button
                 onClick={() => setUserMenuOpen((open) => !open)}

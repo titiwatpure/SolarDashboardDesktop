@@ -23,7 +23,7 @@ frontend/src/
 ├── components/
 │   ├── Header.jsx           # Top header + notification badge
 │   ├── Sidebar.jsx          # Navigation sidebar (dark theme)
-│   ├── KPICards.jsx         # 6 Dashboard KPI cards
+│   ├── KPICards.jsx         # 8 Dashboard KPI cards
 │   ├── Pipeline.jsx         # Step pipeline + pie chart
 │   ├── ProjectsTable.jsx    # Paginated project list
 │   ├── ProjectModal.jsx     # Create/edit project form
@@ -41,9 +41,15 @@ frontend/src/
 │   ├── Tasks.jsx            # /tasks (task management)
 │   ├── Documents.jsx        # /documents (file management)
 │   ├── Organizations.jsx    # /organizations
+│   ├── Customers.jsx        # /customers (customer management)
 │   ├── Reports.jsx          # /reports (10 report sections)
 │   ├── Users.jsx            # /users (admin)
-│   └── Settings.jsx         # /settings (profile + password)
+│   ├── Settings.jsx         # /settings (profile + password + company)
+│   ├── Quotations.jsx       # /quotations (quotation management)
+│   ├── Contracts.jsx        # /contracts (contract management)
+│   ├── Accounting.jsx       # /accounting (finance + installments)
+│   ├── CustomerPortal.jsx   # /portal (customer self-service)
+│   └── NetworkMap.jsx       # /map (project locations)
 ├── utils/
 │   ├── api.js               # Axios wrapper + auto token refresh interceptor
 │   ├── constants.js         # Labels, provinces, enums (Thai)
@@ -64,12 +70,18 @@ backend/
 │   │   ├── users.js         # Users CRUD + Change Password
 │   │   ├── documents.js     # Documents + File Upload (multer)
 │   │   ├── organizations.js # Organizations CRUD + Projects link
+│   │   ├── customers.js     # Customers CRUD + Projects link
 │   │   ├── reports.js       # 10 aggregation reports
 │   │   ├── tasks.js         # Task management + Notifications
 │   │   ├── notifications.js # Notification CRUD
 │   │   ├── activity_logs.js # Audit logging (severity levels)
 │   │   ├── checkpoints.js   # Checkpoint CRUD + Approve + Logs
-│   │   └── backup.js        # Database backup/restore (Admin)
+│   │   ├── backup.js        # Database backup/restore (Admin)
+│   │   ├── quotations.js    # Quotations CRUD + Items + Status
+│   │   ├── contracts.js     # Contracts CRUD
+│   │   ├── accounting.js    # Categories + Transactions + Installments
+│   │   ├── portal.js        # Customer portal (read-only)
+│   │   └── settings.js      # Company settings
 │   ├── services/
 │   │   └── riskDetection.js # Automated risk scoring engine (5 factors)
 │   ├── middleware/
@@ -80,7 +92,7 @@ backend/
 │   ├── utils/
 │   │   └── errors.js        # Custom AppError class
 │   ├── database.js          # SQLite connection + pool.query() interface
-│   ├── init-db.cjs          # DB init + seed (15 tables)
+│   ├── init-db.cjs          # DB init + seed (22 tables)
 │   └── index.js             # Express server entry
 ├── uploads/                 # Uploaded files (auto-created)
 ├── __tests__/               # Jest + Supertest tests
@@ -163,12 +175,63 @@ Timeline integration: checkpoint changes added to project timeline
 Risk integration: failed checkpoints increase risk score
 ```
 
-### 6. Global State (AuthContext)
-```javascript
-const { user, login, logout, changePassword, isAdmin } = useAuth();
+### 6. Customer & Project Extended Data
+```
+Customers Table:
+- customer_name (required), customer_type (individual/company/government)
+- contact_name, contact_phone, contact_email, tax_id, address, notes
+- Linked to projects via customer_id FK (optional)
+
+Project Extended Fields:
+- customer_id -> customers (optional)
+- site_address, site_lat, site_lng (optional)
+- grid_station, grid_voltage (optional)
+- contract_number, contract_value, contract_date, budget (optional)
+
+Project Specs Table (1:1 with project):
+- panel_brand, panel_model, panel_count
+- inverter_brand, inverter_model, inverter_count
+- mounting_type (roof/ground/floating), grid_connection_type
+
+All fields are optional (nullable).
 ```
 
-### 7. Refresh Token
+### 7. Quotations & Contracts
+```
+Quotations:
+- CRUD with status workflow: draft -> sent -> approved/rejected/expired
+- Line items (quotation_items) with quantity, unit_price, amount
+- Auto-calculate subtotal, tax (7%), total_amount
+- Linked to customer + project (optional)
+
+Contracts:
+- CRUD with status: draft -> active -> completed/terminated
+- Linked to project (unique) + customer (optional)
+- Track start_date, end_date, signed_date, total_value
+```
+
+### 8. Accounting System
+```
+3 Tables:
+- accounting_categories: income/expense categories with icons
+- transactions: financial records linked to project (optional) + category
+- payment_installments: installment plans linked to project + contract (optional)
+
+Installment Flow:
+- Bulk create from contract (e.g., 30-30-40 or 50-50 templates)
+- Pay: full or partial -> auto-create income transaction
+- Status: pending -> partial -> paid (or overdue)
+- Delete protection: can't delete installment with linked transaction
+- Due date is optional (null = "ยังไม่กำหนด")
+```
+
+### 9. Global State (AuthContext)
+```javascript
+const { user, login, logout, changePassword, isAdmin } = useAuth();
+// wrapped in useMemo for performance
+```
+
+### 10. Refresh Token
 ```
 - Access token: 15 minutes
 - Refresh token: 30 days (stored in DB)
@@ -179,9 +242,11 @@ const { user, login, logout, changePassword, isAdmin } = useAuth();
 
 ## Database Schema
 
-### Tables (15)
+### Tables (22)
 - `users` - System users (admin/engineer/staff/client) with granular permissions
-- `projects` - Solar installation projects with risk tracking, scope_start/scope_end
+- `projects` - Solar installation projects with risk tracking, scope_start/scope_end, customer/site/contract fields
+- `customers` - Customer data (individual/company/government) with contact info
+- `project_specs` - Technical specs per project (panels, inverters, mounting type)
 - `organizations` - Government/utility entities
 - `project_steps` - Individual step tracking
 - `documents` - Document metadata with file upload
@@ -195,6 +260,13 @@ const { user, login, logout, changePassword, isAdmin } = useAuth();
 - `refresh_tokens` - JWT refresh tokens
 - `checkpoints` - Verification checkpoints per workflow step
 - `checkpoint_logs` - Checkpoint change history
+- `quotations` - Quotations with status workflow
+- `quotation_items` - Line items per quotation
+- `contracts` - Contracts linked to projects
+- `accounting_categories` - Income/expense categories
+- `transactions` - Financial transactions
+- `payment_installments` - Installment payments with partial support
+- `company_settings` - Key-value company info
 
 ### Indexes (26)
 Covering all foreign keys and frequently queried columns including risk_level, severity, approval_status, and checkpoint fields.

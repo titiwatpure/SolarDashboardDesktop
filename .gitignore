@@ -24,3 +24,7 @@ backend/uploads/
 # OS
 Thumbs.db
 Desktop.ini
+
+# Claude Code
+.claude/
+Claude*

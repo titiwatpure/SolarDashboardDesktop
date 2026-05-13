@@ -100,6 +100,7 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
               <th className="px-5 py-4 text-left font-semibold">สถานะ</th>
               <th className="px-5 py-4 text-left font-semibold">ความคืบหน้า</th>
               <th className="px-5 py-4 text-left font-semibold">ความเสี่ยง</th>
+              <th className="px-5 py-4 text-left font-semibold">ลูกค้า</th>
               <th className="px-5 py-4 text-left font-semibold">หน่วยงาน</th>
               <th className="px-5 py-4 text-left font-semibold">ผู้รับผิดชอบ</th>
               <th className="px-5 py-4 text-left font-semibold">อัปเดตล่าสุด</th>
@@ -110,7 +111,7 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
           <tbody className="divide-y divide-slate-100 text-sm">
             {!loading && projects.length === 0 && (
               <tr>
-                <td colSpan="13" className="px-5 py-10 text-center text-slate-500">
+                <td colSpan="14" className="px-5 py-10 text-center text-slate-500">
                   ยังไม่มีข้อมูลโครงการ
                 </td>
               </tr>
@@ -160,6 +161,7 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
                     <span className="text-xs text-slate-400">-</span>
                   )}
                 </td>
+                <td className="px-5 py-4 text-slate-700">{project.customer_name || '-'}</td>
                 <td className="px-5 py-4 text-slate-700 max-w-[200px] truncate" title={project.organizations || ''}>
                   {project.organizations || '-'}
                 </td>

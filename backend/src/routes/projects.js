@@ -126,6 +126,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const query = `
       SELECT p.*,
         u.full_name as responsible_user_name,
+        c.customer_name,
         (
           SELECT GROUP_CONCAT(o.org_name, ', ')
           FROM project_organizations po
@@ -134,6 +135,7 @@ router.get('/', authenticateToken, async (req, res) => {
         ) as organizations
       FROM projects p
       LEFT JOIN users u ON p.responsible_user = u.id
+      LEFT JOIN customers c ON p.customer_id = c.id
       WHERE 1=1${clause}
       ORDER BY p.created_at DESC
       LIMIT ? OFFSET ?`;
@@ -287,15 +289,21 @@ router.delete('/:id/organizations/:orgId', authenticateToken, authorizePermissio
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT p.*, u.full_name as responsible_user_name
+      `SELECT p.*, u.full_name as responsible_user_name, c.customer_name, c.contact_name as customer_contact_name, c.contact_phone as customer_contact_phone, c.contact_email as customer_contact_email, c.customer_type, c.tax_id as customer_tax_id, c.address as customer_address
        FROM projects p
        LEFT JOIN users u ON p.responsible_user = u.id
+       LEFT JOIN customers c ON p.customer_id = c.id
        WHERE p.id = ?`,
       [req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'ไม่พบโครงการ' });
     const project = result.rows[0];
     project.progress = calcProgress(project.current_step, project.status, project.scope_start, project.scope_end);
+
+    // Load specs
+    const specsResult = await pool.query('SELECT * FROM project_specs WHERE project_id = ?', [req.params.id]);
+    project.specs = specsResult.rows[0] || null;
+
     res.json(project);
   } catch (error) {
     console.error(error);
@@ -320,7 +328,6 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
     if (isNaN(sizeKwNum) || sizeKwNum < 0) {
       return res.status(400).json({ error: 'ขนาด kW ต้องเป็นตัวเลข' });
     }
-
     if (size_kva !== undefined && size_kva !== null && size_kva !== '') {
       const sizeKvaNum = Number(size_kva);
       if (isNaN(sizeKvaNum) || sizeKvaNum < 0) {
@@ -369,7 +376,7 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
       ]
     );
 
-    // Create default checkpoints for survey step
+    // Create default checkpoints
     await createDefaultCheckpoints(id, 'survey', req.user.id);
 
     const project = await getProjectById(id);
@@ -487,7 +494,7 @@ router.post('/:id/timeline/:timelineId/comments', authenticateToken, async (req,
         for (const uid of notifyUsers) {
           createNotification(
             uid, 'timeline_comment', 'คอมเมนต์ใหม่',
-            `${commenterName} คอมเมนต์บน Timeline "${stepLabel}": ${comment.text.slice(0, 80)}`,
+            `${commenterName} คอมเมนต์บน Timeline "${stepLabel}": ${String(comment).slice(0, 80)}`,
             'project', req.params.id
           );
         }
@@ -537,6 +544,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
       'blocked_reason', 'blocked_by', 'actual_cod_date', 'expected_cod_date',
       'size_kw', 'size_kva', 'start_date',
       'scope_start', 'scope_end',
+      'customer_id', 'site_address', 'site_lat', 'site_lng',
+      'grid_station', 'grid_voltage',
+      'contract_number', 'contract_value', 'contract_date', 'budget',
     ];
 
     const existing = await getProjectById(id);
@@ -688,6 +698,63 @@ router.delete('/:id', authenticateToken, authorizePermission('project.delete'), 
     await pool.query('DELETE FROM projects WHERE id = ?', [req.params.id]);
     logActivity(req.user.id, 'delete', 'project', req.params.id, { project_name: existingProject.project_name });
     res.json({ message: 'ลบโครงการสำเร็จ' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// GET /api/projects/:id/specs
+router.get('/:id/specs', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM project_specs WHERE project_id = ?', [req.params.id]);
+    res.json(result.rows[0] || null);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// PUT /api/projects/:id/specs — สร้างหรืออัปเดตสเปค (upsert)
+router.put('/:id/specs', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const projectCheck = await pool.query('SELECT id FROM projects WHERE id = ?', [id]);
+    if (projectCheck.rows.length === 0) return res.status(404).json({ error: 'ไม่พบโครงการ' });
+
+    const fields = ['panel_brand', 'panel_model', 'panel_count', 'inverter_brand', 'inverter_model', 'inverter_count', 'mounting_type', 'grid_connection_type'];
+    const existing = await pool.query('SELECT id FROM project_specs WHERE project_id = ?', [id]);
+
+    if (existing.rows.length === 0) {
+      // Insert
+      const specId = uuidv4();
+      const cols = ['id', 'project_id'];
+      const vals = [specId, id];
+      for (const f of fields) {
+        if (req.body[f] !== undefined) { cols.push(f); vals.push(req.body[f] === '' ? null : req.body[f]); }
+      }
+      await pool.query(`INSERT INTO project_specs (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, vals);
+    } else {
+      // Update
+      const setClauses = [];
+      const values = [];
+      for (const f of fields) {
+        if (req.body[f] !== undefined) {
+          setClauses.push(`${f} = ?`);
+          values.push(req.body[f] === '' ? null : req.body[f]);
+        }
+      }
+      if (setClauses.length > 0) {
+        setClauses.push('updated_at = ?');
+        values.push(new Date().toISOString());
+        values.push(id);
+        await pool.query(`UPDATE project_specs SET ${setClauses.join(', ')} WHERE project_id = ?`, values);
+      }
+    }
+
+    const result = await pool.query('SELECT * FROM project_specs WHERE project_id = ?', [id]);
+    logActivity(req.user.id, 'update', 'project_specs', id, { fields: Object.keys(req.body) });
+    res.json(result.rows[0]);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

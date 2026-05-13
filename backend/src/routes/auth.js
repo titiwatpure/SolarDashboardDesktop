@@ -269,6 +269,25 @@ router.post('/logout-all', authenticateToken, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/auth/sessions — รายการ refresh tokens ที่ active อยู่
+// ---------------------------------------------------------------------------
+
+router.get('/sessions', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, created_at, expires_at FROM refresh_tokens
+       WHERE user_id = ? AND expires_at > datetime("now")
+       ORDER BY created_at DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Sessions error:', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/auth/register — สร้างผู้ใช้ใหม่ (เฉพาะ Admin)
 // ---------------------------------------------------------------------------
 

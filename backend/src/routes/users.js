@@ -9,7 +9,7 @@ const router = express.Router();
 
 const getUserById = async (id) => {
   const result = await pool.query(
-    'SELECT id, username, email, full_name, role, status, created_at, updated_at FROM users WHERE id = ?',
+    'SELECT id, username, email, full_name, phone, role, status, created_at, updated_at FROM users WHERE id = ?',
     [id]
   );
   return result.rows[0] || null;
@@ -37,7 +37,7 @@ router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) =>
     const offset = (page - 1) * limit;
 
     const result = await pool.query(
-      'SELECT id, username, email, full_name, role, status, created_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      'SELECT id, username, email, full_name, phone, role, status, created_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?',
       [limit, offset]
     );
 
@@ -106,7 +106,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
 // PUT /api/users/:id — อัปเดตข้อมูลผู้ใช้
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
-    const { full_name, email, role, status } = req.body;
+    const { full_name, email, phone, role, status } = req.body;
     const { id } = req.params;
 
     if (req.user.id !== id && req.user.role !== 'admin') {
@@ -142,8 +142,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 
     await pool.query(
-      'UPDATE users SET full_name = ?, email = ?, role = ?, status = ?, updated_at = ? WHERE id = ?',
-      [full_name ?? existingUser.full_name ?? null, email ?? existingUser.email, newRole, newStatus, new Date().toISOString(), id]
+      'UPDATE users SET full_name = ?, email = ?, phone = ?, role = ?, status = ?, updated_at = ? WHERE id = ?',
+      [full_name ?? existingUser.full_name ?? null, email ?? existingUser.email, phone !== undefined ? phone : (existingUser.phone || null), newRole, newStatus, new Date().toISOString(), id]
     );
 
     const updatedUser = await getUserById(id);

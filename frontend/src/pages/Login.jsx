@@ -89,16 +89,18 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Demo info */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-800 font-semibold mb-2">ทดลองใช้ (รหัสผ่าน = ชื่อผู้ใช้):</p>
-            <div className="text-xs text-blue-700 space-y-1">
-              <p><strong>admin</strong> — ผู้ดูแลระบบ (สิทธิ์เต็ม)</p>
-              <p><strong>engineer</strong> — วิศวกร (จัดการโครงการ/งาน)</p>
-              <p><strong>staff</strong> — เจ้าหน้าที่ (ดู/สร้างโครงการ)</p>
-              <p><strong>client</strong> — ลูกค้า (ดูรายงาน)</p>
+          {/* Demo info — แสดงเฉพาะ dev เท่านั้น */}
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-800 font-semibold mb-2">ทดลองใช้ (รหัสผ่าน = ชื่อผู้ใช้):</p>
+              <div className="text-xs text-blue-700 space-y-1">
+                <p><strong>admin</strong> — ผู้ดูแลระบบ (สิทธิ์เต็ม)</p>
+                <p><strong>engineer</strong> — วิศวกร (จัดการโครงการ/งาน)</p>
+                <p><strong>staff</strong> — เจ้าหน้าที่ (ดู/สร้างโครงการ)</p>
+                <p><strong>client</strong> — ลูกค้า (ดูรายงาน)</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

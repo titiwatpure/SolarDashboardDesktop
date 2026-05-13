@@ -80,6 +80,12 @@ app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api', require('./routes/checkpoints'));
 app.use('/api/backup', require('./routes/backup'));
+app.use('/api/customers', require('./routes/customers'));
+app.use('/api/settings', require('./routes/settings'));
+app.use('/api/quotations', require('./routes/quotations'));
+app.use('/api/contracts', require('./routes/contracts'));
+app.use('/api/portal', require('./routes/portal'));
+app.use('/api/accounting', require('./routes/accounting'));
 
 // Health check with DB connectivity
 const pool = require('./database');

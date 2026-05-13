@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, MapPin, Zap, FileText, Clock,
   Loader, User, Building2, AlertTriangle, Trash2, Plus, X, Save,
-  MessageSquare, Send, Check, Minus, RefreshCw
+  MessageSquare, Send, Check, Minus, RefreshCw, UserCircle, DollarSign, Cpu
 } from 'lucide-react';
 import { projectsAPI, usersAPI, organizationsAPI } from '../utils/api';
 import {
-  STATUS_LABELS, STATUS_COLORS, STEP_LABELS,
+  STATUS_LABELS, STATUS_COLORS, STEP_LABELS, CUSTOMER_TYPES, MOUNTING_TYPES,
   PERMIT_TYPES
 } from '../utils/constants';
 
@@ -391,6 +391,71 @@ export default function ProjectDetail() {
               )}
             </div>
           </section>
+
+          {/* ข้อมูลลูกค้า */}
+          {(project.customer_name || project.customer_id) && (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <UserCircle size={18} className="text-teal-600" /> ข้อมูลลูกค้า
+              </h2>
+              <div className="space-y-3">
+                <InfoRow icon={UserCircle} label="ชื่อลูกค้า" value={project.customer_name} />
+                {project.customer_type && <InfoRow icon={Building2} label="ประเภท" value={CUSTOMER_TYPES[project.customer_type] || project.customer_type} />}
+                {project.customer_contact_name && <InfoRow icon={User} label="ผู้ติดต่อ" value={project.customer_contact_name} />}
+                {project.customer_contact_phone && <InfoRow icon={FileText} label="เบอร์โทร" value={project.customer_contact_phone} />}
+                {project.customer_contact_email && <InfoRow icon={FileText} label="อีเมล" value={project.customer_contact_email} />}
+                {project.customer_tax_id && <InfoRow icon={FileText} label="เลขภาษี" value={project.customer_tax_id} />}
+                {project.customer_address && <InfoRow icon={MapPin} label="ที่อยู่" value={project.customer_address} />}
+              </div>
+            </section>
+          )}
+
+          {/* สถานที่ติดตั้ง */}
+          {(project.site_address || project.grid_station) && (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <MapPin size={18} className="text-orange-600" /> สถานที่ติดตั้ง
+              </h2>
+              <div className="space-y-3">
+                {project.site_address && <InfoRow icon={MapPin} label="ที่อยู่" value={project.site_address} />}
+                {project.site_lat && project.site_lng && (
+                  <InfoRow icon={MapPin} label="พิกัด" value={`${project.site_lat}, ${project.site_lng}`} />
+                )}
+                {project.grid_station && <InfoRow icon={Zap} label="สถานีไฟฟ้า" value={project.grid_station} />}
+                {project.grid_voltage && <InfoRow icon={Zap} label="แรงดัน" value={project.grid_voltage} />}
+              </div>
+            </section>
+          )}
+
+          {/* สัญญา/การเงิน */}
+          {(project.contract_number || project.contract_value || project.budget) && (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <DollarSign size={18} className="text-green-600" /> สัญญา / การเงิน
+              </h2>
+              <div className="space-y-3">
+                {project.contract_number && <InfoRow icon={FileText} label="เลขที่สัญญา" value={project.contract_number} />}
+                {project.contract_date && <InfoRow icon={Calendar} label="วันที่เซ็น" value={formatDate(project.contract_date)} />}
+                {project.contract_value && <InfoRow icon={DollarSign} label="มูลค่าสัญญา" value={`${Number(project.contract_value).toLocaleString()} บาท`} />}
+                {project.budget && <InfoRow icon={DollarSign} label="งบประมาณ" value={`${Number(project.budget).toLocaleString()} บาท`} />}
+              </div>
+            </section>
+          )}
+
+          {/* สเปคเทคนิค */}
+          {project.specs && (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Cpu size={18} className="text-purple-600" /> สเปคเทคนิค
+              </h2>
+              <div className="space-y-3">
+                {project.specs.panel_brand && <InfoRow icon={Zap} label="แผง" value={`${project.specs.panel_brand} ${project.specs.panel_model || ''} (${project.specs.panel_count || '-'} แผง)`} />}
+                {project.specs.inverter_brand && <InfoRow icon={Zap} label="อินเวอร์เตอร์" value={`${project.specs.inverter_brand} ${project.specs.inverter_model || ''} (${project.specs.inverter_count || '-'} เครื่อง)`} />}
+                {project.specs.mounting_type && <InfoRow icon={Building2} label="ประเภทติดตั้ง" value={MOUNTING_TYPES[project.specs.mounting_type] || project.specs.mounting_type} />}
+                {project.specs.grid_connection_type && <InfoRow icon={Zap} label="การต่อเชื่อม" value={project.specs.grid_connection_type} />}
+              </div>
+            </section>
+          )}
 
           {/* ผู้รับผิดชอบ */}
           <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">

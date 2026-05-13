@@ -201,10 +201,71 @@ export const APPROVAL_STATUSES = {
   rejected: { label: 'ไม่อนุมัติ', color: 'bg-red-100 text-red-800' },
 };
 
+// ประเภทลูกค้า
+export const CUSTOMER_TYPES = {
+  individual: 'บุคคลธรรมดา',
+  company: 'นิติบุคคล',
+  government: 'หน่วยงานราชการ',
+};
+
+// ประเภทการติดตั้ง
+export const MOUNTING_TYPES = {
+  roof: 'หลังคา',
+  ground: 'พื้นดิน',
+  floating: 'ลอยน้ำ',
+};
+
+// ประเภทการต่อเชื่อมสายส่ง
+export const GRID_CONNECTION_TYPES = {
+  single_phase: 'เฟสเดียว',
+  three_phase: 'สามเฟส',
+  mv: 'แรงดันปานกลาง (MV)',
+  hv: 'แรงดันสูง (HV)',
+};
+
 // Toast notification types
 export const TOAST_TYPES = {
   success: { bg: 'bg-green-500', icon: '✓' },
   error: { bg: 'bg-red-500', icon: '✕' },
   warning: { bg: 'bg-yellow-500', icon: '⚠' },
   info: { bg: 'bg-blue-500', icon: 'ℹ' },
+};
+
+// สถานะใบเสนอราคา
+export const QUOTATION_STATUSES = {
+  draft: { label: 'ร่าง', color: 'bg-gray-100 text-gray-800' },
+  sent: { label: 'ส่งแล้ว', color: 'bg-blue-100 text-blue-800' },
+  approved: { label: 'อนุมัติ', color: 'bg-green-100 text-green-800' },
+  rejected: { label: 'ปฏิเสธ', color: 'bg-red-100 text-red-800' },
+  expired: { label: 'หมดอายุ', color: 'bg-yellow-100 text-yellow-800' },
+};
+
+// สถานะสัญญา
+export const CONTRACT_STATUSES = {
+  draft: { label: 'ร่าง', color: 'bg-gray-100 text-gray-800' },
+  active: { label: 'มีผล', color: 'bg-green-100 text-green-800' },
+  completed: { label: 'เสร็จสิ้น', color: 'bg-blue-100 text-blue-800' },
+  terminated: { label: 'ยกเลิก', color: 'bg-red-100 text-red-800' },
+};
+
+// วิธีชำระเงิน
+export const PAYMENT_METHODS = {
+  cash: 'เงินสด',
+  transfer: 'โอนเงิน',
+  check: 'เช็ค',
+  other: 'อื่นๆ',
+};
+
+// สถานะงวดชำระ
+export const INSTALLMENT_STATUSES = {
+  pending: { label: 'รอชำระ', color: 'bg-yellow-100 text-yellow-800' },
+  partial: { label: 'ชำระบางส่วน', color: 'bg-blue-100 text-blue-800' },
+  paid: { label: 'ชำระแล้ว', color: 'bg-green-100 text-green-800' },
+  overdue: { label: 'เกินกำหนด', color: 'bg-red-100 text-red-800' },
+};
+
+// ประเภทบัญชี
+export const TRANSACTION_TYPES = {
+  income: { label: 'รายรับ', color: 'text-green-600', bg: 'bg-green-50' },
+  expense: { label: 'รายจ่าย', color: 'text-red-600', bg: 'bg-red-50' },
 };

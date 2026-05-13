@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const sqlite3 = require('sqlite3').verbose();
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { logActivity } = require('./activity_logs');
 
@@ -26,7 +27,19 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) =
     const backupName = `solar_dashboard_backup_${date}.db`;
     const backupPath = path.join(backupDir, backupName);
 
-    fs.copyFileSync(dbPath, backupPath);
+    // ใช้ SQLite Backup API เพื่อ snapshot ที่ consistent
+    await new Promise((resolve, reject) => {
+      const src = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
+      src.backup(backupPath)
+        .then(() => {
+          src.close();
+          resolve();
+        })
+        .catch((err) => {
+          src.close();
+          reject(err);
+        });
+    });
 
     const stats = fs.statSync(backupPath);
 
@@ -132,12 +145,19 @@ router.post('/restore/:name', authenticateToken, authorizeRole(['admin']), async
       return res.status(404).json({ error: 'ไม่พบไฟล์ backup' });
     }
 
-    // สำรองไฟล์ปัจจุบันก่อนกู้คืน
+    // สำรองไฟล์ปัจจุบันก่อนกู้คืน (ใช้ SQLite backup API)
     const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const preRestoreName = `solar_dashboard_pre_restore_${date}.db`;
-    fs.copyFileSync(dbPath, path.join(backupDir, preRestoreName));
+    const preRestorePath = path.join(backupDir, preRestoreName);
 
-    // กู้คืน
+    await new Promise((resolve, reject) => {
+      const src = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
+      src.backup(preRestorePath)
+        .then(() => { src.close(); resolve(); })
+        .catch((err) => { src.close(); reject(err); });
+    });
+
+    // เขียนไฟล์ backup ลงทับ — server ต้อง restart เพื่อโหลด DB ใหม่
     fs.copyFileSync(backupPath, dbPath);
 
     logActivity(req.user.id, 'restore', 'database', null, {

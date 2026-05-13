@@ -22,6 +22,7 @@ const initDB = async () => {
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       full_name TEXT,
+      phone TEXT,
       role TEXT NOT NULL DEFAULT 'engineer',
       permissions TEXT DEFAULT '{}',
       status TEXT DEFAULT 'active',
@@ -216,7 +217,135 @@ const initDB = async () => {
       user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
       comment TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );`
+    );`,
+
+    // Customers Table — ข้อมูลลูกค้า
+    `CREATE TABLE IF NOT EXISTS customers (
+      id TEXT PRIMARY KEY,
+      customer_name TEXT NOT NULL,
+      customer_type TEXT, -- 'individual', 'company', 'government'
+      contact_name TEXT,
+      contact_phone TEXT,
+      contact_email TEXT,
+      tax_id TEXT,
+      address TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Project Specs Table — สเปคเทคนิค (1:1 กับ project)
+    `CREATE TABLE IF NOT EXISTS project_specs (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+      panel_brand TEXT,
+      panel_model TEXT,
+      panel_count INTEGER,
+      inverter_brand TEXT,
+      inverter_model TEXT,
+      inverter_count INTEGER,
+      mounting_type TEXT, -- 'roof', 'ground', 'floating'
+      grid_connection_type TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Company Settings Table — ข้อมูลบริษัท (key-value)
+    `CREATE TABLE IF NOT EXISTS company_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Quotations Table — ใบเสนอราคา
+    `CREATE TABLE IF NOT EXISTS quotations (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
+      project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+      quote_number TEXT UNIQUE NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft', -- draft/sent/approved/rejected/expired
+      valid_until DATE,
+      subtotal REAL DEFAULT 0,
+      tax_rate REAL DEFAULT 7,
+      tax_amount REAL DEFAULT 0,
+      total_amount REAL DEFAULT 0,
+      notes TEXT,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Quotation Items Table — รายการในใบเสนอราคา
+    `CREATE TABLE IF NOT EXISTS quotation_items (
+      id TEXT PRIMARY KEY,
+      quotation_id TEXT NOT NULL REFERENCES quotations(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      quantity REAL NOT NULL DEFAULT 1,
+      unit TEXT DEFAULT 'ชุด',
+      unit_price REAL NOT NULL DEFAULT 0,
+      amount REAL NOT NULL DEFAULT 0,
+      sort_order INTEGER DEFAULT 0
+    );`,
+
+    // Contracts Table — สัญญา
+    `CREATE TABLE IF NOT EXISTS contracts (
+      id TEXT PRIMARY KEY,
+      project_id TEXT UNIQUE REFERENCES projects(id) ON DELETE SET NULL,
+      customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
+      contract_number TEXT,
+      status TEXT NOT NULL DEFAULT 'draft', -- draft/active/completed/terminated
+      start_date DATE,
+      end_date DATE,
+      total_value REAL,
+      signed_date DATE,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Accounting Categories Table — หมวดหมู่บัญชี
+    `CREATE TABLE IF NOT EXISTS accounting_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL, -- income / expense
+      icon TEXT,
+      sort_order INTEGER DEFAULT 0
+    );`,
+
+    // Transactions Table — รายการบัญชี
+    `CREATE TABLE IF NOT EXISTS transactions (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      category_id TEXT REFERENCES accounting_categories(id) ON DELETE SET NULL,
+      type TEXT NOT NULL, -- income / expense
+      amount REAL NOT NULL DEFAULT 0,
+      description TEXT,
+      transaction_date DATE NOT NULL,
+      reference_type TEXT, -- contract / quotation / manual
+      reference_id TEXT,
+      payment_method TEXT, -- cash / transfer / check / other
+      receipt_number TEXT,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Payment Installments Table — งวดชำระ
+    `CREATE TABLE IF NOT EXISTS payment_installments (
+      id TEXT PRIMARY KEY,
+      contract_id TEXT REFERENCES contracts(id) ON DELETE SET NULL,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      installment_number INTEGER NOT NULL,
+      description TEXT,
+      amount REAL NOT NULL DEFAULT 0,
+      due_date DATE,
+      status TEXT NOT NULL DEFAULT 'pending', -- pending / paid / overdue
+      paid_amount REAL DEFAULT 0,
+      paid_date DATE,
+      transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`,
   ];
 
   // สร้าง indexes
@@ -248,7 +377,23 @@ const initDB = async () => {
     'CREATE INDEX IF NOT EXISTS idx_projects_risk_level ON projects(risk_level);',
     'CREATE INDEX IF NOT EXISTS idx_activity_logs_severity ON activity_logs(severity);',
     'CREATE INDEX IF NOT EXISTS idx_project_organizations_approval ON project_organizations(approval_status);',
-    'CREATE INDEX IF NOT EXISTS idx_timeline_comments_timeline_id ON timeline_comments(timeline_id);'
+    'CREATE INDEX IF NOT EXISTS idx_timeline_comments_timeline_id ON timeline_comments(timeline_id);',
+    'CREATE INDEX IF NOT EXISTS idx_projects_customer_id ON projects(customer_id);',
+    'CREATE INDEX IF NOT EXISTS idx_project_specs_project_id ON project_specs(project_id);',
+    'CREATE INDEX IF NOT EXISTS idx_customers_user_id ON customers(user_id);',
+    'CREATE INDEX IF NOT EXISTS idx_quotations_customer_id ON quotations(customer_id);',
+    'CREATE INDEX IF NOT EXISTS idx_quotations_status ON quotations(status);',
+    'CREATE INDEX IF NOT EXISTS idx_quotation_items_quotation_id ON quotation_items(quotation_id);',
+    'CREATE INDEX IF NOT EXISTS idx_contracts_project_id ON contracts(project_id);',
+    'CREATE INDEX IF NOT EXISTS idx_contracts_customer_id ON contracts(customer_id);',
+    'CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status);',
+    'CREATE INDEX IF NOT EXISTS idx_transactions_project_id ON transactions(project_id);',
+    'CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);',
+    'CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(transaction_date);',
+    'CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category_id);',
+    'CREATE INDEX IF NOT EXISTS idx_installments_project_id ON payment_installments(project_id);',
+    'CREATE INDEX IF NOT EXISTS idx_installments_contract_id ON payment_installments(contract_id);',
+    'CREATE INDEX IF NOT EXISTS idx_installments_status ON payment_installments(status);'
   ];
 
   // Helper: wrap db.run ใน Promise
@@ -268,10 +413,22 @@ const initDB = async () => {
     }
   }
 
-  // Migration: เพิ่มคอลัมน์ scope_start/scope_end สำหรับ database ที่มีอยู่แล้ว
+  // Migration: เพิ่มคอลัมน์ใหม่สำหรับ database ที่มีอยู่แล้ว
   const migrations = [
     "ALTER TABLE projects ADD COLUMN scope_start TEXT NOT NULL DEFAULT 'survey'",
     "ALTER TABLE projects ADD COLUMN scope_end TEXT NOT NULL DEFAULT 'cod'",
+    "ALTER TABLE projects ADD COLUMN customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL",
+    "ALTER TABLE projects ADD COLUMN site_address TEXT",
+    "ALTER TABLE projects ADD COLUMN site_lat REAL",
+    "ALTER TABLE projects ADD COLUMN site_lng REAL",
+    "ALTER TABLE projects ADD COLUMN grid_station TEXT",
+    "ALTER TABLE projects ADD COLUMN grid_voltage TEXT",
+    "ALTER TABLE projects ADD COLUMN contract_number TEXT",
+    "ALTER TABLE projects ADD COLUMN contract_value REAL",
+    "ALTER TABLE projects ADD COLUMN contract_date TEXT",
+    "ALTER TABLE projects ADD COLUMN budget REAL",
+    "ALTER TABLE users ADD COLUMN phone TEXT",
+    "ALTER TABLE customers ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE SET NULL",
   ];
   for (const sql of migrations) {
     try {
@@ -352,6 +509,26 @@ const initDB = async () => {
       );
     }
     console.log('✅ เพิ่มหน่วยงาน demo สำเร็จ');
+
+    // เพิ่มหมวดหมู่บัญชีเริ่มต้น
+    const categories = [
+      { name: 'เงินมัดจำ', type: 'income', icon: '💰', sort: 1 },
+      { name: 'งวดระหว่างงาน', type: 'income', icon: '💵', sort: 2 },
+      { name: 'งวดส่งมอบ', type: 'income', icon: '✅', sort: 3 },
+      { name: 'รายรับอื่นๆ', type: 'income', icon: '📋', sort: 4 },
+      { name: 'ค่าวัสดุ', type: 'expense', icon: '🔩', sort: 1 },
+      { name: 'ค่าแรง', type: 'expense', icon: '👷', sort: 2 },
+      { name: 'ค่าดำเนินการ', type: 'expense', icon: '📄', sort: 3 },
+      { name: 'ค่าเดินทาง', type: 'expense', icon: '🚗', sort: 4 },
+      { name: 'ค่าใช้จ่ายอื่นๆ', type: 'expense', icon: '📦', sort: 5 },
+    ];
+    for (const cat of categories) {
+      await runInsert(
+        `INSERT OR IGNORE INTO accounting_categories (id, name, type, icon, sort_order) VALUES (?, ?, ?, ?, ?)`,
+        [uuidv4(), cat.name, cat.type, cat.icon, cat.sort]
+      );
+    }
+    console.log('✅ เพิ่มหมวดหมู่บัญชีสำเร็จ');
   } catch (err) {
     console.error('❌ Error seeding data:', err);
   }

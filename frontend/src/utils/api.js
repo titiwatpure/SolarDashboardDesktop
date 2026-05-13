@@ -59,9 +59,21 @@ const processQueue = (error, token = null) => {
 };
 
 /**
+ * ถอดรหัส JWT payload (ไม่ verify signature — ใช้ client-side เท่านั้น)
+ */
+export const decodeJWT = (token) => {
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+};
+
+/**
  * เรียก refresh token เพื่อขอ access token ใหม่
  */
-const refreshAccessToken = async () => {
+export const refreshAccessToken = async () => {
   const refreshToken = getRefreshToken();
   if (!refreshToken) throw new Error('No refresh token');
 
@@ -154,9 +166,13 @@ export const apiCall = async (method, url, data = null) => {
 
 export const authAPI = {
   login: (username, password) => apiCall('POST', '/auth/login', { username, password }),
-  logout: () => apiCall('POST', '/auth/logout'),
+  logout: () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    return apiCall('POST', '/auth/logout', { refreshToken });
+  },
   logoutAll: () => apiCall('POST', '/auth/logout-all'),
   refresh: () => refreshAccessToken(),
+  getSessions: () => apiCall('GET', '/auth/sessions'),
 };
 
 export const projectsAPI = {
@@ -248,6 +264,15 @@ export const tasksAPI = {
   delete: (id) => apiCall('DELETE', `/tasks/${id}`),
 };
 
+export const customersAPI = {
+  getAll: (params) => apiCall('GET', `/customers?${new URLSearchParams(params || {})}`),
+  getById: (id) => apiCall('GET', `/customers/${id}`),
+  getProjects: (id) => apiCall('GET', `/customers/${id}/projects`),
+  create: (data) => apiCall('POST', '/customers', data),
+  update: (id, data) => apiCall('PUT', `/customers/${id}`, data),
+  delete: (id) => apiCall('DELETE', `/customers/${id}`),
+};
+
 export const activityLogsAPI = {
   getAll: (params) => apiCall('GET', `/activity-logs?${new URLSearchParams(params || {})}`),
   getRecent: () => apiCall('GET', '/activity-logs/recent'),
@@ -260,3 +285,53 @@ export const backupAPI = {
   delete: (name) => apiCall('DELETE', `/backup/${encodeURIComponent(name)}`),
   restore: (name) => apiCall('POST', `/backup/restore/${encodeURIComponent(name)}`),
 };
+
+export const settingsAPI = {
+  getCompany: () => apiCall('GET', '/settings/company'),
+  updateCompany: (data) => apiCall('PUT', '/settings/company', data),
+};
+
+export const quotationsAPI = {
+  getAll: (params) => apiCall('GET', `/quotations?${new URLSearchParams(params || {})}`),
+  getById: (id) => apiCall('GET', `/quotations/${id}`),
+  create: (data) => apiCall('POST', '/quotations', data),
+  update: (id, data) => apiCall('PUT', `/quotations/${id}`, data),
+  updateItems: (id, items) => apiCall('PUT', `/quotations/${id}/items`, { items }),
+  changeStatus: (id, status) => apiCall('POST', `/quotations/${id}/status`, { status }),
+  delete: (id) => apiCall('DELETE', `/quotations/${id}`),
+};
+
+export const contractsAPI = {
+  getAll: (params) => apiCall('GET', `/contracts?${new URLSearchParams(params || {})}`),
+  getById: (id) => apiCall('GET', `/contracts/${id}`),
+  create: (data) => apiCall('POST', '/contracts', data),
+  update: (id, data) => apiCall('PUT', `/contracts/${id}`, data),
+  delete: (id) => apiCall('DELETE', `/contracts/${id}`),
+};
+
+export const portalAPI = {
+  getSummary: () => apiCall('GET', '/portal/summary'),
+  getProjects: () => apiCall('GET', '/portal/projects'),
+  getQuotations: () => apiCall('GET', '/portal/quotations'),
+  getContracts: () => apiCall('GET', '/portal/contracts'),
+  getDocuments: () => apiCall('GET', '/portal/documents'),
+};
+
+export const accountingAPI = {
+  getCategories: (params) => apiCall('GET', `/accounting/categories?${new URLSearchParams(params || {})}`),
+  createCategory: (data) => apiCall('POST', '/accounting/categories', data),
+  getTransactions: (params) => apiCall('GET', `/accounting/transactions?${new URLSearchParams(params || {})}`),
+  getTransaction: (id) => apiCall('GET', `/accounting/transactions/${id}`),
+  createTransaction: (data) => apiCall('POST', '/accounting/transactions', data),
+  updateTransaction: (id, data) => apiCall('PUT', `/accounting/transactions/${id}`, data),
+  deleteTransaction: (id) => apiCall('DELETE', `/accounting/transactions/${id}`),
+  getInstallments: (params) => apiCall('GET', `/accounting/installments?${new URLSearchParams(params || {})}`),
+  createInstallment: (data) => apiCall('POST', '/accounting/installments', data),
+  bulkInstallments: (data) => apiCall('POST', '/accounting/installments/bulk', data),
+  updateInstallment: (id, data) => apiCall('PUT', `/accounting/installments/${id}`, data),
+  payInstallment: (id, data) => apiCall('POST', `/accounting/installments/${id}/pay`, data),
+  deleteInstallment: (id) => apiCall('DELETE', `/accounting/installments/${id}`),
+  getProjectSummary: (projectId) => apiCall('GET', `/accounting/project/${projectId}/summary`),
+  getCompanySummary: () => apiCall('GET', '/accounting/company/summary'),
+};
+

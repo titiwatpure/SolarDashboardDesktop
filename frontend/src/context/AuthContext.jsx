@@ -1,11 +1,38 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { setAuthToken, setRefreshToken, authAPI, usersAPI } from '../utils/api';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { setAuthToken, setRefreshToken, authAPI, usersAPI, decodeJWT, refreshAccessToken } from '../utils/api';
 
 const AuthContext = createContext(null);
+
+// ตั้ง refresh ก่อน token หมดอายุ (วินาที)
+const REFRESH_BEFORE_EXPIRY_SEC = 60;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const refreshTimerRef = useRef(null);
+
+  // ตั้ง timer ให้ refresh อัตโนมัติก่อน token หมดอายุ
+  const startRefreshTimer = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const payload = decodeJWT(token);
+    if (!payload?.exp) return;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const delayMs = Math.max((payload.exp - nowSec - REFRESH_BEFORE_EXPIRY_SEC) * 1000, 5000);
+
+    refreshTimerRef.current = setTimeout(async () => {
+      try {
+        await refreshAccessToken();
+        startRefreshTimer(); // ตั้ง timer ใหม่หลัง refresh สำเร็จ
+      } catch {
+        // refresh ไม่สำเร็จ → ให้ interceptor จัดการ logout เมื่อมี request ถัดไป
+      }
+    }, delayMs);
+  }, []);
 
   // ตรวจสอบ token จาก localStorage ตอนโหลด
   useEffect(() => {
@@ -16,13 +43,18 @@ export function AuthProvider({ children }) {
       setAuthToken(token);
       try {
         setUser(JSON.parse(storedUser));
+        startRefreshTimer();
       } catch {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
       }
     }
     setLoading(false);
-  }, []);
+
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, [startRefreshTimer]);
 
   // Login
   const login = useCallback(async (username, password) => {
@@ -33,11 +65,13 @@ export function AuthProvider({ children }) {
     if (refresh) setRefreshToken(refresh);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
+    startRefreshTimer();
     return userData;
-  }, []);
+  }, [startRefreshTimer]);
 
   // Logout
   const logout = useCallback(async () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     try { await authAPI.logout(); } catch { /* ล้าง local เสมอ */ }
     setAuthToken(null);
     setRefreshToken(null);
@@ -66,15 +100,17 @@ export function AuthProvider({ children }) {
     return res;
   }, []);
 
-  const value = {
+  const isAdmin = user?.role === 'admin';
+
+  const value = useMemo(() => ({
     user,
     loading,
     login,
     logout,
     refreshUser,
     changePassword,
-    isAdmin: user?.role === 'admin',
-  };
+    isAdmin,
+  }), [user, loading, login, logout, refreshUser, changePassword, isAdmin]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -16,6 +16,10 @@
 - **Status Transition Validation** -- บังคับการเปลี่ยนสถานะตาม State Machine
 - **Scope Start/End** -- กำหนดช่วงขั้นตอนของแต่ละโครงการ (เช่น เริ่มจาก Grid ถึง COD)
 - **Progress Calculation** -- คำนวณ % ความคืบหน้าอัตโนมัติตาม scope และ step ปัจจุบัน
+- **ข้อมูลลูกค้า** -- เชื่อมโครงการกับลูกค้า (ไม่บังคับ)
+- **สถานที่ติดตั้ง** -- ที่อยู่, พิกัด, สถานีไฟฟ้า, แรงดัน (ไม่บังคับ)
+- **สัญญา/การเงิน** -- เลขที่สัญญา, มูลค่า, งบประมาณ (ไม่บังคับ)
+- **สเปคเทคนิค** -- แผง, อินเวอร์เตอร์, ประเภทติดตั้ง (ไม่บังคับ)
 - Logic อัตโนมัติ: Step = COD -> Completed
 
 ### ระบบ Checkpoint (จุดตรวจสอบ)
@@ -46,6 +50,12 @@
 - <= 1000 kVA = แจ้งยกเว้น
 - > 1000 kVA = ขอใบอนุญาต
 - มีการขายไฟ = ต้องขอใบอนุญาต
+
+### ลูกค้า
+- จัดการข้อมูลลูกค้า (บุคคลธรรมดา / นิติบุคคล / หน่วยงานราชการ)
+- ข้อมูลติดต่อ: ผู้ติดต่อ, เบอร์โทร, อีเมล, เลขประจำตัวผู้เสียภาษี, ที่อยู่
+- เชื่อมกับหลายโครงการ
+- ค้นหาลูกค้าจากชื่อ/ผู้ติดต่อ/เบอร์โทร
 
 ### หน่วยงาน
 รองรับหน่วยงานต่อไปนี้:
@@ -122,6 +132,36 @@
 - เปลี่ยนรหัสผ่าน
 - ตั้งค่าการแจ้งเตือน
 
+### ใบเสนอราคา (Quotations)
+- สร้าง/แก้ไข/ลบ ใบเสนอราคา
+- สถานะ: ร่าง, ส่งแล้ว, อนุมัติ, ปฏิเสธ, หมดอายุ
+- เพิ่มรายการสินค้า/บริการ พร้อมคำนวณภาษีอัตโนมัติ
+- เชื่อมกับลูกค้าและโครงการ
+- เปลี่ยนสถานะใบเสนอราคา
+
+### สัญญา (Contracts)
+- สร้าง/แก้ไข/ลบ สัญญา
+- สถานะ: ร่าง, มีผล, เสร็จสิ้น, ยกเลิก
+- เชื่อมกับโครงการและลูกค้า
+- บันทึกวันที่เริ่ม/สิ้นสุด/เซ็นสัญญา
+
+### ระบบบัญชี (Accounting)
+- **หมวดหมู่บัญชี** -- รายรับ/รายจ่าย พร้อมไอคอน
+- **บันทึกรายรับ-รายจ่าย** -- ผูกกับโครงการ (ไม่บังคับ)
+- **งวดชำระ** -- สร้างงวดจากสัญญา, ชำระเต็ม/บางส่วน, สถานะอัตโนมัติ
+- **สรุปการเงิน** -- รายรับรวม, รายจ่ายรวม, กำไร, ยอดค้างชำระ
+- กรองตามวันที่, โครงการ, หมวดหมู่
+- งวดชำระ partial payment (ชำระบางส่วน → สถานะ "ชำระบางส่วน")
+- ป้องกันลบงวดที่มี transaction เชื่อมอยู่
+
+### พอร์ทัลลูกค้า (Customer Portal)
+- หน้าสรุปสำหรับลูกค้า
+- ดูโครงการ, ใบเสนอราคา, สัญญา, เอกสาร ของตัวเอง
+
+### แผนที่เครือข่าย (Network Map)
+- แสดงตำแหน่งโครงการบนแผนที่ (Leaflet)
+- ใช้พิกัดจาก site_lat, site_lng ของแต่ละโครงการ
+
 ## การติดตั้ง
 
 ### Backend Setup
@@ -194,12 +234,18 @@ Dashboard/
 │   │   │   ├── users.js         # Users CRUD + Change Password
 │   │   │   ├── documents.js     # Documents + File Upload (multer)
 │   │   │   ├── organizations.js # Organizations CRUD + Projects link
+│   │   │   ├── customers.js     # Customers CRUD + Projects link
 │   │   │   ├── reports.js       # 10 Report endpoints
 │   │   │   ├── tasks.js         # Tasks CRUD + Notifications
 │   │   │   ├── notifications.js # Notifications CRUD
 │   │   │   ├── activity_logs.js # Activity logging
 │   │   │   ├── checkpoints.js   # Checkpoint CRUD + Approve + Logs
-│   │   │   └── backup.js        # Database backup/restore (Admin)
+│   │   │   ├── backup.js        # Database backup/restore (Admin)
+│   │   │   ├── quotations.js    # Quotations CRUD + Items + Status
+│   │   │   ├── contracts.js     # Contracts CRUD
+│   │   │   ├── accounting.js    # Categories + Transactions + Installments
+│   │   │   ├── portal.js        # Customer portal (read-only)
+│   │   │   └── settings.js      # Company settings
 │   │   ├── services/
 │   │   │   └── riskDetection.js # Automated risk scoring engine
 │   │   ├── models/
@@ -207,7 +253,7 @@ Dashboard/
 │   │   ├── utils/
 │   │   │   └── errors.js        # Custom AppError class
 │   │   ├── database.js          # SQLite connection (pool interface)
-│   │   ├── init-db.cjs          # Database init + seed (16 tables)
+│   │   ├── init-db.cjs          # Database init + seed (22 tables)
 │   │   └── index.js             # Express server
 │   ├── uploads/                 # Uploaded files
 │   ├── __tests__/               # Jest + Supertest tests
@@ -236,9 +282,15 @@ Dashboard/
 │   │   │   ├── Tasks.jsx        # /tasks (task management)
 │   │   │   ├── Documents.jsx    # /documents (file management)
 │   │   │   ├── Organizations.jsx # /organizations
-│   │   │   ├── Reports.jsx      # /reports (9 report sections)
+│   │   │   ├── Customers.jsx    # /customers (customer management)
+│   │   │   ├── Reports.jsx      # /reports (10 report sections)
 │   │   │   ├── Users.jsx        # /users (admin)
-│   │   │   └── Settings.jsx     # /settings
+│   │   │   ├── Settings.jsx     # /settings + company settings
+│   │   │   ├── Quotations.jsx   # /quotations (quotation management)
+│   │   │   ├── Contracts.jsx    # /contracts (contract management)
+│   │   │   ├── Accounting.jsx   # /accounting (finance + installments)
+│   │   │   ├── CustomerPortal.jsx # /portal (customer self-service)
+│   │   │   └── NetworkMap.jsx   # /map (project locations)
 │   │   ├── utils/
 │   │   │   ├── api.js           # API client + auto token refresh
 │   │   │   ├── constants.js     # Thai labels + constants
@@ -328,6 +380,18 @@ Dashboard/
 - `GET /api/documents/download/:id` - ดาวน์โหลดไฟล์
 - `DELETE /api/documents/:id` - ลบเอกสาร (Admin)
 
+### Customers
+- `GET /api/customers` - รายการลูกค้า (ค้นหาได้)
+- `GET /api/customers/:id` - รายละเอียดลูกค้า
+- `GET /api/customers/:id/projects` - โครงการของลูกค้า
+- `POST /api/customers` - สร้างลูกค้า
+- `PUT /api/customers/:id` - อัปเดตลูกค้า
+- `DELETE /api/customers/:id` - ลบลูกค้า
+
+### Project Specs
+- `GET /api/projects/:id/specs` - สเปคเทคนิค
+- `PUT /api/projects/:id/specs` - สร้าง/อัปเดตสเปค (upsert)
+
 ### Organizations
 - `GET /api/organizations` - รายการหน่วยงาน
 - `GET /api/organizations/:id/projects` - โครงการที่เชื่อมกับหน่วยงาน
@@ -365,6 +429,49 @@ Dashboard/
 - `GET /api/activity-logs` - บันทึกกิจกรรม
 - `GET /api/activity-logs/recent` - กิจกรรมล่าสุด
 - `POST /api/activity-logs` - สร้าง log ด้วยตนเอง
+
+### Quotations
+- `GET /api/quotations` - รายการใบเสนอราคา
+- `GET /api/quotations/:id` - รายละเอียด
+- `POST /api/quotations` - สร้างใบเสนอราคา
+- `PUT /api/quotations/:id` - อัปเดต
+- `PUT /api/quotations/:id/items` - อัปเดตรายการ
+- `POST /api/quotations/:id/status` - เปลี่ยนสถานะ
+- `DELETE /api/quotations/:id` - ลบ
+
+### Contracts
+- `GET /api/contracts` - รายการสัญญา
+- `GET /api/contracts/:id` - รายละเอียด
+- `POST /api/contracts` - สร้างสัญญา
+- `PUT /api/contracts/:id` - อัปเดต
+- `DELETE /api/contracts/:id` - ลบ
+
+### Accounting
+- `GET /api/accounting/categories` - หมวดหมู่บัญชี
+- `POST /api/accounting/categories` - สร้างหมวดหมู่
+- `GET /api/accounting/transactions` - รายการธุรกรรม
+- `POST /api/accounting/transactions` - สร้างธุรกรรม
+- `PUT /api/accounting/transactions/:id` - อัปเดต
+- `DELETE /api/accounting/transactions/:id` - ลบ
+- `GET /api/accounting/installments` - รายการงวดชำระ
+- `POST /api/accounting/installments` - สร้างงวด
+- `POST /api/accounting/installments/bulk` - สร้างงวดแบบ bulk
+- `PUT /api/accounting/installments/:id` - อัปเดต
+- `POST /api/accounting/installments/:id/pay` - ชำระเงิน
+- `DELETE /api/accounting/installments/:id` - ลบ
+- `GET /api/accounting/project/:id/summary` - สรุปการเงินรายโครงการ
+- `GET /api/accounting/company/summary` - สรุปการเงินบริษัท
+
+### Customer Portal
+- `GET /api/portal/summary` - สรุปข้อมูลลูกค้า
+- `GET /api/portal/projects` - โครงการของลูกค้า
+- `GET /api/portal/quotations` - ใบเสนอราคาของลูกค้า
+- `GET /api/portal/contracts` - สัญญาของลูกค้า
+- `GET /api/portal/documents` - เอกสารของลูกค้า
+
+### Settings
+- `GET /api/settings/company` - ข้อมูลบริษัท
+- `PUT /api/settings/company` - อัปเดตข้อมูลบริษัท
 
 ### Backup (Admin)
 - `POST /api/backup` - สำรองฐานข้อมูล

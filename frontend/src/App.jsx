@@ -16,8 +16,13 @@ import Steps from './pages/Steps';
 import Documents from './pages/Documents';
 import Tasks from './pages/Tasks';
 import NetworkMap from './pages/NetworkMap';
+import Customers from './pages/Customers';
 import ProjectDetail from './pages/ProjectDetail';
 import ProjectReport from './pages/ProjectReport';
+import Quotations from './pages/Quotations';
+import Contracts from './pages/Contracts';
+import CustomerPortal from './pages/CustomerPortal';
+import Accounting from './pages/Accounting';
 import { Component, useState } from 'react';
 
 class ErrorBoundary extends Component {
@@ -95,8 +100,9 @@ function AppContent() {
 
         <main className="px-4 py-5 md:px-6 md:py-6 xl:px-8">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={user?.role === 'client' ? <Navigate to="/portal" replace /> : <Dashboard />} />
             <Route path="/projects" element={<Projects />} />
+            <Route path="/customers" element={<Customers />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/users" element={<Users />} />
@@ -107,6 +113,10 @@ function AppContent() {
             <Route path="/network-map" element={<NetworkMap />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
             <Route path="/projects/:id/report" element={<ProjectReport />} />
+            <Route path="/quotations" element={<Quotations />} />
+            <Route path="/contracts" element={<Contracts />} />
+            <Route path="/portal" element={<CustomerPortal />} />
+            <Route path="/accounting" element={<Accounting />} />
           </Routes>
         </main>
       </div>
