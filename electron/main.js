@@ -7,10 +7,11 @@ Module._resolveFilename = function (request, parent, isMain, options) {
   return _originalResolve.call(this, request, parent, isMain, options);
 };
 
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const https = require('https');
 
 // ──────────────────────────────────────────────
 // 1. Resolve all data paths to userData
@@ -47,6 +48,47 @@ if (fs.existsSync(jwtSecretPath)) {
   const secret = crypto.randomBytes(32).toString('hex');
   fs.writeFileSync(jwtSecretPath, secret, 'utf8');
   process.env.JWT_SECRET = secret;
+}
+
+// ──────────────────────────────────────────────
+// 2b. Update checker
+// ──────────────────────────────────────────────
+function checkForUpdates() {
+  const currentVersion = app.getVersion();
+  const options = {
+    hostname: 'api.github.com',
+    path: '/repos/titiwatpure/SolarDashboardDesktop/releases/latest',
+    method: 'GET',
+    headers: { 'User-Agent': 'SolarDashboard' },
+  };
+
+  const req = https.request(options, (res) => {
+    let data = '';
+    res.on('data', (chunk) => { data += chunk; });
+    res.on('end', () => {
+      try {
+        const release = JSON.parse(data);
+        const latestVersion = release.tag_name?.replace('v', '');
+        if (latestVersion && latestVersion !== currentVersion) {
+          dialog.showMessageBox({
+            type: 'info',
+            title: 'มีเวอร์ชันใหม่',
+            message: `Solar Dashboard v${latestVersion}`,
+            detail: 'ต้องการดาวน์โหลดเวอร์ชันใหม่หรือไม่?',
+            buttons: ['ดาวน์โหลด', 'ภายหลัง'],
+            defaultId: 0,
+            cancelId: 1,
+          }).then((result) => {
+            if (result.response === 0) {
+              shell.openExternal(release.html_url);
+            }
+          });
+        }
+      } catch (_) {}
+    });
+  });
+  req.on('error', () => {});
+  req.end();
 }
 
 // ──────────────────────────────────────────────
@@ -116,6 +158,9 @@ async function createApp() {
     mainWindow.on('closed', () => {
       mainWindow = null;
     });
+
+    // เช็คอัปเดตหลังเปิดหน้าต่าง
+    setTimeout(checkForUpdates, 3000);
   });
 
   server.on('error', (err) => {
