@@ -10,7 +10,7 @@ const { logActivity } = require('./activity_logs');
 const router = express.Router();
 
 // สร้าง uploads directory ถ้ายังไม่มี
-const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
+const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

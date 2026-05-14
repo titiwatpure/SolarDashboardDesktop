@@ -5,7 +5,7 @@
 
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
 const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'solar_dashboard.db');
@@ -414,7 +414,7 @@ const initDB = async () => {
   }
 
   // Migration: เพิ่มคอลัมน์ใหม่สำหรับ database ที่มีอยู่แล้ว
-  const { runMigrations } = require('./migrations/runner');
+  const { runMigrations } = require('./migrations/runner.cjs');
   await runMigrations(db);
 
   // สร้าง indexes (sequential)
@@ -520,4 +520,7 @@ const initDB = async () => {
   });
 };
 
-initDB();
+if (require.main === module) {
+  initDB();
+}
+module.exports = { initDB };

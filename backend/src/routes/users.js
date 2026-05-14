@@ -1,6 +1,6 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const pool = require('../database');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { logActivity } = require('./activity_logs');

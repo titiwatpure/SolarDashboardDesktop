@@ -2,14 +2,13 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const sqlite3 = require('sqlite3').verbose();
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { logActivity } = require('./activity_logs');
 
 const router = express.Router();
 
 const dbPath = process.env.DB_PATH || path.join(__dirname, '..', '..', 'solar_dashboard.db');
-const backupDir = path.join(__dirname, '..', '..', 'backups');
+const backupDir = process.env.BACKUPS_DIR || path.join(__dirname, '..', '..', 'backups');
 
 // สร้าง backups directory ถ้ายังไม่มี
 if (!fs.existsSync(backupDir)) {
@@ -27,19 +26,8 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) =
     const backupName = `solar_dashboard_backup_${date}.db`;
     const backupPath = path.join(backupDir, backupName);
 
-    // ใช้ SQLite Backup API เพื่อ snapshot ที่ consistent
-    await new Promise((resolve, reject) => {
-      const src = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
-      src.backup(backupPath)
-        .then(() => {
-          src.close();
-          resolve();
-        })
-        .catch((err) => {
-          src.close();
-          reject(err);
-        });
-    });
+    // Copy database file as backup
+    fs.copyFileSync(dbPath, backupPath);
 
     const stats = fs.statSync(backupPath);
 
@@ -145,17 +133,12 @@ router.post('/restore/:name', authenticateToken, authorizeRole(['admin']), async
       return res.status(404).json({ error: 'ไม่พบไฟล์ backup' });
     }
 
-    // สำรองไฟล์ปัจจุบันก่อนกู้คืน (ใช้ SQLite backup API)
+    // สำรองไฟล์ปัจจุบันก่อนกู้คืน
     const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const preRestoreName = `solar_dashboard_pre_restore_${date}.db`;
     const preRestorePath = path.join(backupDir, preRestoreName);
 
-    await new Promise((resolve, reject) => {
-      const src = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
-      src.backup(preRestorePath)
-        .then(() => { src.close(); resolve(); })
-        .catch((err) => { src.close(); reject(err); });
-    });
+    fs.copyFileSync(dbPath, preRestorePath);
 
     // เขียนไฟล์ backup ลงทับ — server ต้อง restart เพื่อโหลด DB ใหม่
     fs.copyFileSync(backupPath, dbPath);

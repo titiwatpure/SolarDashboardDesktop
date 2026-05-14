@@ -25,7 +25,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Serve frontend in production (only if frontend build exists)
 if (isProduction) {
-  const frontendBuild = path.join(__dirname, '..', '..', 'frontend', 'build');
+  const frontendBuild = process.env.FRONTEND_BUILD_DIR || path.join(__dirname, '..', '..', 'frontend', 'build');
   const fs = require('fs');
   if (fs.existsSync(frontendBuild)) {
     app.use(express.static(frontendBuild));
@@ -39,7 +39,9 @@ if (isProduction) {
 app.set('trust proxy', 1);
 
 // Security headers
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: process.env.ELECTRON_MODE ? false : undefined,
+}));
 
 // Rate limiting - ป้องกัน brute-force
 const limiter = rateLimit({
@@ -110,7 +112,7 @@ app.get('/api/health', async (req, res) => {
 
 // SPA fallback - serve frontend for non-API routes in production
 if (isProduction) {
-  const frontendIndex = path.join(__dirname, '..', '..', 'frontend', 'build', 'index.html');
+  const frontendIndex = path.join(process.env.FRONTEND_BUILD_DIR || path.join(__dirname, '..', '..', 'frontend', 'build'), 'index.html');
   const fs = require('fs');
   if (fs.existsSync(frontendIndex)) {
     app.get('*', (req, res) => {

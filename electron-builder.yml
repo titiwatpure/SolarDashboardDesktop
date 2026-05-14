@@ -1,0 +1,39 @@
+appId: com.solardashboard.desktop
+productName: Solar Dashboard
+directories:
+  output: dist
+
+files:
+  - electron/**/*
+  - backend/src/**/*
+  - backend/package.json
+  - frontend/build/**/*
+  - package.json
+  - "!frontend/node_modules/**"
+  - "!backend/node_modules/**"
+  - "!**/*.test.*"
+  - "!**/__tests__/**"
+
+extraResources:
+  - from: frontend/build
+    to: app/frontend/build
+
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: electron/icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Solar Dashboard
+
+npmRebuild: false
+buildVersion: 1.0.0
