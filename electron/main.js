@@ -13,6 +13,9 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { autoUpdater } = require('electron-updater');
 
+// IPC: expose app version to renderer
+ipcMain.handle('get-app-version', () => app.getVersion());
+
 // ──────────────────────────────────────────────
 // 1. Resolve all data paths to userData
 // ──────────────────────────────────────────────

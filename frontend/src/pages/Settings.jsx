@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, Shield, Globe, User, Lock, Eye, EyeOff, Database, Download, Trash2, RefreshCw, HardDrive, AlertTriangle, CheckCircle, Edit3, X, Save, Building2, Monitor, Users as UsersIcon, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
+import { Bell, Shield, Globe, User, Lock, Eye, EyeOff, Database, Download, Trash2, RefreshCw, HardDrive, AlertTriangle, CheckCircle, Edit3, X, Save, Building2, Monitor, Users as UsersIcon, ChevronDown, ChevronUp, LogOut, History } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authAPI, usersAPI, backupAPI } from '../utils/api';
 import { ROLES } from '../utils/constants';
@@ -882,6 +882,60 @@ export default function Settings() {
           )}
         </div>
       )}
+
+      {/* ======================== */}
+      {/* 8. Update History        */}
+      {/* ======================== */}
+      <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <History size={24} className="text-blue-600" />
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">ประวัติเวอร์ชัน</h2>
+            <p className="text-xs text-slate-400">บันทึกการอัปเดตแต่ละเวอร์ชัน</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {CHANGELOG.map((entry, idx) => (
+            <div key={entry.version} className={`relative pl-8 ${idx < CHANGELOG.length - 1 ? 'pb-4 border-l-2 border-slate-200 ml-3' : 'ml-3'}`}>
+              <div className="absolute left-[-7px] top-1 h-3 w-3 rounded-full border-2 border-blue-600 bg-white" />
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-bold text-slate-900">v{entry.version}</span>
+                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">{entry.date}</span>
+              </div>
+              <ul className="space-y-1">
+                {entry.changes.map((change, i) => (
+                  <li key={i} className="text-sm text-slate-600">{change}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
+
+const CHANGELOG = [
+  {
+    version: '1.0.1',
+    date: '2026-05-14',
+    changes: [
+      'เพิ่มระบบอัปเดตอัตโนมัติ (electron-updater)',
+      'เพิ่ม GitHub Actions สำหรับ build & release อัตโนมัติ',
+      'แสดงเวอร์ชันปัจจุบันที่ Sidebar',
+      'เพิ่มประวัติเวอร์ชันในหน้าตั้งค่า',
+    ],
+  },
+  {
+    version: '1.0.0',
+    date: '2026-05-14',
+    changes: [
+      'เปิดตัว Solar Dashboard Desktop App',
+      'ระบบติดตามโครงการ Solar ครบวงจร',
+      'รองรับ 4 บทบาท: Admin, Engineer, Staff, Client',
+      'ขั้นตอนดำเนินงาน 7 ขั้น: Survey → COD',
+      'แผนที่เครือข่าย, รายงาน, สัญญา, บัญชี',
+    ],
+  },
+];

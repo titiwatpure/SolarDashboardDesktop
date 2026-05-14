@@ -18,7 +18,7 @@ import {
   LayoutGrid,
   Wallet
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../utils/constants';
 
@@ -55,6 +55,13 @@ export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
+
+  useEffect(() => {
+    if (window.electronAPI?.getAppVersion) {
+      window.electronAPI.getAppVersion().then(setAppVersion);
+    }
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -168,6 +175,12 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
           </div>
         </div>
+
+        {appVersion && (
+          <div className="px-6 pb-4 pt-2">
+            <p className="text-center text-[11px] text-slate-500">Solar Dashboard v{appVersion}</p>
+          </div>
+        )}
       </aside>
     </>
   );
