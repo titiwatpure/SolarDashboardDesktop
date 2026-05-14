@@ -14,7 +14,6 @@ import {
   Users,
   UserCircle,
   Zap,
-  FileSignature,
   ShieldCheck,
   LayoutGrid,
   Wallet
@@ -29,8 +28,7 @@ const allMenuItems = [
   { id: 'projects', label: 'โครงการทั้งหมด', icon: Zap, path: '/projects', roles: ['admin', 'engineer', 'staff'] },
   { id: 'steps', label: 'ปฏิบัติงาน', icon: CheckSquare, path: '/steps', roles: ['admin', 'engineer', 'staff'] },
   { id: 'customers', label: 'ลูกค้า', icon: UserCircle, path: '/customers', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'quotations', label: 'ใบเสนอราคา', icon: FileSignature, path: '/quotations', roles: ['admin', 'engineer'] },
-  { id: 'contracts', label: 'สัญญา', icon: ShieldCheck, path: '/contracts', roles: ['admin', 'engineer'] },
+{ id: 'contracts', label: 'สัญญา', icon: ShieldCheck, path: '/contracts', roles: ['admin', 'engineer'] },
   { id: 'accounting', label: 'บัญชี', icon: Wallet, path: '/accounting', roles: ['admin', 'engineer'] },
   { id: 'organizations', label: 'หน่วยงาน', icon: Building2, path: '/organizations', roles: ['admin', 'engineer', 'staff'] },
   { id: 'documents', label: 'เอกสาร', icon: FileText, path: '/documents', roles: ['admin', 'engineer', 'staff'] },

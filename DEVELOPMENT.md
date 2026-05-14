@@ -31,6 +31,10 @@ frontend/src/
 │   ├── RiskBadge.jsx        # Risk level badge (low/medium/high/critical)
 │   ├── Toast.jsx            # Toast notification system
 │   └── ErrorBoundary        # Inline in App.jsx (crash recovery)
+├── hooks/
+│   ├── useAccounting.js     # useAccountingOverview, useProjectAccounting, useInstallments
+│   ├── useSettings.js       # useProfileEdit, useCompanySettings, useBackupManagement
+│   └── useProjectDetail.js  # useProjectDetail, useProjectCheckpoints
 ├── pages/
 │   ├── Login.jsx            # /login
 │   ├── Dashboard.jsx        # / (KPI + Pipeline)
@@ -45,7 +49,6 @@ frontend/src/
 │   ├── Reports.jsx          # /reports (10 report sections)
 │   ├── Users.jsx            # /users (admin)
 │   ├── Settings.jsx         # /settings (profile + password + company)
-│   ├── Quotations.jsx       # /quotations (quotation management)
 │   ├── Contracts.jsx        # /contracts (contract management)
 │   ├── Accounting.jsx       # /accounting (finance + installments)
 │   ├── CustomerPortal.jsx   # /portal (customer self-service)
@@ -56,7 +59,7 @@ frontend/src/
 │   └── thaiFont.js          # Sarabun font base64 for PDF export
 ├── styles/
 │   └── index.css            # Tailwind imports
-├── App.jsx                  # Router + AuthProvider
+├── App.jsx                  # Router + AuthProvider (code splitting via React.lazy)
 └── index.js                 # Entry point
 ```
 
@@ -77,7 +80,6 @@ backend/
 │   │   ├── activity_logs.js # Audit logging (severity levels)
 │   │   ├── checkpoints.js   # Checkpoint CRUD + Approve + Logs
 │   │   ├── backup.js        # Database backup/restore (Admin)
-│   │   ├── quotations.js    # Quotations CRUD + Items + Status
 │   │   ├── contracts.js     # Contracts CRUD
 │   │   ├── accounting.js    # Categories + Transactions + Installments
 │   │   ├── portal.js        # Customer portal (read-only)
@@ -86,6 +88,9 @@ backend/
 │   │   └── riskDetection.js # Automated risk scoring engine (5 factors)
 │   ├── middleware/
 │   │   └── auth.js          # JWT authenticateToken + authorizeRole + authorizePermission
+│   ├── migrations/
+│   │   ├── runner.cjs       # Migration runner with version tracking
+│   │   └── 001_initial_schema.cjs  # Initial column additions
 │   ├── models/
 │   │   ├── database-schema.sql  # Schema reference (SQLite)
 │   │   └── seed-data.sql        # Seed organizations

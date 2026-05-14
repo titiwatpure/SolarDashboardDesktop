@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Bell, Shield, Globe, User, Lock, Eye, EyeOff, Database, Download, Trash2, RefreshCw, HardDrive, AlertTriangle, CheckCircle, Edit3, X, Save, Building2, Monitor, Users as UsersIcon, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { backupAPI, settingsAPI, authAPI, usersAPI } from '../utils/api';
+import { authAPI, usersAPI, backupAPI } from '../utils/api';
 import { ROLES } from '../utils/constants';
+import { useProfileEdit, useCompanySettings, useBackupManagement } from '../hooks/useSettings';
 
 // Permission matrix (mirror of backend middleware/auth.js)
 const PERMISSION_MATRIX = {
@@ -67,26 +68,6 @@ export default function Settings() {
     weeklyReport: false
   });
 
-  // Backup state
-  const [backups, setBackups] = useState([]);
-  const [backupLoading, setBackupLoading] = useState(false);
-  const [backupMessage, setBackupMessage] = useState({ type: '', text: '' });
-  const [restoringName, setRestoringName] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
-  const [confirmRestore, setConfirmRestore] = useState(null);
-
-  // Profile edit state
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState({ full_name: '', email: '', phone: '' });
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileError, setProfileError] = useState('');
-  const [profileSuccess, setProfileSuccess] = useState('');
-
-  // Company settings state
-  const [companyForm, setCompanyForm] = useState({ company_name: '', address: '', phone: '', email: '', tax_id: '', logo_url: '' });
-  const [companyLoading, setCompanyLoading] = useState(false);
-  const [companyMessage, setCompanyMessage] = useState({ type: '', text: '' });
-
   // Sessions state
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -100,74 +81,10 @@ export default function Settings() {
 
   const isAdmin = user?.role === 'admin';
 
-  // ========================
-  // Backup
-  // ========================
-  const loadBackups = useCallback(async () => {
-    if (!isAdmin) return;
-    try {
-      const data = await backupAPI.getAll();
-      setBackups(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Failed to load backups:', err);
-    }
-  }, [isAdmin]);
-
-  useEffect(() => {
-    loadBackups();
-  }, [loadBackups]);
-
-  const handleCreateBackup = async () => {
-    setBackupLoading(true);
-    setBackupMessage({ type: '', text: '' });
-    try {
-      const result = await backupAPI.create();
-      setBackupMessage({ type: 'success', text: result.message || 'สำรองฐานข้อมูลสำเร็จ' });
-      loadBackups();
-    } catch (err) {
-      setBackupMessage({ type: 'error', text: err.response?.data?.error || 'เกิดข้อผิดพลาด' });
-    } finally {
-      setBackupLoading(false);
-    }
-  };
-
-  const handleDeleteBackup = async (name) => {
-    try {
-      await backupAPI.delete(name);
-      setBackupMessage({ type: 'success', text: 'ลบไฟล์ backup สำเร็จ' });
-      setConfirmDelete(null);
-      loadBackups();
-    } catch (err) {
-      setBackupMessage({ type: 'error', text: err.response?.data?.error || 'เกิดข้อผิดพลาด' });
-    }
-  };
-
-  const handleRestoreBackup = async (name) => {
-    setRestoringName(name);
-    setBackupMessage({ type: '', text: '' });
-    try {
-      const result = await backupAPI.restore(name);
-      setBackupMessage({ type: 'success', text: result.message || 'กู้คืนสำเร็จ กรุณา restart server' });
-      setConfirmRestore(null);
-    } catch (err) {
-      setBackupMessage({ type: 'error', text: err.response?.data?.error || 'เกิดข้อผิดพลาด' });
-    } finally {
-      setRestoringName(null);
-    }
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
-
-  const formatDate = (isoString) => {
-    return new Date(isoString).toLocaleString('th-TH', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-  };
+  // Hooks
+  const profile = useProfileEdit(user, refreshUser);
+  const company = useCompanySettings(isAdmin);
+  const backup = useBackupManagement(isAdmin);
 
   // ========================
   // Password
@@ -209,79 +126,6 @@ export default function Settings() {
   };
 
   // ========================
-  // Profile Edit
-  // ========================
-  const handleStartEditProfile = () => {
-    setProfileForm({
-      full_name: user?.full_name || '',
-      email: user?.email || '',
-      phone: user?.phone || '',
-    });
-    setProfileError('');
-    setProfileSuccess('');
-    setIsEditingProfile(true);
-  };
-
-  const handleCancelEditProfile = () => {
-    setIsEditingProfile(false);
-    setProfileError('');
-  };
-
-  const handleSaveProfile = async () => {
-    setProfileError('');
-    setProfileSuccess('');
-    setProfileLoading(true);
-    try {
-      await usersAPI.update(user.id, profileForm);
-      await refreshUser();
-      setIsEditingProfile(false);
-      setProfileSuccess('บันทึกโปรไฟล์สำเร็จ');
-      setTimeout(() => setProfileSuccess(''), 3000);
-    } catch (err) {
-      setProfileError(err.response?.data?.error || 'เกิดข้อผิดพลาด');
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
-  // ========================
-  // Company Settings
-  // ========================
-  useEffect(() => {
-    if (!isAdmin) return;
-    const loadCompany = async () => {
-      try {
-        const data = await settingsAPI.getCompany();
-        setCompanyForm({
-          company_name: data.company_name || '',
-          address: data.address || '',
-          phone: data.phone || '',
-          email: data.email || '',
-          tax_id: data.tax_id || '',
-          logo_url: data.logo_url || '',
-        });
-      } catch (err) {
-        console.error('Failed to load company settings:', err);
-      }
-    };
-    loadCompany();
-  }, [isAdmin]);
-
-  const handleSaveCompany = async () => {
-    setCompanyLoading(true);
-    setCompanyMessage({ type: '', text: '' });
-    try {
-      await settingsAPI.updateCompany(companyForm);
-      setCompanyMessage({ type: 'success', text: 'บันทึกข้อมูลบริษัทสำเร็จ' });
-      setTimeout(() => setCompanyMessage({ type: '', text: '' }), 3000);
-    } catch (err) {
-      setCompanyMessage({ type: 'error', text: err.response?.data?.error || 'เกิดข้อผิดพลาด' });
-    } finally {
-      setCompanyLoading(false);
-    }
-  };
-
-  // ========================
   // Sessions
   // ========================
   const loadSessions = useCallback(async () => {
@@ -305,7 +149,6 @@ export default function Settings() {
     setLogoutAllLoading(true);
     try {
       await authAPI.logoutAll();
-      // Clear local tokens and redirect to login
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
@@ -372,9 +215,9 @@ export default function Settings() {
             <User size={24} className="text-blue-600" />
             <h2 className="text-lg font-bold text-slate-900">ข้อมูลผู้ใช้</h2>
           </div>
-          {!isEditingProfile && (
+          {!profile.isEditingProfile && (
             <button
-              onClick={handleStartEditProfile}
+              onClick={profile.handleStartEditProfile}
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
             >
               <Edit3 size={14} />
@@ -383,21 +226,21 @@ export default function Settings() {
           )}
         </div>
 
-        {profileSuccess && (
+        {profile.profileSuccess && (
           <div className="mb-4 flex items-center gap-2 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
             <CheckCircle size={16} />
-            {profileSuccess}
+            {profile.profileSuccess}
           </div>
         )}
 
-        {isEditingProfile ? (
+        {profile.isEditingProfile ? (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">ชื่อ-นามสกุล</label>
               <input
                 type="text"
-                value={profileForm.full_name}
-                onChange={(e) => setProfileForm((p) => ({ ...p, full_name: e.target.value }))}
+                value={profile.profileForm.full_name}
+                onChange={(e) => profile.setProfileForm((p) => ({ ...p, full_name: e.target.value }))}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
                 placeholder="กรอกชื่อ-นามสกุล"
               />
@@ -406,8 +249,8 @@ export default function Settings() {
               <label className="block text-sm font-medium text-slate-700 mb-1.5">อีเมล</label>
               <input
                 type="email"
-                value={profileForm.email}
-                onChange={(e) => setProfileForm((p) => ({ ...p, email: e.target.value }))}
+                value={profile.profileForm.email}
+                onChange={(e) => profile.setProfileForm((p) => ({ ...p, email: e.target.value }))}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
                 placeholder="กรอกอีเมล"
               />
@@ -416,28 +259,28 @@ export default function Settings() {
               <label className="block text-sm font-medium text-slate-700 mb-1.5">เบอร์โทรศัพท์</label>
               <input
                 type="tel"
-                value={profileForm.phone}
-                onChange={(e) => setProfileForm((p) => ({ ...p, phone: e.target.value }))}
+                value={profile.profileForm.phone}
+                onChange={(e) => profile.setProfileForm((p) => ({ ...p, phone: e.target.value }))}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
                 placeholder="กรอกเบอร์โทรศัพท์"
               />
             </div>
 
-            {profileError && (
-              <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{profileError}</div>
+            {profile.profileError && (
+              <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{profile.profileError}</div>
             )}
 
             <div className="flex gap-3">
               <button
-                onClick={handleSaveProfile}
-                disabled={profileLoading}
+                onClick={profile.handleSaveProfile}
+                disabled={profile.profileLoading}
                 className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
               >
                 <Save size={16} />
-                {profileLoading ? 'กำลังบันทึก...' : 'บันทึก'}
+                {profile.profileLoading ? 'กำลังบันทึก...' : 'บันทึก'}
               </button>
               <button
-                onClick={handleCancelEditProfile}
+                onClick={profile.handleCancelEditProfile}
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
               >
                 <X size={16} />
@@ -619,31 +462,19 @@ export default function Settings() {
         </div>
 
         {sessionsLoading ? (
-          <div className="py-6 text-center text-sm text-slate-400">กำลังโหลด...</div>
+          <div className="py-3 text-center text-sm text-slate-400">กำลังโหลด...</div>
         ) : sessions.length === 0 ? (
-          <div className="py-6 text-center text-sm text-slate-400">ไม่มี session ที่ active</div>
+          <div className="py-3 text-center text-sm text-slate-400">ไม่มี session ที่ active</div>
         ) : (
-          <div className="mb-4 overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-slate-50 text-sm text-slate-500">
-                <tr>
-                  <th className="px-4 py-2.5 text-left font-semibold">Session</th>
-                  <th className="px-4 py-2.5 text-left font-semibold">สร้างเมื่อ</th>
-                  <th className="px-4 py-2.5 text-left font-semibold">หมดอายุ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {sessions.map((s, idx) => (
-                  <tr key={s.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-2.5 font-medium text-slate-700">
-                      {idx === 0 ? '🟢 Session ปัจจุบัน' : `Session #${idx + 1}`}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-600">{formatDate(s.created_at)}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{formatDate(s.expires_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mb-4 space-y-1.5">
+            {sessions.map((s, idx) => (
+              <div key={s.id} className="flex items-center gap-2 text-sm">
+                <span className={idx === 0 ? 'text-green-500' : 'text-slate-300'}>●</span>
+                <span className="font-medium text-slate-700">{idx === 0 ? 'อุปกรณ์ปัจจุบัน' : `อุปกรณ์ #${idx + 1}`}</span>
+                <span className="text-slate-400">·</span>
+                <span className="text-slate-500">{backup.formatDate(s.created_at)}</span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -670,12 +501,12 @@ export default function Settings() {
             </div>
           </div>
 
-          {companyMessage.text && (
+          {company.companyMessage.text && (
             <div className={`mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm ${
-              companyMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              company.companyMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
             }`}>
-              {companyMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
-              {companyMessage.text}
+              {company.companyMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+              {company.companyMessage.text}
             </div>
           )}
 
@@ -684,8 +515,8 @@ export default function Settings() {
               <label className="block text-sm font-medium text-slate-700 mb-1.5">ชื่อบริษัท</label>
               <input
                 type="text"
-                value={companyForm.company_name}
-                onChange={(e) => setCompanyForm((p) => ({ ...p, company_name: e.target.value }))}
+                value={company.companyForm.company_name}
+                onChange={(e) => company.setCompanyForm((p) => ({ ...p, company_name: e.target.value }))}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
                 placeholder="ชื่อบริษัท"
               />
@@ -693,8 +524,8 @@ export default function Settings() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">ที่อยู่</label>
               <textarea
-                value={companyForm.address}
-                onChange={(e) => setCompanyForm((p) => ({ ...p, address: e.target.value }))}
+                value={company.companyForm.address}
+                onChange={(e) => company.setCompanyForm((p) => ({ ...p, address: e.target.value }))}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 resize-none"
                 rows={3}
                 placeholder="ที่อยู่บริษัท"
@@ -705,8 +536,8 @@ export default function Settings() {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">เบอร์โทร</label>
                 <input
                   type="tel"
-                  value={companyForm.phone}
-                  onChange={(e) => setCompanyForm((p) => ({ ...p, phone: e.target.value }))}
+                  value={company.companyForm.phone}
+                  onChange={(e) => company.setCompanyForm((p) => ({ ...p, phone: e.target.value }))}
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
                   placeholder="เบอร์โทร"
                 />
@@ -715,8 +546,8 @@ export default function Settings() {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">อีเมล</label>
                 <input
                   type="email"
-                  value={companyForm.email}
-                  onChange={(e) => setCompanyForm((p) => ({ ...p, email: e.target.value }))}
+                  value={company.companyForm.email}
+                  onChange={(e) => company.setCompanyForm((p) => ({ ...p, email: e.target.value }))}
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
                   placeholder="อีเมล"
                 />
@@ -727,8 +558,8 @@ export default function Settings() {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">เลขผู้เสียภาษี</label>
                 <input
                   type="text"
-                  value={companyForm.tax_id}
-                  onChange={(e) => setCompanyForm((p) => ({ ...p, tax_id: e.target.value }))}
+                  value={company.companyForm.tax_id}
+                  onChange={(e) => company.setCompanyForm((p) => ({ ...p, tax_id: e.target.value }))}
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
                   placeholder="เลขผู้เสียภาษี"
                 />
@@ -737,8 +568,8 @@ export default function Settings() {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">URL โลโก้</label>
                 <input
                   type="url"
-                  value={companyForm.logo_url}
-                  onChange={(e) => setCompanyForm((p) => ({ ...p, logo_url: e.target.value }))}
+                  value={company.companyForm.logo_url}
+                  onChange={(e) => company.setCompanyForm((p) => ({ ...p, logo_url: e.target.value }))}
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
                   placeholder="https://..."
                 />
@@ -746,12 +577,12 @@ export default function Settings() {
             </div>
 
             <button
-              onClick={handleSaveCompany}
-              disabled={companyLoading}
+              onClick={company.handleSaveCompany}
+              disabled={company.companyLoading}
               className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
             >
               <Save size={16} />
-              {companyLoading ? 'กำลังบันทึก...' : 'บันทึกข้อมูลบริษัท'}
+              {company.companyLoading ? 'กำลังบันทึก...' : 'บันทึกข้อมูลบริษัท'}
             </button>
           </div>
         </div>
@@ -892,22 +723,22 @@ export default function Settings() {
             </div>
           </div>
 
-          {backupMessage.text && (
+          {backup.backupMessage.text && (
             <div className={`mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm ${
-              backupMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              backup.backupMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
             }`}>
-              {backupMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
-              {backupMessage.text}
+              {backup.backupMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+              {backup.backupMessage.text}
             </div>
           )}
 
           <button
-            onClick={handleCreateBackup}
-            disabled={backupLoading}
+            onClick={backup.handleCreateBackup}
+            disabled={backup.backupLoading}
             className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed mb-5"
           >
             <HardDrive size={16} />
-            {backupLoading ? 'กำลังสำรอง...' : 'สำรองฐานข้อมูลตอนนี้'}
+            {backup.backupLoading ? 'กำลังสำรอง...' : 'สำรองฐานข้อมูลตอนนี้'}
           </button>
 
           <div className="overflow-x-auto">
@@ -921,18 +752,18 @@ export default function Settings() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {backups.length === 0 ? (
+                {backup.backups.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
                       ยังไม่มีไฟล์ backup
                     </td>
                   </tr>
                 ) : (
-                  backups.map((b) => (
+                  backup.backups.map((b) => (
                     <tr key={b.name} className="hover:bg-slate-50/70">
                       <td className="px-4 py-3 font-medium text-slate-900">{b.name}</td>
-                      <td className="px-4 py-3 text-slate-600">{formatFileSize(b.size)}</td>
-                      <td className="px-4 py-3 text-slate-600">{formatDate(b.created_at)}</td>
+                      <td className="px-4 py-3 text-slate-600">{backup.formatFileSize(b.size)}</td>
+                      <td className="px-4 py-3 text-slate-600">{backup.formatDate(b.created_at)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <a
@@ -959,16 +790,16 @@ export default function Settings() {
                             ดาวน์โหลด
                           </a>
                           <button
-                            onClick={() => setConfirmRestore(b.name)}
-                            disabled={restoringName === b.name}
+                            onClick={() => backup.setConfirmRestore(b.name)}
+                            disabled={backup.restoringName === b.name}
                             className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
                             title="กู้คืน"
                           >
-                            <RefreshCw size={14} className={restoringName === b.name ? 'animate-spin' : ''} />
+                            <RefreshCw size={14} className={backup.restoringName === b.name ? 'animate-spin' : ''} />
                             กู้คืน
                           </button>
                           <button
-                            onClick={() => setConfirmDelete(b.name)}
+                            onClick={() => backup.setConfirmDelete(b.name)}
                             className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100"
                             title="ลบ"
                           >
@@ -985,7 +816,7 @@ export default function Settings() {
           </div>
 
           {/* Confirm Delete Modal */}
-          {confirmDelete && (
+          {backup.confirmDelete && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
               <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
                 <div className="mb-4 flex items-center gap-3">
@@ -995,17 +826,17 @@ export default function Settings() {
                   <h3 className="text-lg font-bold text-slate-900">ยืนยันการลบ</h3>
                 </div>
                 <p className="mb-6 text-sm text-slate-600">
-                  ต้องการลบไฟล์ backup <span className="font-semibold">{confirmDelete}</span> ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+                  ต้องการลบไฟล์ backup <span className="font-semibold">{backup.confirmDelete}</span> ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
                 </p>
                 <div className="flex justify-end gap-3">
                   <button
-                    onClick={() => setConfirmDelete(null)}
+                    onClick={() => backup.setConfirmDelete(null)}
                     className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
                   >
                     ยกเลิก
                   </button>
                   <button
-                    onClick={() => handleDeleteBackup(confirmDelete)}
+                    onClick={() => backup.handleDeleteBackup(backup.confirmDelete)}
                     className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
                   >
                     ลบ
@@ -1016,7 +847,7 @@ export default function Settings() {
           )}
 
           {/* Confirm Restore Modal */}
-          {confirmRestore && (
+          {backup.confirmRestore && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
               <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
                 <div className="mb-4 flex items-center gap-3">
@@ -1026,24 +857,24 @@ export default function Settings() {
                   <h3 className="text-lg font-bold text-slate-900">ยืนยันการกู้คืน</h3>
                 </div>
                 <p className="mb-2 text-sm text-slate-600">
-                  ต้องการกู้คืนฐานข้อมูลจาก <span className="font-semibold">{confirmRestore}</span> ใช่หรือไม่?
+                  ต้องการกู้คืนฐานข้อมูลจาก <span className="font-semibold">{backup.confirmRestore}</span> ใช่หรือไม่?
                 </p>
                 <p className="mb-6 text-xs text-amber-600">
                   ระบบจะสำรองฐานข้อมูลปัจจุบันไว้ก่อน และคุณจะต้อง restart server หลังกู้คืน
                 </p>
                 <div className="flex justify-end gap-3">
                   <button
-                    onClick={() => setConfirmRestore(null)}
+                    onClick={() => backup.setConfirmRestore(null)}
                     className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
                   >
                     ยกเลิก
                   </button>
                   <button
-                    onClick={() => handleRestoreBackup(confirmRestore)}
-                    disabled={restoringName !== null}
+                    onClick={() => backup.handleRestoreBackup(backup.confirmRestore)}
+                    disabled={backup.restoringName !== null}
                     className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
                   >
-                    {restoringName ? 'กำลังกู้คืน...' : 'กู้คืน'}
+                    {backup.restoringName ? 'กำลังกู้คืน...' : 'กู้คืน'}
                   </button>
                 </div>
               </div>

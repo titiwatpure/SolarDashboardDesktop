@@ -5,11 +5,12 @@ import {
   Loader, User, Building2, AlertTriangle, Trash2, Plus, X, Save,
   MessageSquare, Send, Check, Minus, RefreshCw, UserCircle, DollarSign, Cpu
 } from 'lucide-react';
-import { projectsAPI, usersAPI, organizationsAPI } from '../utils/api';
+import { projectsAPI } from '../utils/api';
 import {
   STATUS_LABELS, STATUS_COLORS, STEP_LABELS, CUSTOMER_TYPES, MOUNTING_TYPES,
   PERMIT_TYPES
 } from '../utils/constants';
+import { useProjectDetail, useProjectCheckpoints } from '../hooks/useProjectDetail';
 
 const stepMeta = {
   survey:       { color: 'bg-blue-500',   ring: 'ring-blue-200',   text: 'text-blue-600' },
@@ -41,125 +42,18 @@ const formatDateTime = (value) => {
 export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [project, setProject] = useState(null);
-  const [timeline, setTimeline] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  // สำหรับจัดการหน่วยงาน
-  const [allOrgs, setAllOrgs] = useState([]);
-  const [projectOrgs, setProjectOrgs] = useState([]);
-  const [showOrgPicker, setShowOrgPicker] = useState(false);
-
-  // สำหรับจัดการผู้รับผิดชอบ
-  const [allUsers, setAllUsers] = useState([]);
-  const [showUserPicker, setShowUserPicker] = useState(false);
-  const [savingUser, setSavingUser] = useState(false);
-
-  // สำหรับจัดการคอมเมนต์ timeline
+  // สำหรับจัดการคอมเมนต์ detail.timeline
   const [expandedComments, setExpandedComments] = useState({});
   const [commentsMap, setCommentsMap] = useState({});
   const [commentTexts, setCommentTexts] = useState({});
   const [submittingComment, setSubmittingComment] = useState(false);
 
-  // สำหรับจัดการ checkpoints
-  const [checkpoints, setCheckpoints] = useState([]);
-  const [selectedStep, setSelectedStep] = useState(null);
-  const [showCpForm, setShowCpForm] = useState(false);
-  const [cpForm, setCpForm] = useState({ checkpoint_name: '', notes: '', required: true });
-  const [editingCp, setEditingCp] = useState(null);
+  // Hooks
+  const detail = useProjectDetail(id);
+  const cpHooks = useProjectCheckpoints(id, detail.project?.current_step);
 
-  const requestIdRef = useRef(0);
-
-  useEffect(() => {
-    const currentId = ++requestIdRef.current;
-    loadAll(currentId);
-  }, [id]);
-
-  const loadAll = async (reqId) => {
-    try {
-      setLoading(true);
-      const [proj, tl, orgs, usersResult, cps] = await Promise.all([
-        projectsAPI.getById(id),
-        projectsAPI.getTimeline(id),
-        projectsAPI.getOrganizations(id),
-        usersAPI.getAll(),
-        projectsAPI.getCheckpoints(id)
-      ]);
-      if (reqId !== requestIdRef.current) return;
-      setProject(proj);
-      setTimeline(tl);
-      setProjectOrgs(Array.isArray(orgs) ? orgs : (orgs.data || []));
-      setAllUsers(Array.isArray(usersResult) ? usersResult : (usersResult.data || []));
-      setCheckpoints(Array.isArray(cps) ? cps : (cps.data || []));
-    } catch (error) {
-      if (reqId === requestIdRef.current) console.error('Failed to load:', error);
-    } finally {
-      if (reqId === requestIdRef.current) setLoading(false);
-    }
-  };
-
-  // โหลด organizations list เมื่อกดปุ่มเพิ่ม
-  const loadOrgsList = async () => {
-    try {
-      const orgsResult = await organizationsAPI.getAll();
-      setAllOrgs(Array.isArray(orgsResult) ? orgsResult : (orgsResult.data || []));
-      setShowOrgPicker(true);
-    } catch (error) {
-      console.error('Failed to load organizations:', error);
-    }
-  };
-
-  // เพิ่มหน่วยงานให้โครงการ
-  const handleAddOrg = async (orgId) => {
-    try {
-      await projectsAPI.addOrganization(id, orgId);
-      const orgs = await projectsAPI.getOrganizations(id);
-      setProjectOrgs(Array.isArray(orgs) ? orgs : (orgs.data || []));
-      setShowOrgPicker(false);
-    } catch (error) {
-      console.error('Failed to add organization:', error);
-    }
-  };
-
-  // ลบหน่วยงานจากโครงการ
-  const handleRemoveOrg = async (orgId) => {
-    if (!window.confirm('ต้องการลบหน่วยงานนี้ออกจากโครงการหรือไม่?')) return;
-    try {
-      await projectsAPI.removeOrganization(id, orgId);
-      const orgs = await projectsAPI.getOrganizations(id);
-      setProjectOrgs(Array.isArray(orgs) ? orgs : (orgs.data || []));
-    } catch (error) {
-      console.error('Failed to remove organization:', error);
-    }
-  };
-
-  // เปลี่ยนผู้รับผิดชอบ
-  const handleChangeUser = async (userId) => {
-    try {
-      setSavingUser(true);
-      await projectsAPI.update(id, { responsible_user: userId || null });
-      const proj = await projectsAPI.getById(id);
-      setProject(proj);
-      setShowUserPicker(false);
-    } catch (error) {
-      console.error('Failed to update responsible user:', error);
-    } finally {
-      setSavingUser(false);
-    }
-  };
-
-  const handleDeleteTimeline = async (timelineId) => {
-    if (!window.confirm('ต้องการลบรายการ timeline นี้หรือไม่?')) return;
-    try {
-      await projectsAPI.deleteTimeline(id, timelineId);
-      const tl = await projectsAPI.getTimeline(id);
-      setTimeline(Array.isArray(tl) ? tl : (tl.data || []));
-    } catch (error) {
-      console.error('Failed to delete timeline:', error);
-    }
-  };
-
-  // โหลดคอมเมนต์ของ timeline entry
+  // โหลดคอมเมนต์ของ detail.timeline entry
   const loadComments = async (timelineId) => {
     try {
       const result = await projectsAPI.getTimelineComments(id, timelineId);
@@ -187,7 +81,7 @@ export default function ProjectDetail() {
       await projectsAPI.addTimelineComment(id, timelineId, { comment: text });
       setCommentTexts((prev) => ({ ...prev, [timelineId]: '' }));
       await loadComments(timelineId);
-      setTimeline((prev) => prev.map((t) => t.id === timelineId ? { ...t, comment_count: (t.comment_count || 0) + 1 } : t));
+      detail.setTimeline((prev) => prev.map((t) => t.id === timelineId ? { ...t, comment_count: (t.comment_count || 0) + 1 } : t));
       window.dispatchEvent(new Event('refresh-notifications'));
     } catch (error) {
       console.error('Failed to add comment:', error);
@@ -202,91 +96,13 @@ export default function ProjectDetail() {
     try {
       await projectsAPI.deleteTimelineComment(id, timelineId, commentId);
       await loadComments(timelineId);
-      setTimeline((prev) => prev.map((t) => t.id === timelineId ? { ...t, comment_count: Math.max(0, (t.comment_count || 0) - 1) } : t));
+      detail.setTimeline((prev) => prev.map((t) => t.id === timelineId ? { ...t, comment_count: Math.max(0, (t.comment_count || 0) - 1) } : t));
     } catch (error) {
       console.error('Failed to delete comment:', error);
     }
   };
 
-  // Checkpoint functions
-  const loadCheckpoints = async (step) => {
-    try {
-      const cps = await projectsAPI.getCheckpoints(id, step);
-      setCheckpoints(Array.isArray(cps) ? cps : (cps.data || []));
-    } catch (error) {
-      console.error('Failed to load checkpoints:', error);
-    }
-  };
-
-  const handleStepClick = (step) => {
-    console.log('Step clicked:', step);
-    if (selectedStep === step) {
-      setSelectedStep(null);
-      loadCheckpoints();
-    } else {
-      setSelectedStep(step);
-      loadCheckpoints(step);
-    }
-  };
-
-  const handleCreateCheckpoint = async () => {
-    if (!cpForm.checkpoint_name.trim()) return;
-    try {
-      await projectsAPI.createCheckpoint(id, {
-        step: selectedStep || project.current_step,
-        checkpoint_name: cpForm.checkpoint_name.trim(),
-        notes: cpForm.notes.trim() || null,
-        required: cpForm.required ? 1 : 0
-      });
-      setCpForm({ checkpoint_name: '', notes: '', required: true });
-      setShowCpForm(false);
-      await loadCheckpoints(selectedStep);
-    } catch (error) {
-      console.error('Failed to create checkpoint:', error);
-    }
-  };
-
-  const handleUpdateCheckpointStatus = async (cpId, status) => {
-    try {
-      await projectsAPI.updateCheckpoint(cpId, { status });
-      await loadCheckpoints(selectedStep);
-      window.dispatchEvent(new Event('refresh-notifications'));
-    } catch (error) {
-      console.error('Failed to update checkpoint:', error);
-    }
-  };
-
-  const handleApproveCheckpoint = async (cpId) => {
-    try {
-      await projectsAPI.approveCheckpoint(cpId, { reason: 'อนุมัติ' });
-      await loadCheckpoints(selectedStep);
-      window.dispatchEvent(new Event('refresh-notifications'));
-    } catch (error) {
-      console.error('Failed to approve checkpoint:', error);
-    }
-  };
-
-  const handleDeleteCheckpoint = async (cpId) => {
-    if (!window.confirm('ต้องการลบจุดตรวจสอบนี้หรือไม่?')) return;
-    try {
-      await projectsAPI.deleteCheckpoint(cpId);
-      await loadCheckpoints(selectedStep);
-    } catch (error) {
-      console.error('Failed to delete checkpoint:', error);
-    }
-  };
-
-  const handleUpdateCheckpointNotes = async (cpId, notes) => {
-    try {
-      await projectsAPI.updateCheckpoint(cpId, { notes });
-      setEditingCp(null);
-      await loadCheckpoints(selectedStep);
-    } catch (error) {
-      console.error('Failed to update checkpoint notes:', error);
-    }
-  };
-
-  if (loading) {
+  if (detail.loading) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-500">
         <Loader size={24} className="animate-spin mr-3" />
@@ -295,7 +111,7 @@ export default function ProjectDetail() {
     );
   }
 
-  if (!project) {
+  if (!detail.project) {
     return (
       <div className="text-center py-20 text-slate-500">
         <p className="text-lg">ไม่พบโครงการ</p>
@@ -306,9 +122,9 @@ export default function ProjectDetail() {
     );
   }
 
-  const currentStepIndex = stepOrder.indexOf(project.current_step);
+  const currentStepIndex = stepOrder.indexOf(detail.project.current_step);
   // หน่วยงานที่ยังไม่ได้เชื่อม
-  const availableOrgs = allOrgs.filter(o => !projectOrgs.some(po => po.id === o.id));
+  const availableOrgs = detail.allOrgs.filter(o => !detail.projectOrgs.some(po => po.id === o.id));
 
   return (
     <div className="space-y-6">
@@ -323,43 +139,43 @@ export default function ProjectDetail() {
               <ArrowLeft size={22} />
             </button>
             <div>
-              <p className="text-sm text-slate-500">{project.project_code}</p>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.project_name}</h1>
+              <p className="text-sm text-slate-500">{detail.project.project_code}</p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">{detail.project.project_name}</h1>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                  stepMeta[project.current_step]?.color || 'bg-slate-500'
+                  stepMeta[detail.project.current_step]?.color || 'bg-slate-500'
                 } text-white`}>
-                  {STEP_LABELS[project.current_step]}
+                  {STEP_LABELS[detail.project.current_step]}
                 </span>
-                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[project.status]}`}>
-                  {STATUS_LABELS[project.status]}
+                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[detail.project.status]}`}>
+                  {STATUS_LABELS[detail.project.status]}
                 </span>
-                {project.permit_type && (
+                {detail.project.permit_type && (
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    project.permit_type === 'exemption' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                    detail.project.permit_type === 'exemption' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
                   }`}>
-                    {PERMIT_TYPES[project.permit_type]}
+                    {PERMIT_TYPES[detail.project.permit_type]}
                   </span>
                 )}
               </div>
               <div className="mt-4 max-w-md">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-sm font-medium text-slate-600">ความคืบหน้า</span>
-                  <span className="text-sm font-bold text-slate-900">{project.progress || 0}%</span>
+                  <span className="text-sm font-bold text-slate-900">{detail.project.progress || 0}%</span>
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-3">
                   <div
                     className={`h-3 rounded-full transition-all duration-500 ${
-                      project.progress >= 100 ? 'bg-emerald-500' :
-                      project.progress >= 60 ? 'bg-blue-500' :
-                      project.progress >= 30 ? 'bg-amber-500' : 'bg-slate-400'
+                      detail.project.progress >= 100 ? 'bg-emerald-500' :
+                      detail.project.progress >= 60 ? 'bg-blue-500' :
+                      detail.project.progress >= 30 ? 'bg-amber-500' : 'bg-slate-400'
                     }`}
-                    style={{ width: `${project.progress || 0}%` }}
+                    style={{ width: `${detail.project.progress || 0}%` }}
                   />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-                  <span>{STEP_LABELS[project.scope_start] || 'สำรวจ'}</span>
-                  <span>{STEP_LABELS[project.scope_end] || 'COD'}</span>
+                  <span>{STEP_LABELS[detail.project.scope_start] || 'สำรวจ'}</span>
+                  <span>{STEP_LABELS[detail.project.scope_end] || 'COD'}</span>
                 </div>
               </div>
             </div>
@@ -374,85 +190,85 @@ export default function ProjectDetail() {
           <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-slate-900 mb-5">ข้อมูลโครงการ</h2>
             <div className="space-y-4">
-              <InfoRow icon={Zap} label="ขนาด" value={`${project.size_kw} kW / ${project.size_kva || '-'} kVA`} />
-              <InfoRow icon={MapPin} label="จังหวัด" value={project.province} />
-              <InfoRow icon={Calendar} label="วันที่เริ่ม" value={formatDate(project.start_date)} />
-              <InfoRow icon={Calendar} label="วันที่คาดว่าจะ COD" value={formatDate(project.expected_cod_date)} />
-              <InfoRow icon={Calendar} label="วันที่ COD จริง" value={formatDate(project.actual_cod_date)} />
-              <InfoRow icon={FileText} label="ขายไฟ" value={project.has_power_selling ? 'มี' : 'ไม่มี'} />
-              {project.blocked_reason && (
-                <InfoRow icon={AlertTriangle} label="เหตุผลที่ติดปัญหา" value={project.blocked_reason} />
+              <InfoRow icon={Zap} label="ขนาด" value={`${detail.project.size_kw} kW / ${detail.project.size_kva || '-'} kVA`} />
+              <InfoRow icon={MapPin} label="จังหวัด" value={detail.project.province} />
+              <InfoRow icon={Calendar} label="วันที่เริ่ม" value={formatDate(detail.project.start_date)} />
+              <InfoRow icon={Calendar} label="วันที่คาดว่าจะ COD" value={formatDate(detail.project.expected_cod_date)} />
+              <InfoRow icon={Calendar} label="วันที่ COD จริง" value={formatDate(detail.project.actual_cod_date)} />
+              <InfoRow icon={FileText} label="ขายไฟ" value={detail.project.has_power_selling ? 'มี' : 'ไม่มี'} />
+              {detail.project.blocked_reason && (
+                <InfoRow icon={AlertTriangle} label="เหตุผลที่ติดปัญหา" value={detail.project.blocked_reason} />
               )}
-              {project.description && (
+              {detail.project.description && (
                 <div className="pt-3 border-t border-slate-100">
                   <p className="text-sm text-slate-500 mb-1">รายละเอียด</p>
-                  <p className="text-sm text-slate-700">{project.description}</p>
+                  <p className="text-sm text-slate-700">{detail.project.description}</p>
                 </div>
               )}
             </div>
           </section>
 
           {/* ข้อมูลลูกค้า */}
-          {(project.customer_name || project.customer_id) && (
+          {(detail.project.customer_name || detail.project.customer_id) && (
             <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                 <UserCircle size={18} className="text-teal-600" /> ข้อมูลลูกค้า
               </h2>
               <div className="space-y-3">
-                <InfoRow icon={UserCircle} label="ชื่อลูกค้า" value={project.customer_name} />
-                {project.customer_type && <InfoRow icon={Building2} label="ประเภท" value={CUSTOMER_TYPES[project.customer_type] || project.customer_type} />}
-                {project.customer_contact_name && <InfoRow icon={User} label="ผู้ติดต่อ" value={project.customer_contact_name} />}
-                {project.customer_contact_phone && <InfoRow icon={FileText} label="เบอร์โทร" value={project.customer_contact_phone} />}
-                {project.customer_contact_email && <InfoRow icon={FileText} label="อีเมล" value={project.customer_contact_email} />}
-                {project.customer_tax_id && <InfoRow icon={FileText} label="เลขภาษี" value={project.customer_tax_id} />}
-                {project.customer_address && <InfoRow icon={MapPin} label="ที่อยู่" value={project.customer_address} />}
+                <InfoRow icon={UserCircle} label="ชื่อลูกค้า" value={detail.project.customer_name} />
+                {detail.project.customer_type && <InfoRow icon={Building2} label="ประเภท" value={CUSTOMER_TYPES[detail.project.customer_type] || detail.project.customer_type} />}
+                {detail.project.customer_contact_name && <InfoRow icon={User} label="ผู้ติดต่อ" value={detail.project.customer_contact_name} />}
+                {detail.project.customer_contact_phone && <InfoRow icon={FileText} label="เบอร์โทร" value={detail.project.customer_contact_phone} />}
+                {detail.project.customer_contact_email && <InfoRow icon={FileText} label="อีเมล" value={detail.project.customer_contact_email} />}
+                {detail.project.customer_tax_id && <InfoRow icon={FileText} label="เลขภาษี" value={detail.project.customer_tax_id} />}
+                {detail.project.customer_address && <InfoRow icon={MapPin} label="ที่อยู่" value={detail.project.customer_address} />}
               </div>
             </section>
           )}
 
           {/* สถานที่ติดตั้ง */}
-          {(project.site_address || project.grid_station) && (
+          {(detail.project.site_address || detail.project.grid_station) && (
             <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                 <MapPin size={18} className="text-orange-600" /> สถานที่ติดตั้ง
               </h2>
               <div className="space-y-3">
-                {project.site_address && <InfoRow icon={MapPin} label="ที่อยู่" value={project.site_address} />}
-                {project.site_lat && project.site_lng && (
-                  <InfoRow icon={MapPin} label="พิกัด" value={`${project.site_lat}, ${project.site_lng}`} />
+                {detail.project.site_address && <InfoRow icon={MapPin} label="ที่อยู่" value={detail.project.site_address} />}
+                {detail.project.site_lat && detail.project.site_lng && (
+                  <InfoRow icon={MapPin} label="พิกัด" value={`${detail.project.site_lat}, ${detail.project.site_lng}`} />
                 )}
-                {project.grid_station && <InfoRow icon={Zap} label="สถานีไฟฟ้า" value={project.grid_station} />}
-                {project.grid_voltage && <InfoRow icon={Zap} label="แรงดัน" value={project.grid_voltage} />}
+                {detail.project.grid_station && <InfoRow icon={Zap} label="สถานีไฟฟ้า" value={detail.project.grid_station} />}
+                {detail.project.grid_voltage && <InfoRow icon={Zap} label="แรงดัน" value={detail.project.grid_voltage} />}
               </div>
             </section>
           )}
 
           {/* สัญญา/การเงิน */}
-          {(project.contract_number || project.contract_value || project.budget) && (
+          {(detail.project.contract_number || detail.project.contract_value || detail.project.budget) && (
             <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                 <DollarSign size={18} className="text-green-600" /> สัญญา / การเงิน
               </h2>
               <div className="space-y-3">
-                {project.contract_number && <InfoRow icon={FileText} label="เลขที่สัญญา" value={project.contract_number} />}
-                {project.contract_date && <InfoRow icon={Calendar} label="วันที่เซ็น" value={formatDate(project.contract_date)} />}
-                {project.contract_value && <InfoRow icon={DollarSign} label="มูลค่าสัญญา" value={`${Number(project.contract_value).toLocaleString()} บาท`} />}
-                {project.budget && <InfoRow icon={DollarSign} label="งบประมาณ" value={`${Number(project.budget).toLocaleString()} บาท`} />}
+                {detail.project.contract_number && <InfoRow icon={FileText} label="เลขที่สัญญา" value={detail.project.contract_number} />}
+                {detail.project.contract_date && <InfoRow icon={Calendar} label="วันที่เซ็น" value={formatDate(detail.project.contract_date)} />}
+                {detail.project.contract_value && <InfoRow icon={DollarSign} label="มูลค่าสัญญา" value={`${Number(detail.project.contract_value).toLocaleString()} บาท`} />}
+                {detail.project.budget && <InfoRow icon={DollarSign} label="งบประมาณ" value={`${Number(detail.project.budget).toLocaleString()} บาท`} />}
               </div>
             </section>
           )}
 
           {/* สเปคเทคนิค */}
-          {project.specs && (
+          {detail.project.specs && (
             <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                 <Cpu size={18} className="text-purple-600" /> สเปคเทคนิค
               </h2>
               <div className="space-y-3">
-                {project.specs.panel_brand && <InfoRow icon={Zap} label="แผง" value={`${project.specs.panel_brand} ${project.specs.panel_model || ''} (${project.specs.panel_count || '-'} แผง)`} />}
-                {project.specs.inverter_brand && <InfoRow icon={Zap} label="อินเวอร์เตอร์" value={`${project.specs.inverter_brand} ${project.specs.inverter_model || ''} (${project.specs.inverter_count || '-'} เครื่อง)`} />}
-                {project.specs.mounting_type && <InfoRow icon={Building2} label="ประเภทติดตั้ง" value={MOUNTING_TYPES[project.specs.mounting_type] || project.specs.mounting_type} />}
-                {project.specs.grid_connection_type && <InfoRow icon={Zap} label="การต่อเชื่อม" value={project.specs.grid_connection_type} />}
+                {detail.project.specs.panel_brand && <InfoRow icon={Zap} label="แผง" value={`${detail.project.specs.panel_brand} ${detail.project.specs.panel_model || ''} (${detail.project.specs.panel_count || '-'} แผง)`} />}
+                {detail.project.specs.inverter_brand && <InfoRow icon={Zap} label="อินเวอร์เตอร์" value={`${detail.project.specs.inverter_brand} ${detail.project.specs.inverter_model || ''} (${detail.project.specs.inverter_count || '-'} เครื่อง)`} />}
+                {detail.project.specs.mounting_type && <InfoRow icon={Building2} label="ประเภทติดตั้ง" value={MOUNTING_TYPES[detail.project.specs.mounting_type] || detail.project.specs.mounting_type} />}
+                {detail.project.specs.grid_connection_type && <InfoRow icon={Zap} label="การต่อเชื่อม" value={detail.project.specs.grid_connection_type} />}
               </div>
             </section>
           )}
@@ -462,11 +278,11 @@ export default function ProjectDetail() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-900">ผู้รับผิดชอบ</h2>
               <button
-                onClick={() => setShowUserPicker(!showUserPicker)}
+                onClick={() => detail.setShowUserPicker(!detail.showUserPicker)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
               >
-                {showUserPicker ? <X size={14} /> : <Plus size={14} />}
-                {showUserPicker ? 'ยกเลิก' : 'เปลี่ยน'}
+                {detail.showUserPicker ? <X size={14} /> : <Plus size={14} />}
+                {detail.showUserPicker ? 'ยกเลิก' : 'เปลี่ยน'}
               </button>
             </div>
 
@@ -477,26 +293,26 @@ export default function ProjectDetail() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-900">
-                  {project.responsible_user_name || 'ยังไม่ได้กำหนด'}
+                  {detail.project.responsible_user_name || 'ยังไม่ได้กำหนด'}
                 </p>
                 <p className="text-xs text-slate-500">ผู้รับผิดชอบโครงการ</p>
               </div>
             </div>
 
             {/* Dropdown เลือกผู้ใช้ */}
-            {showUserPicker && (
+            {detail.showUserPicker && (
               <div className="mt-3 max-h-48 overflow-y-auto rounded-xl border border-slate-200">
                 <button
-                  onClick={() => handleChangeUser(null)}
+                  onClick={() => detail.handleChangeUser(null)}
                   className="w-full px-4 py-2.5 text-left text-sm text-slate-500 hover:bg-slate-50 border-b border-slate-100"
                 >
                   -- ไม่กำหนด --
                 </button>
-                {allUsers.map(user => (
+                {detail.allUsers.map(user => (
                   <button
                     key={user.id}
-                    onClick={() => handleChangeUser(user.id)}
-                    disabled={savingUser}
+                    onClick={() => detail.handleChangeUser(user.id)}
+                    disabled={detail.savingUser}
                     className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-3"
                   >
                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
@@ -517,7 +333,7 @@ export default function ProjectDetail() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-900">หน่วยงานที่เกี่ยวข้อง</h2>
               <button
-                onClick={loadOrgsList}
+                onClick={detail.loadOrgsList}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
               >
                 <Plus size={14} />
@@ -526,11 +342,11 @@ export default function ProjectDetail() {
             </div>
 
             {/* แสดงหน่วยงานที่เชื่อมแล้ว */}
-            {projectOrgs.length === 0 ? (
+            {detail.projectOrgs.length === 0 ? (
               <p className="text-sm text-slate-400 py-3">ยังไม่ได้เชื่อมหน่วยงาน</p>
             ) : (
               <div className="space-y-2">
-                {projectOrgs.map(org => (
+                {detail.projectOrgs.map(org => (
                   <div key={org.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
@@ -542,7 +358,7 @@ export default function ProjectDetail() {
                       </div>
                     </div>
                     <button
-                      onClick={() => handleRemoveOrg(org.id)}
+                      onClick={() => detail.handleRemoveOrg(org.id)}
                       className="rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
                       title="ลบ"
                     >
@@ -554,7 +370,7 @@ export default function ProjectDetail() {
             )}
 
             {/* Dropdown เลือกหน่วยงาน */}
-            {showOrgPicker && (
+            {detail.showOrgPicker && (
               <div className="mt-3">
                 <p className="text-xs text-slate-500 mb-2">เลือกหน่วยงานที่ต้องการเพิ่ม:</p>
                 {availableOrgs.length === 0 ? (
@@ -564,7 +380,7 @@ export default function ProjectDetail() {
                     {availableOrgs.map(org => (
                       <button
                         key={org.id}
-                        onClick={() => handleAddOrg(org.id)}
+                        onClick={() => detail.handleAddOrg(org.id)}
                         className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-3"
                       >
                         <Building2 size={14} className="text-slate-400" />
@@ -574,7 +390,7 @@ export default function ProjectDetail() {
                   </div>
                 )}
                 <button
-                  onClick={() => setShowOrgPicker(false)}
+                  onClick={() => detail.setShowOrgPicker(false)}
                   className="mt-2 text-xs text-slate-500 hover:text-slate-700"
                 >
                   ปิด
@@ -594,24 +410,24 @@ export default function ProjectDetail() {
               const meta = stepMeta[step];
               const isCompleted = index < currentStepIndex;
               const isCurrent = index === currentStepIndex;
-              const scopeStartIdx = stepOrder.indexOf(project.scope_start || 'survey');
-              const scopeEndIdx = stepOrder.indexOf(project.scope_end || 'cod');
+              const scopeStartIdx = stepOrder.indexOf(detail.project.scope_start || 'survey');
+              const scopeEndIdx = stepOrder.indexOf(detail.project.scope_end || 'cod');
               const inScope = index >= scopeStartIdx && index <= scopeEndIdx;
-              const isSelected = selectedStep === step;
-              const stepCheckpoints = checkpoints.filter(cp => cp.step === step);
+              const isSelected = cpHooks.selectedStep === step;
+              const stepCheckpoints = cpHooks.checkpoints.filter(cp => cp.step === step);
               const passedCount = stepCheckpoints.filter(c => c.status === 'passed').length;
 
               return (
                 <div
                   key={step}
-                  onClick={() => handleStepClick(step)}
+                  onClick={() => cpHooks.handleStepClick(step)}
                   className={`flex flex-col items-center gap-2 p-3 rounded-xl cursor-pointer transition-all select-none ${
                     isSelected ? 'bg-blue-50 ring-2 ring-blue-400 shadow-sm' :
                     'hover:bg-slate-100 active:bg-slate-200'
                   }`}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleStepClick(step); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') cpHooks.handleStepClick(step); }}
                 >
                   <div className={`w-full h-3 rounded-full transition-all duration-300 ${
                     !inScope ? 'bg-slate-100 border-2 border-dashed border-slate-300' :
@@ -642,39 +458,39 @@ export default function ProjectDetail() {
           </div>
 
           {/* Checkpoints Section */}
-          {selectedStep && (
+          {cpHooks.selectedStep && (
             <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    จุดตรวจสอบ: {STEP_LABELS[selectedStep]}
+                    จุดตรวจสอบ: {STEP_LABELS[cpHooks.selectedStep]}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {checkpoints.filter(c => c.step === selectedStep).length} รายการ
+                    {cpHooks.checkpoints.filter(c => c.step === cpHooks.selectedStep).length} รายการ
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowCpForm(!showCpForm)}
+                  onClick={() => cpHooks.setShowCpForm(!cpHooks.showCpForm)}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
                 >
-                  {showCpForm ? <X size={14} /> : <Plus size={14} />}
-                  {showCpForm ? 'ยกเลิก' : 'เพิ่ม'}
+                  {cpHooks.showCpForm ? <X size={14} /> : <Plus size={14} />}
+                  {cpHooks.showCpForm ? 'ยกเลิก' : 'เพิ่ม'}
                 </button>
               </div>
 
               {/* Checkpoint Form */}
-              {showCpForm && (
+              {cpHooks.showCpForm && (
                 <div className="mb-4 rounded-xl border border-blue-200 bg-white p-3">
                   <input
                     type="text"
-                    value={cpForm.checkpoint_name}
-                    onChange={(e) => setCpForm(prev => ({ ...prev, checkpoint_name: e.target.value }))}
+                    value={cpHooks.cpForm.checkpoint_name}
+                    onChange={(e) => cpHooks.setCpForm(prev => ({ ...prev, checkpoint_name: e.target.value }))}
                     placeholder="ชื่อจุดตรวจสอบ (เช่น ยื่น COP)"
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm mb-2 focus:border-blue-400 outline-none"
                   />
                   <textarea
-                    value={cpForm.notes}
-                    onChange={(e) => setCpForm(prev => ({ ...prev, notes: e.target.value }))}
+                    value={cpHooks.cpForm.notes}
+                    onChange={(e) => cpHooks.setCpForm(prev => ({ ...prev, notes: e.target.value }))}
                     placeholder="หมายเหตุ (ถ้ามี)"
                     rows="2"
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm mb-2 focus:border-blue-400 outline-none"
@@ -682,15 +498,15 @@ export default function ProjectDetail() {
                   <label className="flex items-center gap-2 mb-3">
                     <input
                       type="checkbox"
-                      checked={cpForm.required}
-                      onChange={(e) => setCpForm(prev => ({ ...prev, required: e.target.checked }))}
+                      checked={cpHooks.cpForm.required}
+                      onChange={(e) => cpHooks.setCpForm(prev => ({ ...prev, required: e.target.checked }))}
                       className="w-4 h-4 text-blue-600 rounded"
                     />
                     <span className="text-xs text-slate-600">จำเป็นต้องผ่าน</span>
                   </label>
                   <button
-                    onClick={handleCreateCheckpoint}
-                    disabled={!cpForm.checkpoint_name.trim()}
+                    onClick={cpHooks.handleCreateCheckpoint}
+                    disabled={!cpHooks.cpForm.checkpoint_name.trim()}
                     className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
                   >
                     บันทึก
@@ -699,11 +515,11 @@ export default function ProjectDetail() {
               )}
 
               {/* Checkpoint List */}
-              {checkpoints.filter(c => c.step === selectedStep).length === 0 ? (
+              {cpHooks.checkpoints.filter(c => c.step === cpHooks.selectedStep).length === 0 ? (
                 <p className="text-xs text-slate-400 py-2 text-center">ยังไม่มีจุดตรวจสอบในขั้นตอนนี้</p>
               ) : (
                 <div className="space-y-2">
-                  {checkpoints.filter(c => c.step === selectedStep).map((cp) => (
+                  {cpHooks.checkpoints.filter(c => c.step === cpHooks.selectedStep).map((cp) => (
                     <div key={cp.id} className="rounded-xl border border-slate-200 bg-white p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
@@ -728,22 +544,22 @@ export default function ProjectDetail() {
                           {cp.assigned_to_name && (
                             <p className="text-xs text-slate-500 mt-1">ผู้รับผิดชอบ: {cp.assigned_to_name}</p>
                           )}
-                          {editingCp === cp.id ? (
+                          {cpHooks.editingCp === cp.id ? (
                             <div className="mt-2 flex gap-2">
                               <input
                                 type="text"
                                 defaultValue={cp.notes || ''}
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleUpdateCheckpointNotes(cp.id, e.target.value);
-                                  if (e.key === 'Escape') setEditingCp(null);
+                                  if (e.key === 'Enter') cpHooks.handleUpdateCheckpointNotes(cp.id, e.target.value);
+                                  if (e.key === 'Escape') cpHooks.setEditingCp(null);
                                 }}
                                 className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-blue-400 outline-none"
                                 autoFocus
                               />
-                              <button onClick={() => setEditingCp(null)} className="text-xs text-slate-400 hover:text-slate-600">ยกเลิก</button>
+                              <button onClick={() => cpHooks.setEditingCp(null)} className="text-xs text-slate-400 hover:text-slate-600">ยกเลิก</button>
                             </div>
                           ) : cp.notes ? (
-                            <p className="text-xs text-slate-600 mt-1 cursor-pointer hover:text-blue-600" onClick={() => setEditingCp(cp.id)}>
+                            <p className="text-xs text-slate-600 mt-1 cursor-pointer hover:text-blue-600" onClick={() => cpHooks.setEditingCp(cp.id)}>
                               {cp.notes}
                             </p>
                           ) : null}
@@ -753,21 +569,21 @@ export default function ProjectDetail() {
                           {cp.status === 'pending' && (
                             <>
                               <button
-                                onClick={() => handleApproveCheckpoint(cp.id)}
+                                onClick={() => cpHooks.handleApproveCheckpoint(cp.id)}
                                 className="rounded-full p-1.5 text-emerald-500 hover:bg-emerald-50 transition-colors"
                                 title="อนุมัติ"
                               >
                                 <Check size={14} />
                               </button>
                               <button
-                                onClick={() => handleUpdateCheckpointStatus(cp.id, 'failed')}
+                                onClick={() => cpHooks.handleUpdateCheckpointStatus(cp.id, 'failed')}
                                 className="rounded-full p-1.5 text-red-500 hover:bg-red-50 transition-colors"
                                 title="ไม่ผ่าน"
                               >
                                 <X size={14} />
                               </button>
                               <button
-                                onClick={() => handleUpdateCheckpointStatus(cp.id, 'skipped')}
+                                onClick={() => cpHooks.handleUpdateCheckpointStatus(cp.id, 'skipped')}
                                 className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 transition-colors"
                                 title="ข้าม"
                               >
@@ -777,7 +593,7 @@ export default function ProjectDetail() {
                           )}
                           {cp.status === 'failed' && (
                             <button
-                              onClick={() => handleUpdateCheckpointStatus(cp.id, 'pending')}
+                              onClick={() => cpHooks.handleUpdateCheckpointStatus(cp.id, 'pending')}
                               className="rounded-full p-1.5 text-amber-500 hover:bg-amber-50 transition-colors"
                               title="รีเซ็ต"
                             >
@@ -785,7 +601,7 @@ export default function ProjectDetail() {
                             </button>
                           )}
                           <button
-                            onClick={() => handleDeleteCheckpoint(cp.id)}
+                            onClick={() => cpHooks.handleDeleteCheckpoint(cp.id)}
                             className="rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
                             title="ลบ"
                           >
@@ -803,14 +619,14 @@ export default function ProjectDetail() {
           {/* Timeline */}
           <h3 className="text-lg font-bold text-slate-900 mb-4">Timeline</h3>
 
-          {timeline.length === 0 ? (
+          {detail.timeline.length === 0 ? (
             <p className="text-sm text-slate-400 py-4">ยังไม่มีประวัติการเปลี่ยนแปลง</p>
           ) : (
             <div className="relative">
               <div className="absolute left-5 top-3 bottom-3 w-0.5 bg-slate-200" />
 
               <div className="space-y-6">
-                {timeline.map((entry) => {
+                {detail.timeline.map((entry) => {
                   const isCheckpoint = entry.status?.startsWith('checkpoint_');
                   const meta = stepMeta[entry.step] || { color: 'bg-slate-500', text: 'text-slate-600' };
 
@@ -864,7 +680,7 @@ export default function ProjectDetail() {
                             )}
                           </button>
                           <button
-                            onClick={() => handleDeleteTimeline(entry.id)}
+                            onClick={() => detail.handleDeleteTimeline(entry.id)}
                             className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                             title="ลบรายการนี้"
                           >

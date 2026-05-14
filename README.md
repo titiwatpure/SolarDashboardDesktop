@@ -132,13 +132,6 @@
 - เปลี่ยนรหัสผ่าน
 - ตั้งค่าการแจ้งเตือน
 
-### ใบเสนอราคา (Quotations)
-- สร้าง/แก้ไข/ลบ ใบเสนอราคา
-- สถานะ: ร่าง, ส่งแล้ว, อนุมัติ, ปฏิเสธ, หมดอายุ
-- เพิ่มรายการสินค้า/บริการ พร้อมคำนวณภาษีอัตโนมัติ
-- เชื่อมกับลูกค้าและโครงการ
-- เปลี่ยนสถานะใบเสนอราคา
-
 ### สัญญา (Contracts)
 - สร้าง/แก้ไข/ลบ สัญญา
 - สถานะ: ร่าง, มีผล, เสร็จสิ้น, ยกเลิก
@@ -156,7 +149,7 @@
 
 ### พอร์ทัลลูกค้า (Customer Portal)
 - หน้าสรุปสำหรับลูกค้า
-- ดูโครงการ, ใบเสนอราคา, สัญญา, เอกสาร ของตัวเอง
+- ดูโครงการ, สัญญา, เอกสาร ของตัวเอง
 
 ### แผนที่เครือข่าย (Network Map)
 - แสดงตำแหน่งโครงการบนแผนที่ (Leaflet)
@@ -241,7 +234,6 @@ Dashboard/
 │   │   │   ├── activity_logs.js # Activity logging
 │   │   │   ├── checkpoints.js   # Checkpoint CRUD + Approve + Logs
 │   │   │   ├── backup.js        # Database backup/restore (Admin)
-│   │   │   ├── quotations.js    # Quotations CRUD + Items + Status
 │   │   │   ├── contracts.js     # Contracts CRUD
 │   │   │   ├── accounting.js    # Categories + Transactions + Installments
 │   │   │   ├── portal.js        # Customer portal (read-only)
@@ -249,6 +241,7 @@ Dashboard/
 │   │   ├── services/
 │   │   │   └── riskDetection.js # Automated risk scoring engine
 │   │   ├── models/
+│   │   ├── migrations/          # Database migrations (version-tracked)
 │   │   ├── middleware/          # JWT Auth + Role + Permission Authorization
 │   │   ├── utils/
 │   │   │   └── errors.js        # Custom AppError class
@@ -272,6 +265,10 @@ Dashboard/
 │   │   │   ├── StatusModal.jsx  # Status change
 │   │   │   ├── RiskBadge.jsx    # Risk level badge
 │   │   │   └── Toast.jsx        # Toast notifications
+│   │   ├── hooks/
+│   │   │   ├── useAccounting.js # useAccountingOverview, useProjectAccounting, useInstallments
+│   │   │   ├── useSettings.js   # useProfileEdit, useCompanySettings, useBackupManagement
+│   │   │   └── useProjectDetail.js # useProjectDetail, useProjectCheckpoints
 │   │   ├── pages/
 │   │   │   ├── Login.jsx        # /login
 │   │   │   ├── Dashboard.jsx    # / (KPI + Pipeline)
@@ -286,7 +283,6 @@ Dashboard/
 │   │   │   ├── Reports.jsx      # /reports (10 report sections)
 │   │   │   ├── Users.jsx        # /users (admin)
 │   │   │   ├── Settings.jsx     # /settings + company settings
-│   │   │   ├── Quotations.jsx   # /quotations (quotation management)
 │   │   │   ├── Contracts.jsx    # /contracts (contract management)
 │   │   │   ├── Accounting.jsx   # /accounting (finance + installments)
 │   │   │   ├── CustomerPortal.jsx # /portal (customer self-service)
@@ -296,7 +292,7 @@ Dashboard/
 │   │   │   ├── constants.js     # Thai labels + constants
 │   │   │   └── thaiFont.js      # Sarabun font for PDF
 │   │   ├── styles/
-│   │   ├── App.jsx
+│   │   ├── App.jsx              # Router + AuthProvider (code splitting via React.lazy)
 │   │   └── index.js
 │   ├── Dockerfile
 │   └── package.json
@@ -429,15 +425,6 @@ Dashboard/
 - `GET /api/activity-logs` - บันทึกกิจกรรม
 - `GET /api/activity-logs/recent` - กิจกรรมล่าสุด
 - `POST /api/activity-logs` - สร้าง log ด้วยตนเอง
-
-### Quotations
-- `GET /api/quotations` - รายการใบเสนอราคา
-- `GET /api/quotations/:id` - รายละเอียด
-- `POST /api/quotations` - สร้างใบเสนอราคา
-- `PUT /api/quotations/:id` - อัปเดต
-- `PUT /api/quotations/:id/items` - อัปเดตรายการ
-- `POST /api/quotations/:id/status` - เปลี่ยนสถานะ
-- `DELETE /api/quotations/:id` - ลบ
 
 ### Contracts
 - `GET /api/contracts` - รายการสัญญา

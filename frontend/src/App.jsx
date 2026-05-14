@@ -6,24 +6,24 @@ import { ToastProvider } from './components/Toast';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Projects from './pages/Projects';
-import Organizations from './pages/Organizations';
-import Reports from './pages/Reports';
-import Users from './pages/Users';
-import Settings from './pages/Settings';
-import Steps from './pages/Steps';
-import Documents from './pages/Documents';
-import Tasks from './pages/Tasks';
-import NetworkMap from './pages/NetworkMap';
-import Customers from './pages/Customers';
-import ProjectDetail from './pages/ProjectDetail';
-import ProjectReport from './pages/ProjectReport';
-import Quotations from './pages/Quotations';
-import Contracts from './pages/Contracts';
-import CustomerPortal from './pages/CustomerPortal';
-import Accounting from './pages/Accounting';
-import { Component, useState } from 'react';
+import { Component, Suspense, lazy, useState } from 'react';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Projects = lazy(() => import('./pages/Projects'));
+const Organizations = lazy(() => import('./pages/Organizations'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Users = lazy(() => import('./pages/Users'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Steps = lazy(() => import('./pages/Steps'));
+const Documents = lazy(() => import('./pages/Documents'));
+const Tasks = lazy(() => import('./pages/Tasks'));
+const NetworkMap = lazy(() => import('./pages/NetworkMap'));
+const Customers = lazy(() => import('./pages/Customers'));
+const ProjectDetail = lazy(() => import('./pages/ProjectDetail'));
+const ProjectReport = lazy(() => import('./pages/ProjectReport'));
+const Contracts = lazy(() => import('./pages/Contracts'));
+const CustomerPortal = lazy(() => import('./pages/CustomerPortal'));
+const Accounting = lazy(() => import('./pages/Accounting'));
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -58,6 +58,17 @@ class ErrorBoundary extends Component {
     }
     return this.props.children;
   }
+}
+
+function PageLoading() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="text-center">
+        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600"></div>
+        <p className="mt-3 text-sm text-slate-400">กำลังโหลด...</p>
+      </div>
+    </div>
+  );
 }
 
 function AppContent() {
@@ -99,6 +110,7 @@ function AppContent() {
         />
 
         <main className="px-4 py-5 md:px-6 md:py-6 xl:px-8">
+          <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={user?.role === 'client' ? <Navigate to="/portal" replace /> : <Dashboard />} />
             <Route path="/projects" element={<Projects />} />
@@ -113,11 +125,11 @@ function AppContent() {
             <Route path="/network-map" element={<NetworkMap />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
             <Route path="/projects/:id/report" element={<ProjectReport />} />
-            <Route path="/quotations" element={<Quotations />} />
             <Route path="/contracts" element={<Contracts />} />
             <Route path="/portal" element={<CustomerPortal />} />
             <Route path="/accounting" element={<Accounting />} />
           </Routes>
+          </Suspense>
         </main>
       </div>
     </div>

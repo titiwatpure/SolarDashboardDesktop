@@ -8,7 +8,8 @@
     "dev": "nodemon src/index.js",
     "lint": "eslint src/**/*.js",
     "test": "jest --runInBand --forceExit --detectOpenHandles",
-    "test:watch": "jest --watch --runInBand"
+    "test:watch": "jest --watch --runInBand",
+    "db:migrate": "node -e \"const db = require('./src/database'); const { runMigrations } = require('./src/migrations/runner'); runMigrations(db.pool).then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });\""
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

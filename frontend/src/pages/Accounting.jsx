@@ -28,16 +28,13 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { accountingAPI, contractsAPI, projectsAPI } from '../utils/api';
+import { accountingAPI, projectsAPI } from '../utils/api';
 import {
   PAYMENT_METHODS,
   INSTALLMENT_STATUSES,
   TRANSACTION_TYPES,
 } from '../utils/constants';
-
-const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899'];
-
-const today = () => new Date().toISOString().slice(0, 10);
+import { useAccountingOverview, useProjectAccounting, useInstallments } from '../hooks/useAccounting';
 
 const formatCurrency = (v) => {
   if (v == null || v === '') return '-';
@@ -46,26 +43,6 @@ const formatCurrency = (v) => {
 
 const formatDate = (v) =>
   v ? new Date(v).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
-
-const emptyTransactionForm = {
-  type: 'expense',
-  category_id: '',
-  amount: '',
-  description: '',
-  transaction_date: today(),
-  payment_method: 'transfer',
-  receipt_number: '',
-};
-
-const emptyInstallmentForm = {
-  contract_id: '',
-  project_id: '',
-  installment_number: '',
-  description: '',
-  amount: '',
-  due_date: '',
-  notes: '',
-};
 
 const emptyBulkRow = () => ({
   description: '',
@@ -102,12 +79,6 @@ const STANDALONE_TEMPLATES = {
   '100': [
     { description: 'ชำระเต็มจำนวน' },
   ],
-};
-
-const emptyPayForm = {
-  paid_amount: '',
-  paid_date: today(),
-  payment_method: 'transfer',
 };
 
 /* ---- KPI Card component ---- */
@@ -151,30 +122,14 @@ export default function Accounting() {
   const [categories, setCategories] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  /* ---- tab 1: overview ---- */
-  const [companySummary, setCompanySummary] = useState(null);
-  const [overviewLoading, setOverviewLoading] = useState(true);
-
-  /* ---- tab 2: project accounting ---- */
   const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [projectSummary, setProjectSummary] = useState(null);
-  const [projectLoading, setProjectLoading] = useState(false);
-  const [txFilter, setTxFilter] = useState('all');
-  const [txDateFrom, setTxDateFrom] = useState('');
-  const [txDateTo, setTxDateTo] = useState('');
-  const [txCategoryFilter, setTxCategoryFilter] = useState('');
-  const [showTxModal, setShowTxModal] = useState(false);
-  const [editTx, setEditTx] = useState(null);
-  const [txForm, setTxForm] = useState(emptyTransactionForm);
-  const [txSaving, setTxSaving] = useState(false);
-  const [txError, setTxError] = useState('');
 
-  /* ---- tab 3: installments ---- */
-  const [installments, setInstallments] = useState([]);
-  const [installmentsLoading, setInstallmentsLoading] = useState(false);
-  const [instStatusFilter, setInstStatusFilter] = useState('');
-  const [instProjectFilter, setInstProjectFilter] = useState('');
+  /* ---- hooks ---- */
+  const overview = useAccountingOverview();
+  const projectAcc = useProjectAccounting(selectedProjectId);
+  const installmentAcc = useInstallments();
+
+  /* ---- bulk installment state (not in hook) ---- */
   const [showBulkInstModal, setShowBulkInstModal] = useState(false);
   const [bulkProject, setBulkProject] = useState('');
   const [bulkContract, setBulkContract] = useState('');
@@ -182,12 +137,6 @@ export default function Accounting() {
   const [bulkRows, setBulkRows] = useState([emptyBulkRow()]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState('');
-  const [contracts, setContracts] = useState([]);
-  const [showPayModal, setShowPayModal] = useState(false);
-  const [payTarget, setPayTarget] = useState(null);
-  const [payForm, setPayForm] = useState(emptyPayForm);
-  const [paySaving, setPaySaving] = useState(false);
-  const [payError, setPayError] = useState('');
 
   /* ============================================================ */
   /* DATA LOADING                                                  */
@@ -211,199 +160,20 @@ export default function Accounting() {
     }
   }, []);
 
-  const loadCompanySummary = useCallback(async () => {
-    setOverviewLoading(true);
-    try {
-      const data = await accountingAPI.getCompanySummary();
-      setCompanySummary(data || null);
-    } catch (err) {
-      console.error('Failed to load company summary:', err);
-    } finally {
-      setOverviewLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      await Promise.all([loadCategories(), loadProjects(), loadCompanySummary()]);
+      await Promise.all([loadCategories(), loadProjects()]);
       setLoading(false);
     };
     init();
-  }, [loadCategories, loadProjects, loadCompanySummary]);
+  }, [loadCategories, loadProjects]);
 
-  /* ---- project summary ---- */
-  const loadProjectSummary = useCallback(async (projectId) => {
-    if (!projectId) {
-      setProjectSummary(null);
-      return;
-    }
-    setProjectLoading(true);
-    try {
-      const data = await accountingAPI.getProjectSummary(projectId);
-      setProjectSummary(data || null);
-    } catch (err) {
-      console.error('Failed to load project summary:', err);
-      setProjectSummary(null);
-    } finally {
-      setProjectLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'project' && selectedProjectId) {
-      loadProjectSummary(selectedProjectId);
-    }
-  }, [activeTab, selectedProjectId, loadProjectSummary]);
-
-  /* ---- installments ---- */
-  const loadInstallments = useCallback(async () => {
-    setInstallmentsLoading(true);
-    try {
-      const params = { limit: 500 };
-      if (instStatusFilter) params.status = instStatusFilter;
-      if (instProjectFilter) params.project_id = instProjectFilter;
-      const data = await accountingAPI.getInstallments(params);
-      setInstallments(Array.isArray(data) ? data : data.data || []);
-    } catch (err) {
-      console.error('Failed to load installments:', err);
-    } finally {
-      setInstallmentsLoading(false);
-    }
-  }, [instStatusFilter, instProjectFilter]);
-
-  useEffect(() => {
-    if (activeTab === 'installments') {
-      loadInstallments();
-    }
-  }, [activeTab, loadInstallments]);
-
-  /* ============================================================ */
-  /* MEMOIZED DATA                                                 */
-  /* ============================================================ */
-
-  const monthlyTrend = useMemo(() => {
-    const trend = companySummary?.monthly_trend;
-    if (!Array.isArray(trend)) return [];
-    return trend.map((m) => ({
-      month: m.month || m.label || '',
-      income: Number(m.income || 0),
-      expense: Number(m.expense || 0),
-    }));
-  }, [companySummary]);
-
-  const topProjects = useMemo(() => {
-    const tp = companySummary?.top_projects;
-    if (!Array.isArray(tp)) return [];
-    return tp;
-  }, [companySummary]);
-
-  const receivables = useMemo(() => {
-    const rec = companySummary?.receivables;
-    if (Array.isArray(rec)) return rec;
-    return installments.filter((i) => i.status === 'pending' || i.status === 'overdue' || i.status === 'partial');
-  }, [companySummary, installments]);
-
-  const filteredTransactions = useMemo(() => {
-    const txs = projectSummary?.transactions;
-    if (!Array.isArray(txs)) return [];
-    return txs.filter((t) => {
-      if (txFilter !== 'all' && t.type !== txFilter) return false;
-      if (txCategoryFilter && t.category_id !== txCategoryFilter) return false;
-      if (txDateFrom && t.transaction_date < txDateFrom) return false;
-      if (txDateTo && t.transaction_date > txDateTo) return false;
-      return true;
-    });
-  }, [projectSummary, txFilter, txCategoryFilter, txDateFrom, txDateTo]);
-
+  /* ---- filtered categories for tx form ---- */
   const filteredCategories = useMemo(() => {
-    if (txForm.type === 'all') return categories;
-    return categories.filter((c) => c.type === txForm.type);
-  }, [categories, txForm.type]);
-
-  const pieData = useMemo(() => {
-    const bd = projectSummary?.category_breakdown;
-    if (!Array.isArray(bd)) return [];
-    return bd.map((item, idx) => ({
-      ...item,
-      name: item.category_name || item.name || '-',
-      value: Number(item.total || item.amount || 0),
-      fill: COLORS[idx % COLORS.length],
-    }));
-  }, [projectSummary]);
-
-  /* ============================================================ */
-  /* TRANSACTION HANDLERS                                          */
-  /* ============================================================ */
-
-  const openCreateTx = () => {
-    setEditTx(null);
-    setTxForm({ ...emptyTransactionForm, transaction_date: today() });
-    setTxError('');
-    setShowTxModal(true);
-  };
-
-  const openEditTx = (tx) => {
-    setEditTx(tx);
-    setTxForm({
-      type: tx.type || 'expense',
-      category_id: tx.category_id || '',
-      amount: tx.amount ?? '',
-      description: tx.description || '',
-      transaction_date: tx.transaction_date ? tx.transaction_date.slice(0, 10) : today(),
-      payment_method: tx.payment_method || 'transfer',
-      receipt_number: tx.receipt_number || '',
-    });
-    setTxError('');
-    setShowTxModal(true);
-  };
-
-  const handleTxChange = (e) => {
-    const { name, value } = e.target;
-    setTxForm((prev) => {
-      const next = { ...prev, [name]: value };
-      if (name === 'type') next.category_id = '';
-      return next;
-    });
-  };
-
-  const handleTxSave = async (e) => {
-    e.preventDefault();
-    if (!txForm.category_id || !txForm.amount) {
-      setTxError('กรุณากรอกข้อมูลที่จำเป็น');
-      return;
-    }
-    setTxSaving(true);
-    setTxError('');
-    try {
-      const payload = {
-        ...txForm,
-        project_id: selectedProjectId,
-        amount: Number(txForm.amount),
-      };
-      if (editTx) {
-        await accountingAPI.updateTransaction(editTx.id, payload);
-      } else {
-        await accountingAPI.createTransaction(payload);
-      }
-      setShowTxModal(false);
-      loadProjectSummary(selectedProjectId);
-    } catch (err) {
-      setTxError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึก');
-    } finally {
-      setTxSaving(false);
-    }
-  };
-
-  const handleTxDelete = async (id) => {
-    if (!window.confirm('ต้องการลบรายการนี้?')) return;
-    try {
-      await accountingAPI.deleteTransaction(id);
-      loadProjectSummary(selectedProjectId);
-    } catch (err) {
-      console.error('Failed to delete transaction:', err);
-    }
-  };
+    if (projectAcc.txForm.type === 'all') return categories;
+    return categories.filter((c) => c.type === projectAcc.txForm.type);
+  }, [categories, projectAcc.txForm.type]);
 
   /* ============================================================ */
   /* INSTALLMENT HANDLERS                                          */
@@ -416,10 +186,7 @@ export default function Accounting() {
     setBulkRows([emptyBulkRow()]);
     setBulkError('');
     setShowBulkInstModal(true);
-    try {
-      const res = await contractsAPI.getAll({ limit: 200 });
-      setContracts(Array.isArray(res) ? res : res?.data || []);
-    } catch { setContracts([]); }
+    installmentAcc.loadContracts();
   };
 
   const applyTemplate = (key) => {
@@ -437,7 +204,7 @@ export default function Accounting() {
 
   const applyAmountPct = (idx, pct) => {
     if (bulkMode !== 'contract' || !bulkContract) return;
-    const contract = contracts.find((c) => c.id === bulkContract);
+    const contract = installmentAcc.contracts.find((c) => c.id === bulkContract);
     if (!contract?.total_amount) return;
     const amt = Math.round((Number(contract.total_amount) * pct) / 100);
     updateBulkRow(idx, 'amount', String(amt));
@@ -462,61 +229,11 @@ export default function Accounting() {
         })),
       });
       setShowBulkInstModal(false);
-      loadInstallments();
+      installmentAcc.loadInstallments();
     } catch (err) {
       setBulkError(err.response?.data?.error || 'เกิดข้อผิดพลาด');
     } finally {
       setBulkSaving(false);
-    }
-  };
-
-  const handleInstDelete = async (id) => {
-    if (!window.confirm('ต้องการลบงวดชำระนี้?')) return;
-    try {
-      await accountingAPI.deleteInstallment(id);
-      loadInstallments();
-    } catch (err) {
-      const msg = err.response?.data?.error || 'เกิดข้อผิดพลาด';
-      alert(msg);
-    }
-  };
-
-  const openPayModal = (inst) => {
-    setPayTarget(inst);
-    const remaining = (inst.amount || 0) - (inst.paid_amount || 0);
-    setPayForm({
-      paid_amount: remaining > 0 ? remaining : (inst.amount ?? ''),
-      paid_date: today(),
-      payment_method: 'transfer',
-    });
-    setPayError('');
-    setShowPayModal(true);
-  };
-
-  const handlePayChange = (e) => {
-    const { name, value } = e.target;
-    setPayForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handlePaySave = async (e) => {
-    e.preventDefault();
-    if (!payForm.paid_amount) {
-      setPayError('กรุณากรอกจำนวนเงินที่ชำระ');
-      return;
-    }
-    setPaySaving(true);
-    setPayError('');
-    try {
-      await accountingAPI.payInstallment(payTarget.id, {
-        ...payForm,
-        paid_amount: Number(payForm.paid_amount),
-      });
-      setShowPayModal(false);
-      loadInstallments();
-    } catch (err) {
-      setPayError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึกชำระ');
-    } finally {
-      setPaySaving(false);
     }
   };
 
@@ -576,11 +293,11 @@ export default function Accounting() {
       {/* ============================================================ */}
       {activeTab === 'overview' && (
         <OverviewTab
-          loading={overviewLoading}
-          summary={companySummary}
-          monthlyTrend={monthlyTrend}
-          topProjects={topProjects}
-          receivables={receivables}
+          loading={overview.overviewLoading}
+          summary={overview.companySummary}
+          monthlyTrend={overview.monthlyTrend}
+          topProjects={overview.topProjects}
+          receivables={overview.receivables}
         />
       )}
 
@@ -592,22 +309,22 @@ export default function Accounting() {
           projects={projects}
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
-          summary={projectSummary}
-          loading={projectLoading}
-          txFilter={txFilter}
-          onTxFilterChange={setTxFilter}
+          summary={projectAcc.projectSummary}
+          loading={projectAcc.projectLoading}
+          txFilter={projectAcc.txFilter}
+          onTxFilterChange={projectAcc.setTxFilter}
           categories={categories}
-          txCategoryFilter={txCategoryFilter}
-          onTxCategoryFilterChange={setTxCategoryFilter}
-          txDateFrom={txDateFrom}
-          onTxDateFromChange={setTxDateFrom}
-          txDateTo={txDateTo}
-          onTxDateToChange={setTxDateTo}
-          filteredTransactions={filteredTransactions}
-          pieData={pieData}
-          onAddTx={openCreateTx}
-          onEditTx={openEditTx}
-          onDeleteTx={handleTxDelete}
+          txCategoryFilter={projectAcc.txCategoryFilter}
+          onTxCategoryFilterChange={projectAcc.setTxCategoryFilter}
+          txDateFrom={projectAcc.txDateFrom}
+          onTxDateFromChange={projectAcc.setTxDateFrom}
+          txDateTo={projectAcc.txDateTo}
+          onTxDateToChange={projectAcc.setTxDateTo}
+          filteredTransactions={projectAcc.filteredTransactions}
+          pieData={projectAcc.pieData}
+          onAddTx={projectAcc.openCreateTx}
+          onEditTx={projectAcc.openEditTx}
+          onDeleteTx={projectAcc.handleTxDelete}
         />
       )}
 
@@ -616,44 +333,44 @@ export default function Accounting() {
       {/* ============================================================ */}
       {activeTab === 'installments' && (
         <InstallmentsTab
-          installments={installments}
-          loading={installmentsLoading}
-          statusFilter={instStatusFilter}
-          onStatusFilterChange={setInstStatusFilter}
+          installments={installmentAcc.installments}
+          loading={installmentAcc.installmentsLoading}
+          statusFilter={installmentAcc.instStatusFilter}
+          onStatusFilterChange={installmentAcc.setInstStatusFilter}
           projects={projects}
-          instProjectFilter={instProjectFilter}
-          onInstProjectFilterChange={setInstProjectFilter}
+          instProjectFilter={installmentAcc.instProjectFilter}
+          onInstProjectFilterChange={installmentAcc.setInstProjectFilter}
           onCreate={openCreateInst}
-          onPay={openPayModal}
-          onDelete={handleInstDelete}
+          onPay={installmentAcc.openPayModal}
+          onDelete={installmentAcc.handleInstDelete}
         />
       )}
 
       {/* ============================================================ */}
       {/* TRANSACTION MODAL                                             */}
       {/* ============================================================ */}
-      {showTxModal && (
+      {projectAcc.showTxModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-[28px] bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-xl font-bold text-slate-900">
-                {editTx ? 'แก้ไขรายการ' : 'เพิ่มรายการ'}
+                {projectAcc.editTx ? 'แก้ไขรายการ' : 'เพิ่มรายการ'}
               </h3>
               <button
-                onClick={() => setShowTxModal(false)}
+                onClick={() => projectAcc.setShowTxModal(false)}
                 className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {txError && (
+            {projectAcc.txError && (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {txError}
+                {projectAcc.txError}
               </div>
             )}
 
-            <form onSubmit={handleTxSave} className="space-y-4">
+            <form onSubmit={projectAcc.handleTxSave} className="space-y-4">
               {/* Type radio */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">ประเภท</label>
@@ -662,7 +379,7 @@ export default function Accounting() {
                     <label
                       key={key}
                       className={`flex-1 cursor-pointer rounded-xl border-2 px-4 py-3 text-center text-sm font-semibold transition ${
-                        txForm.type === key
+                        projectAcc.txForm.type === key
                           ? `${bg} ${color} border-current`
                           : 'border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}
@@ -671,8 +388,8 @@ export default function Accounting() {
                         type="radio"
                         name="type"
                         value={key}
-                        checked={txForm.type === key}
-                        onChange={handleTxChange}
+                        checked={projectAcc.txForm.type === key}
+                        onChange={projectAcc.handleTxChange}
                         className="sr-only"
                       />
                       {label}
@@ -686,8 +403,8 @@ export default function Accounting() {
                 <label className="mb-1 block text-sm font-medium text-slate-700">หมวดหมู่ *</label>
                 <select
                   name="category_id"
-                  value={txForm.category_id}
-                  onChange={handleTxChange}
+                  value={projectAcc.txForm.category_id}
+                  onChange={projectAcc.handleTxChange}
                   required
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
                 >
@@ -706,8 +423,8 @@ export default function Accounting() {
                 <input
                   type="number"
                   name="amount"
-                  value={txForm.amount}
-                  onChange={handleTxChange}
+                  value={projectAcc.txForm.amount}
+                  onChange={projectAcc.handleTxChange}
                   placeholder="0.00"
                   min="0"
                   step="0.01"
@@ -722,8 +439,8 @@ export default function Accounting() {
                 <input
                   type="text"
                   name="description"
-                  value={txForm.description}
-                  onChange={handleTxChange}
+                  value={projectAcc.txForm.description}
+                  onChange={projectAcc.handleTxChange}
                   placeholder="รายละเอียดรายการ..."
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
                 />
@@ -736,8 +453,8 @@ export default function Accounting() {
                   <input
                     type="date"
                     name="transaction_date"
-                    value={txForm.transaction_date}
-                    onChange={handleTxChange}
+                    value={projectAcc.txForm.transaction_date}
+                    onChange={projectAcc.handleTxChange}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
                   />
                 </div>
@@ -745,8 +462,8 @@ export default function Accounting() {
                   <label className="mb-1 block text-sm font-medium text-slate-700">วิธีชำระ</label>
                   <select
                     name="payment_method"
-                    value={txForm.payment_method}
-                    onChange={handleTxChange}
+                    value={projectAcc.txForm.payment_method}
+                    onChange={projectAcc.handleTxChange}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
                   >
                     {Object.entries(PAYMENT_METHODS).map(([key, label]) => (
@@ -764,8 +481,8 @@ export default function Accounting() {
                 <input
                   type="text"
                   name="receipt_number"
-                  value={txForm.receipt_number}
-                  onChange={handleTxChange}
+                  value={projectAcc.txForm.receipt_number}
+                  onChange={projectAcc.handleTxChange}
                   placeholder="REC-001"
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
                 />
@@ -775,18 +492,18 @@ export default function Accounting() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowTxModal(false)}
+                  onClick={() => projectAcc.setShowTxModal(false)}
                   className="rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  disabled={txSaving}
+                  disabled={projectAcc.txSaving}
                   className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
                 >
                   <Save size={16} />
-                  {txSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+                  {projectAcc.txSaving ? 'กำลังบันทึก...' : 'บันทึก'}
                 </button>
               </div>
             </form>
@@ -863,7 +580,7 @@ export default function Accounting() {
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
                   >
                     <option value="">เลือกสัญญา</option>
-                    {contracts.map((c) => (
+                    {installmentAcc.contracts.map((c) => (
                       <option key={c.id} value={c.id}>{c.contract_number || c.id}</option>
                     ))}
                   </select>
@@ -937,8 +654,8 @@ export default function Accounting() {
                                   onClick={() => applyAmountPct(idx, pct)}
                                   className="block w-full rounded-lg px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-blue-50"
                                 >
-                                  {pct}% → {contracts.find((c) => c.id === bulkContract)?.total_amount
-                                    ? formatCurrency(Math.round((Number(contracts.find((c) => c.id === bulkContract).total_amount) * pct) / 100))
+                                  {pct}% → {installmentAcc.contracts.find((c) => c.id === bulkContract)?.total_amount
+                                    ? formatCurrency(Math.round((Number(installmentAcc.contracts.find((c) => c.id === bulkContract).total_amount) * pct) / 100))
                                     : '—'}
                                 </button>
                               ))}
@@ -1009,13 +726,13 @@ export default function Accounting() {
       {/* ============================================================ */}
       {/* PAY INSTALLMENT MODAL                                         */}
       {/* ============================================================ */}
-      {showPayModal && payTarget && (
+      {installmentAcc.showPayModal && installmentAcc.payTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl">
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-xl font-bold text-slate-900">บันทึกชำระ</h3>
               <button
-                onClick={() => setShowPayModal(false)}
+                onClick={() => installmentAcc.setShowPayModal(false)}
                 className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               >
                 <X size={20} />
@@ -1023,34 +740,34 @@ export default function Accounting() {
             </div>
 
             <div className="mb-4 rounded-xl bg-slate-50 px-4 py-3 text-sm">
-              <p className="text-slate-500">งวดที่ {payTarget.installment_number || '-'}</p>
-              <p className="font-semibold text-slate-900">{payTarget.description || '-'}</p>
+              <p className="text-slate-500">งวดที่ {installmentAcc.payTarget.installment_number || '-'}</p>
+              <p className="font-semibold text-slate-900">{installmentAcc.payTarget.description || '-'}</p>
               <p className="mt-1 text-slate-500">
                 จำนวนเงิน:{' '}
-                <span className="font-semibold text-slate-700">{formatCurrency(payTarget.amount)} บาท</span>
+                <span className="font-semibold text-slate-700">{formatCurrency(installmentAcc.payTarget.amount)} บาท</span>
               </p>
-              {payTarget.paid_amount > 0 && (
+              {installmentAcc.payTarget.paid_amount > 0 && (
                 <p className="mt-1 text-slate-500">
-                  ชำระแล้ว: <span className="font-semibold text-blue-600">{formatCurrency(payTarget.paid_amount)} บาท</span>
-                  {' '}| เหลือ: <span className="font-semibold text-orange-600">{formatCurrency(payTarget.amount - payTarget.paid_amount)} บาท</span>
+                  ชำระแล้ว: <span className="font-semibold text-blue-600">{formatCurrency(installmentAcc.payTarget.paid_amount)} บาท</span>
+                  {' '}| เหลือ: <span className="font-semibold text-orange-600">{formatCurrency(installmentAcc.payTarget.amount - installmentAcc.payTarget.paid_amount)} บาท</span>
                 </p>
               )}
             </div>
 
-            {payError && (
+            {installmentAcc.payError && (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {payError}
+                {installmentAcc.payError}
               </div>
             )}
 
-            <form onSubmit={handlePaySave} className="space-y-4">
+            <form onSubmit={installmentAcc.handlePaySave} className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">จำนวนเงินที่ชำระ (บาท) *</label>
                 <input
                   type="number"
                   name="paid_amount"
-                  value={payForm.paid_amount}
-                  onChange={handlePayChange}
+                  value={installmentAcc.payForm.paid_amount}
+                  onChange={installmentAcc.handlePayChange}
                   placeholder="0.00"
                   min="0"
                   step="0.01"
@@ -1065,8 +782,8 @@ export default function Accounting() {
                   <input
                     type="date"
                     name="paid_date"
-                    value={payForm.paid_date}
-                    onChange={handlePayChange}
+                    value={installmentAcc.payForm.paid_date}
+                    onChange={installmentAcc.handlePayChange}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
                   />
                 </div>
@@ -1074,8 +791,8 @@ export default function Accounting() {
                   <label className="mb-1 block text-sm font-medium text-slate-700">วิธีชำระ</label>
                   <select
                     name="payment_method"
-                    value={payForm.payment_method}
-                    onChange={handlePayChange}
+                    value={installmentAcc.payForm.payment_method}
+                    onChange={installmentAcc.handlePayChange}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
                   >
                     {Object.entries(PAYMENT_METHODS).map(([key, label]) => (
@@ -1090,18 +807,18 @@ export default function Accounting() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowPayModal(false)}
+                  onClick={() => installmentAcc.setShowPayModal(false)}
                   className="rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  disabled={paySaving}
+                  disabled={installmentAcc.paySaving}
                   className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
                 >
                   <CheckCircle2 size={16} />
-                  {paySaving ? 'กำลังบันทึก...' : 'บันทึกชำระ'}
+                  {installmentAcc.paySaving ? 'กำลังบันทึก...' : 'บันทึกชำระ'}
                 </button>
               </div>
             </form>
