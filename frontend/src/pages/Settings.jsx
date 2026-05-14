@@ -918,6 +918,14 @@ export default function Settings() {
 
 const CHANGELOG = [
   {
+    version: '1.0.2',
+    date: '2026-05-14',
+    changes: [
+      'แก้ bug migration ไม่ทำงานตอนอัปเดตแอพ',
+      'รัน migration ทุกครั้งที่เปิดแอพ (ปลอดภัยสำหรับ db เดิม)',
+    ],
+  },
+  {
     version: '1.0.1',
     date: '2026-05-14',
     changes: [

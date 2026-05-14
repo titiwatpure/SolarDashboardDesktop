@@ -146,17 +146,20 @@ for (const dir of [uploadsDir, backupsDir]) {
 }
 
 // ──────────────────────────────────────────────
-// 4. First-run database initialization
+// 4. Database initialization + migrations
 // ──────────────────────────────────────────────
 let mainWindow;
 
 async function initializeDatabase() {
-  if (!fs.existsSync(dbPath)) {
+  const isFirstRun = !fs.existsSync(dbPath);
+  if (isFirstRun) {
     console.log('First run: initializing database...');
-    const { initDB } = require('../backend/src/init-db.cjs');
-    await initDB();
-    console.log('Database initialized.');
+  } else {
+    console.log('Existing database found: running migrations...');
   }
+  const { initDB } = require('../backend/src/init-db.cjs');
+  await initDB();
+  console.log('Database ready.');
 }
 
 // ──────────────────────────────────────────────
