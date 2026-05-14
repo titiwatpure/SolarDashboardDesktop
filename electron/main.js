@@ -7,11 +7,11 @@ Module._resolveFilename = function (request, parent, isMain, options) {
   return _originalResolve.call(this, request, parent, isMain, options);
 };
 
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, dialog, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const https = require('https');
+const { autoUpdater } = require('electron-updater');
 
 // ──────────────────────────────────────────────
 // 1. Resolve all data paths to userData
@@ -51,44 +51,86 @@ if (fs.existsSync(jwtSecretPath)) {
 }
 
 // ──────────────────────────────────────────────
-// 2b. Update checker
+// 2b. Auto-updater (electron-updater)
 // ──────────────────────────────────────────────
-function checkForUpdates() {
-  const currentVersion = app.getVersion();
-  const options = {
-    hostname: 'api.github.com',
-    path: '/repos/titiwatpure/SolarDashboardDesktop/releases/latest',
-    method: 'GET',
-    headers: { 'User-Agent': 'SolarDashboard' },
-  };
+let updateDownloaded = false;
 
-  const req = https.request(options, (res) => {
-    let data = '';
-    res.on('data', (chunk) => { data += chunk; });
-    res.on('end', () => {
-      try {
-        const release = JSON.parse(data);
-        const latestVersion = release.tag_name?.replace('v', '');
-        if (latestVersion && latestVersion !== currentVersion) {
-          dialog.showMessageBox({
-            type: 'info',
-            title: 'มีเวอร์ชันใหม่',
-            message: `Solar Dashboard v${latestVersion}`,
-            detail: 'ต้องการดาวน์โหลดเวอร์ชันใหม่หรือไม่?',
-            buttons: ['ดาวน์โหลด', 'ภายหลัง'],
-            defaultId: 0,
-            cancelId: 1,
-          }).then((result) => {
-            if (result.response === 0) {
-              shell.openExternal(release.html_url);
-            }
-          });
-        }
-      } catch (_) {}
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  autoUpdater.on('update-available', (info) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('update-status', { status: 'available', version: info.version });
+    }
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'มีเวอร์ชันใหม่',
+      message: `Solar Dashboard v${info.version}`,
+      detail: 'ต้องการดาวน์โหลดเวอร์ชันใหม่หรือไม่?',
+      buttons: ['ดาวน์โหลด', 'ภายหลัง'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.downloadProgressChanged = (progress) => {
+          if (mainWindow) {
+            mainWindow.setProgressBar(progress.percent / 100);
+          }
+        };
+        autoUpdater.downloadUpdate();
+      }
     });
   });
-  req.on('error', () => {});
-  req.end();
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('App is up to date.');
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`Download progress: ${Math.round(progress.percent)}%`);
+    if (mainWindow) {
+      mainWindow.webContents.send('update-status', { status: 'downloading', percent: Math.round(progress.percent) });
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    updateDownloaded = true;
+    if (mainWindow) {
+      mainWindow.setProgressBar(-1);
+      mainWindow.webContents.send('update-status', { status: 'downloaded', version: info.version });
+    }
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'ดาวน์โหลดเสร็จสิ้น',
+      message: `พร้อมติดตั้ง v${info.version}`,
+      detail: 'ต้องการรีสตาร์ทเพื่อติดตั้งตอนนี้หรือไม่?',
+      buttons: ['รีสตาร์ท', 'ภายหลัง'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-updater error:', err.message);
+    if (mainWindow) {
+      mainWindow.webContents.send('update-status', { status: 'error', message: err.message });
+    }
+    if (mainWindow) {
+      mainWindow.setProgressBar(-1);
+    }
+  });
+}
+
+function checkForUpdates() {
+  setupAutoUpdater();
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.error('Check for updates failed:', err.message);
+  });
 }
 
 // ──────────────────────────────────────────────

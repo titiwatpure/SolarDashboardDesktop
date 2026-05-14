@@ -36,4 +36,9 @@ nsis:
   shortcutName: Solar Dashboard
 
 npmRebuild: false
-buildVersion: 1.0.0
+
+publish:
+  provider: github
+  owner: titiwatpure
+  repo: SolarDashboardDesktop
+  releaseType: release
