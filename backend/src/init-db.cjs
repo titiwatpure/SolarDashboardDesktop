@@ -393,7 +393,18 @@ const initDB = async () => {
     'CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category_id);',
     'CREATE INDEX IF NOT EXISTS idx_installments_project_id ON payment_installments(project_id);',
     'CREATE INDEX IF NOT EXISTS idx_installments_contract_id ON payment_installments(contract_id);',
-    'CREATE INDEX IF NOT EXISTS idx_installments_status ON payment_installments(status);'
+    'CREATE INDEX IF NOT EXISTS idx_installments_status ON payment_installments(status);',
+    // Composite indexes สำหรับ report queries
+    'CREATE INDEX IF NOT EXISTS idx_projects_status_step ON projects(status, current_step);',
+    'CREATE INDEX IF NOT EXISTS idx_projects_risk_status ON projects(risk_level, status);',
+    'CREATE INDEX IF NOT EXISTS idx_projects_province_status ON projects(province, status);',
+    'CREATE INDEX IF NOT EXISTS idx_projects_user_status ON projects(responsible_user, status);',
+    'CREATE INDEX IF NOT EXISTS idx_timeline_project_step_time ON project_timeline(project_id, step, created_at);',
+    'CREATE INDEX IF NOT EXISTS idx_tasks_priority_status ON tasks(priority, status);',
+    'CREATE INDEX IF NOT EXISTS idx_tasks_due_status ON tasks(due_date, status);',
+    'CREATE INDEX IF NOT EXISTS idx_transactions_proj_type_date ON transactions(project_id, type, transaction_date);',
+    'CREATE INDEX IF NOT EXISTS idx_activity_entity_time ON activity_logs(entity_type, created_at);',
+    'CREATE INDEX IF NOT EXISTS idx_notifications_read_time ON notifications(is_read, created_at);'
   ];
 
   // Helper: wrap db.run ใน Promise

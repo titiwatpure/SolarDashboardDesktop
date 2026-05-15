@@ -1,9 +1,9 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { logActivity } = require('./activity_logs');
+const { vacuumDatabase, cleanupOldLogs } = require('../services/maintenance');
 
 const router = express.Router();
 
@@ -155,6 +155,30 @@ router.post('/restore/:name', authenticateToken, authorizeRole(['admin']), async
   } catch (error) {
     console.error('Restore error:', error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการกู้คืน' });
+  }
+});
+
+// POST /api/backup/vacuum — VACUUM ฐานข้อมูล (Admin only)
+router.post('/vacuum', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+  try {
+    await vacuumDatabase();
+    logActivity(req.user.id, 'vacuum', 'database', null, {});
+    res.json({ message: 'VACUUM สำเร็จ' });
+  } catch (error) {
+    console.error('Vacuum error:', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการ VACUUM' });
+  }
+});
+
+// POST /api/backup/cleanup — ลบ logs เก่า (Admin only)
+router.post('/cleanup', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+  try {
+    const result = await cleanupOldLogs();
+    logActivity(req.user.id, 'cleanup', 'database', null, result);
+    res.json({ message: 'Cleanup สำเร็จ', ...result });
+  } catch (error) {
+    console.error('Cleanup error:', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการ cleanup' });
   }
 });
 

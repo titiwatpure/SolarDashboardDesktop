@@ -1,6 +1,6 @@
 {
   "name": "solar-dashboard",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Solar Dashboard - ระบบติดตามโครงการ Solar (Desktop App)",
   "main": "electron/main.js",
   "scripts": {

@@ -165,6 +165,15 @@ if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
+
+    // Run maintenance tasks on startup (vacuum + cleanup old logs)
+    const { runMaintenance } = require('./services/maintenance');
+    runMaintenance().then(results => {
+      if (results.vacuum) console.log('✅ Monthly VACUUM completed');
+      if (results.cleanup) console.log('✅ Old logs cleanup completed');
+    }).catch(err => {
+      console.error('Maintenance error:', err.message);
+    });
   });
 }
 
