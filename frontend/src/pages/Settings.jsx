@@ -918,6 +918,17 @@ export default function Settings() {
 
 const CHANGELOG = [
   {
+    version: '1.0.4',
+    date: '2026-05-15',
+    changes: [
+      'แก้ไขระบบหน่วยงาน: เพิ่มปุ่มอนุมัติ/ปฏิเสธ + แสดงสถานะอนุมัติ',
+      'เพิ่ม notification เมื่ออนุมัติ/ปฏิเสธหน่วยงาน',
+      'เพิ่ม GET /api/organizations/:id endpoint',
+      'validate ประเภทหน่วยงาน (org_type) ที่ backend',
+      'ปรับปรุง error handling และ loading state ทั้งระบบ',
+    ],
+  },
+  {
     version: '1.0.3',
     date: '2026-05-15',
     changes: [
