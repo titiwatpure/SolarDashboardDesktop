@@ -918,6 +918,16 @@ export default function Settings() {
 
 const CHANGELOG = [
   {
+    version: '1.0.3',
+    date: '2026-05-15',
+    changes: [
+      'เพิ่ม composite indexes สำหรับ report queries ที่ช้า',
+      'เพิ่ม auto-vacuum ทุกเดือน (บีบอัดไฟล์ DB อัตโนมัติ)',
+      'เพิ่ม auto-cleanup logs เก่าเกิน 1 ปี',
+      'เพิ่ม API endpoints สำหรับ manual vacuum/cleanup (admin only)',
+    ],
+  },
+  {
     version: '1.0.2',
     date: '2026-05-14',
     changes: [
