@@ -221,7 +221,7 @@ router.post('/:id/organizations/:orgId/approve', authenticateToken, authorizePer
     if (existing.rows.length === 0) return res.status(404).json({ error: 'ไม่พบการเชื่อมต่อ' });
 
     await pool.query(
-      `UPDATE project_organizations SET approval_status = 'approved', approved_at = ?, approved_by = ? WHERE project_id = ? AND org_id = ?`,
+      `UPDATE project_organizations SET approval_status = 'approved', approved_at = ?, approved_by = ?, rejection_reason = NULL WHERE project_id = ? AND org_id = ?`,
       [new Date().toISOString(), req.user.id, id, orgId]
     );
 
@@ -231,6 +231,24 @@ router.post('/:id/organizations/:orgId/approve', authenticateToken, authorizePer
     );
 
     logActivity(req.user.id, 'approve', 'project_organization', id, { org_id: orgId, reason });
+
+    // ส่ง notification ไปยัง responsible_user และ admin
+    try {
+      const proj = await pool.query('SELECT responsible_user, project_name FROM projects WHERE id = ?', [id]);
+      const notifyUsers = new Set();
+      if (proj.rows[0]?.responsible_user && proj.rows[0].responsible_user !== req.user.id) notifyUsers.add(proj.rows[0].responsible_user);
+      const admins = await pool.query("SELECT id FROM users WHERE role = 'admin'");
+      admins.rows.forEach(a => { if (a.id !== req.user.id) notifyUsers.add(a.id); });
+      if (notifyUsers.size === 0) notifyUsers.add(req.user.id);
+      const orgName = existing.rows[0]?.org_name || 'หน่วยงาน';
+      for (const uid of notifyUsers) {
+        await pool.query(
+          'INSERT INTO notifications (id, user_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [uuidv4(), uid, 'org_approved', 'หน่วยงานอนุมัติแล้ว', `${orgName} อนุมัติโครงการ ${proj.rows[0]?.project_name || ''}`, 'project', id]
+        );
+      }
+    } catch {}
+
     res.json({ message: 'อนุมัติสำเร็จ' });
   } catch (error) {
     console.error(error);
@@ -261,6 +279,24 @@ router.post('/:id/organizations/:orgId/reject', authenticateToken, authorizePerm
     );
 
     logActivity(req.user.id, 'reject', 'project_organization', id, { org_id: orgId, reason });
+
+    // ส่ง notification ไปยัง responsible_user และ admin
+    try {
+      const proj = await pool.query('SELECT responsible_user, project_name FROM projects WHERE id = ?', [id]);
+      const notifyUsers = new Set();
+      if (proj.rows[0]?.responsible_user && proj.rows[0].responsible_user !== req.user.id) notifyUsers.add(proj.rows[0].responsible_user);
+      const admins = await pool.query("SELECT id FROM users WHERE role = 'admin'");
+      admins.rows.forEach(a => { if (a.id !== req.user.id) notifyUsers.add(a.id); });
+      if (notifyUsers.size === 0) notifyUsers.add(req.user.id);
+      const orgName = existing.rows[0]?.org_name || 'หน่วยงาน';
+      for (const uid of notifyUsers) {
+        await pool.query(
+          'INSERT INTO notifications (id, user_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [uuidv4(), uid, 'org_rejected', 'หน่วยงานไม่อนุมัติ', `${orgName} ไม่อนุมัติโครงการ ${proj.rows[0]?.project_name || ''}: ${reason || 'ไม่ระบุเหตุผล'}`, 'project', id]
+        );
+      }
+    } catch {}
+
     res.json({ message: 'ปฏิเสธสำเร็จ' });
   } catch (error) {
     console.error(error);

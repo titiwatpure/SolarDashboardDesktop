@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, X, Building2, Loader, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { organizationsAPI } from '../utils/api';
-import { ORG_TYPES, STEP_LABELS, STATUS_LABELS, STATUS_COLORS } from '../utils/constants';
+import { ORG_TYPES, STEP_LABELS, STATUS_LABELS, STATUS_COLORS, APPROVAL_STATUSES } from '../utils/constants';
 
 const emptyForm = { org_name: '', org_type: 'erc' };
 
@@ -94,6 +94,7 @@ export default function Organizations() {
       await loadOrganizations();
     } catch (error) {
       console.error('Failed to delete organization:', error);
+      alert('ไม่สามารถลบหน่วยงานได้');
     }
   };
 
@@ -206,7 +207,9 @@ export default function Organizations() {
                     <p className="text-sm text-slate-400 text-center py-2">ยังไม่มีโครงการ</p>
                   ) : (
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {orgProjects.map(p => (
+                      {orgProjects.map(p => {
+                        const apSt = APPROVAL_STATUSES[p.approval_status] || {};
+                        return (
                         <div
                           key={p.id}
                           onClick={() => navigate(`/projects/${p.project_id}`)}
@@ -214,13 +217,19 @@ export default function Organizations() {
                         >
                           <div>
                             <p className="text-sm font-medium text-slate-900">{p.project_name}</p>
-                            <p className="text-xs text-slate-500">{STEP_LABELS[p.current_step]}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-slate-500">{STEP_LABELS[p.current_step]}</p>
+                              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${apSt.color || 'bg-slate-100 text-slate-600'}`}>
+                                {apSt.label || p.approval_status || 'รออนุมัติ'}
+                              </span>
+                            </div>
                           </div>
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[p.project_status] || 'bg-slate-100 text-slate-600'}`}>
                             {STATUS_LABELS[p.project_status]}
                           </span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

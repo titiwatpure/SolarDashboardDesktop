@@ -8,7 +8,7 @@ import {
 import { projectsAPI } from '../utils/api';
 import {
   STATUS_LABELS, STATUS_COLORS, STEP_LABELS, CUSTOMER_TYPES, MOUNTING_TYPES,
-  PERMIT_TYPES
+  PERMIT_TYPES, APPROVAL_STATUSES
 } from '../utils/constants';
 import { useProjectDetail, useProjectCheckpoints } from '../hooks/useProjectDetail';
 
@@ -346,7 +346,9 @@ export default function ProjectDetail() {
               <p className="text-sm text-slate-400 py-3">ยังไม่ได้เชื่อมหน่วยงาน</p>
             ) : (
               <div className="space-y-2">
-                {detail.projectOrgs.map(org => (
+                {detail.projectOrgs.map(org => {
+                  const st = APPROVAL_STATUSES[org.approval_status] || {};
+                  return (
                   <div key={org.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
@@ -354,18 +356,47 @@ export default function ProjectDetail() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-slate-900">{org.org_name}</p>
-                        <p className="text-xs text-slate-500">{org.org_type}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-slate-500">{org.org_type}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.color || 'bg-slate-100 text-slate-600'}`}>
+                            {st.label || org.approval_status || 'รออนุมัติ'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => detail.handleRemoveOrg(org.id)}
-                      className="rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                      title="ลบ"
-                    >
-                      <X size={14} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {org.approval_status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => detail.handleApproveOrg(org.id)}
+                            disabled={detail.savingOrg}
+                            className="rounded-full p-1.5 text-emerald-500 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                            title="อนุมัติ"
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button
+                            onClick={() => detail.handleRejectOrg(org.id)}
+                            disabled={detail.savingOrg}
+                            className="rounded-full p-1.5 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            title="ไม่อนุมัติ"
+                          >
+                            <Minus size={14} />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => detail.handleRemoveOrg(org.id)}
+                        disabled={detail.savingOrg}
+                        className="rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50"
+                        title="ลบ"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

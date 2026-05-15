@@ -11,6 +11,7 @@ export function useProjectDetail(id) {
   const [allUsers, setAllUsers] = useState([]);
   const [showUserPicker, setShowUserPicker] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
+  const [savingOrg, setSavingOrg] = useState(false);
   const requestIdRef = useRef(0);
 
   const loadAll = useCallback(async (reqId) => {
@@ -51,23 +52,63 @@ export function useProjectDetail(id) {
 
   const handleAddOrg = useCallback(async (orgId) => {
     try {
+      setSavingOrg(true);
       await projectsAPI.addOrganization(id, orgId);
       const orgs = await projectsAPI.getOrganizations(id);
       setProjectOrgs(Array.isArray(orgs) ? orgs : (orgs.data || []));
       setShowOrgPicker(false);
     } catch (error) {
       console.error('Failed to add organization:', error);
+      alert('ไม่สามารถเพิ่มหน่วยงานได้');
+    } finally {
+      setSavingOrg(false);
     }
   }, [id]);
 
   const handleRemoveOrg = useCallback(async (orgId) => {
     if (!window.confirm('ต้องการลบหน่วยงานนี้ออกจากโครงการหรือไม่?')) return;
     try {
+      setSavingOrg(true);
       await projectsAPI.removeOrganization(id, orgId);
       const orgs = await projectsAPI.getOrganizations(id);
       setProjectOrgs(Array.isArray(orgs) ? orgs : (orgs.data || []));
     } catch (error) {
       console.error('Failed to remove organization:', error);
+      alert('ไม่สามารถลบหน่วยงานได้');
+    } finally {
+      setSavingOrg(false);
+    }
+  }, [id]);
+
+  const handleApproveOrg = useCallback(async (orgId) => {
+    try {
+      setSavingOrg(true);
+      await projectsAPI.approveOrganization(id, orgId, { reason: 'อนุมัติ' });
+      const orgs = await projectsAPI.getOrganizations(id);
+      setProjectOrgs(Array.isArray(orgs) ? orgs : (orgs.data || []));
+      window.dispatchEvent(new Event('refresh-notifications'));
+    } catch (error) {
+      console.error('Failed to approve organization:', error);
+      alert('ไม่สามารถอนุมัติได้');
+    } finally {
+      setSavingOrg(false);
+    }
+  }, [id]);
+
+  const handleRejectOrg = useCallback(async (orgId) => {
+    const reason = window.prompt('เหตุผลที่ไม่อนุมัติ:', '');
+    if (reason === null) return;
+    try {
+      setSavingOrg(true);
+      await projectsAPI.rejectOrganization(id, orgId, { reason: reason || 'ไม่ระบุเหตุผล' });
+      const orgs = await projectsAPI.getOrganizations(id);
+      setProjectOrgs(Array.isArray(orgs) ? orgs : (orgs.data || []));
+      window.dispatchEvent(new Event('refresh-notifications'));
+    } catch (error) {
+      console.error('Failed to reject organization:', error);
+      alert('ไม่สามารถปฏิเสธได้');
+    } finally {
+      setSavingOrg(false);
     }
   }, [id]);
 
@@ -109,10 +150,13 @@ export function useProjectDetail(id) {
     showUserPicker,
     setShowUserPicker,
     savingUser,
+    savingOrg,
     loadAll,
     loadOrgsList,
     handleAddOrg,
     handleRemoveOrg,
+    handleApproveOrg,
+    handleRejectOrg,
     handleChangeUser,
     handleDeleteTimeline,
   };

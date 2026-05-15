@@ -190,6 +190,8 @@ export const projectsAPI = {
   getOrganizations: (id) => apiCall('GET', `/projects/${id}/organizations`),
   addOrganization: (id, orgId) => apiCall('POST', `/projects/${id}/organizations`, { org_id: orgId }),
   removeOrganization: (id, orgId) => apiCall('DELETE', `/projects/${id}/organizations/${orgId}`),
+  approveOrganization: (id, orgId, data) => apiCall('POST', `/projects/${id}/organizations/${orgId}/approve`, data),
+  rejectOrganization: (id, orgId, data) => apiCall('POST', `/projects/${id}/organizations/${orgId}/reject`, data),
   getCheckpoints: (projectId, step) => apiCall('GET', `/projects/${projectId}/checkpoints${step ? '?step=' + step : ''}`),
   createCheckpoint: (projectId, data) => apiCall('POST', `/projects/${projectId}/checkpoints`, data),
   updateCheckpoint: (id, data) => apiCall('PUT', `/checkpoints/${id}`, data),
@@ -229,6 +231,7 @@ export const documentsAPI = {
 
 export const organizationsAPI = {
   getAll: () => apiCall('GET', '/organizations'),
+  getById: (id) => apiCall('GET', `/organizations/${id}`),
   getProjects: (id) => apiCall('GET', `/organizations/${id}/projects`),
   create: (data) => apiCall('POST', '/organizations', data),
   update: (id, data) => apiCall('PUT', `/organizations/${id}`, data),
