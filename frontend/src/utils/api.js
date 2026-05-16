@@ -227,6 +227,21 @@ export const documentsAPI = {
   },
   delete: (id) => apiCall('DELETE', `/documents/${id}`),
   getDownloadUrl: (id) => `${API_BASE_URL}/documents/download/${id}`,
+  download: async (id, filename) => {
+    const token = getToken();
+    const res = await axios.get(`${API_BASE_URL}/documents/download/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'document';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };
 
 export const organizationsAPI = {
@@ -336,5 +351,6 @@ export const accountingAPI = {
   deleteInstallment: (id) => apiCall('DELETE', `/accounting/installments/${id}`),
   getProjectSummary: (projectId) => apiCall('GET', `/accounting/project/${projectId}/summary`),
   getCompanySummary: () => apiCall('GET', '/accounting/company/summary'),
+  export: (params) => apiCall('GET', `/accounting/export?${new URLSearchParams(params || {})}`),
 };
 

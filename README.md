@@ -131,6 +131,9 @@
 - ดูข้อมูลผู้ใช้
 - เปลี่ยนรหัสผ่าน
 - ตั้งค่าการแจ้งเตือน
+- ตั้งค่าข้อมูลบริษัท (ใช้ในรายงาน PDF)
+- **ตั้งค่าที่จัดเก็บไฟล์เอกสาร** -- เลือกไดรฟ์/โฟลเดอร์สำหรับจัดเก็บเอกสารอัปโหลด
+- ประวัติเวอร์ชัน (Changelog)
 
 ### สัญญา (Contracts)
 - สร้าง/แก้ไข/ลบ สัญญา
@@ -138,12 +141,23 @@
 - เชื่อมกับโครงการและลูกค้า
 - บันทึกวันที่เริ่ม/สิ้นสุด/เซ็นสัญญา
 
+### ใบเสนอราคา (Quotations)
+- สร้าง/แก้ไข/ลบ ใบเสนอราคา
+- สถานะ: ร่าง, ส่งแล้ว, อนุมัติ, ปฏิเสธ, หมดอายุ
+- รายการสินค้า/บริการ พร้อมจำนวน หน่วย ราคาต่อหน่วย
+- คำนวณภาษีอัตโนมัติ (subtotal + tax = total)
+- เชื่อมกับลูกค้าและโครงการ
+- ค้นหาจากเลขที่ใบเสนอราคา/ชื่อลูกค้า
+
 ### ระบบบัญชี (Accounting)
 - **หมวดหมู่บัญชี** -- รายรับ/รายจ่าย พร้อมไอคอน
 - **บันทึกรายรับ-รายจ่าย** -- ผูกกับโครงการ (ไม่บังคับ)
 - **งวดชำระ** -- สร้างงวดจากสัญญา, ชำระเต็ม/บางส่วน, สถานะอัตโนมัติ
+- **ชำระงวด → สร้างธุรกรรม income อัตโนมัติ** พร้อม categorize หมวดหมู่
 - **สรุปการเงิน** -- รายรับรวม, รายจ่ายรวม, กำไร, ยอดค้างชำระ
 - กรองตามวันที่, โครงการ, หมวดหมู่
+- **ฟิลเตอร์** -- เลือกโครงการ/ประเภท/วันที่
+- **ส่งออก CSV** -- ส่งออกข้อมูลบัญชีเป็นไฟล์ CSV
 - งวดชำระ partial payment (ชำระบางส่วน → สถานะ "ชำระบางส่วน")
 - ป้องกันลบงวดที่มี transaction เชื่อมอยู่
 
@@ -191,6 +205,9 @@ docker compose -f docker-compose.production.yml up -d
 ### Database
 ระบบใช้ **SQLite** ไม่ต้องติดตั้ง PostgreSQL
 ไฟล์ฐานข้อมูล: `backend/solar_dashboard.db`
+- เปิด WAL mode สำหรับ concurrent read/write
+- PRAGMA synchronous=NORMAL, busy_timeout=5000, cache_size=64MB
+- รองรับ transaction (BEGIN/COMMIT/ROLLBACK)
 
 ## ข้อมูลเข้าสู่ระบบทดลอง
 
@@ -235,6 +252,7 @@ Dashboard/
 │   │   │   ├── checkpoints.js   # Checkpoint CRUD + Approve + Logs
 │   │   │   ├── backup.js        # Database backup/restore (Admin)
 │   │   │   ├── contracts.js     # Contracts CRUD
+│   │   │   ├── quotations.js    # Quotations CRUD + Items
 │   │   │   ├── accounting.js    # Categories + Transactions + Installments
 │   │   │   ├── portal.js        # Customer portal (read-only)
 │   │   │   └── settings.js      # Company settings
@@ -373,7 +391,7 @@ Dashboard/
 - `GET /api/documents` - รายการเอกสาร
 - `GET /api/documents/project/:id` - เอกสารตามโครงการ
 - `POST /api/documents` - เพิ่มเอกสาร (file upload)
-- `GET /api/documents/download/:id` - ดาวน์โหลดไฟล์
+- `GET /api/documents/download/:id` - ดาวน์โหลดไฟล์ (ใช้ axios + auth header)
 - `DELETE /api/documents/:id` - ลบเอกสาร (Admin)
 
 ### Customers
@@ -433,6 +451,15 @@ Dashboard/
 - `PUT /api/contracts/:id` - อัปเดต
 - `DELETE /api/contracts/:id` - ลบ
 
+### Quotations
+- `GET /api/quotations` - รายการใบเสนอราคา (pagination + search)
+- `GET /api/quotations/:id` - รายละเอียด + รายการสินค้า
+- `POST /api/quotations` - สร้างใบเสนอราคา
+- `PUT /api/quotations/:id` - อัปเดต
+- `PUT /api/quotations/:id/items` - อัปเดตรายการสินค้า (replace all)
+- `PUT /api/quotations/:id/status` - เปลี่ยนสถานะ
+- `DELETE /api/quotations/:id` - ลบ
+
 ### Accounting
 - `GET /api/accounting/categories` - หมวดหมู่บัญชี
 - `POST /api/accounting/categories` - สร้างหมวดหมู่
@@ -448,6 +475,7 @@ Dashboard/
 - `DELETE /api/accounting/installments/:id` - ลบ
 - `GET /api/accounting/project/:id/summary` - สรุปการเงินรายโครงการ
 - `GET /api/accounting/company/summary` - สรุปการเงินบริษัท
+- `GET /api/accounting/export` - ส่งออกข้อมูลบัญชี (JSON + CSV)
 
 ### Customer Portal
 - `GET /api/portal/summary` - สรุปข้อมูลลูกค้า

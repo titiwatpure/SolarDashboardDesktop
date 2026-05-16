@@ -24,6 +24,7 @@ const ProjectReport = lazy(() => import('./pages/ProjectReport'));
 const Contracts = lazy(() => import('./pages/Contracts'));
 const CustomerPortal = lazy(() => import('./pages/CustomerPortal'));
 const Accounting = lazy(() => import('./pages/Accounting'));
+const Quotations = lazy(() => import('./pages/Quotations'));
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -126,6 +127,7 @@ function AppContent() {
             <Route path="/projects/:id" element={<ProjectDetail />} />
             <Route path="/projects/:id/report" element={<ProjectReport />} />
             <Route path="/contracts" element={<Contracts />} />
+            <Route path="/quotations" element={<Quotations />} />
             <Route path="/portal" element={<CustomerPortal />} />
             <Route path="/accounting" element={<Accounting />} />
           </Routes>

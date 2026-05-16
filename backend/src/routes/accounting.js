@@ -506,16 +506,24 @@ router.post('/installments/:id/pay', authenticateToken, authorizeRole(['admin', 
     const now = new Date().toISOString();
     const transactionId = uuidv4();
 
+    // หาหมวดหมู่รายรับเริ่มต้น (ใช้ "รายรับจากงวดชำระ" หรือหมวดแรก)
+    let incomeCategoryId = null;
+    const catResult = await pool.query(
+      "SELECT id FROM accounting_categories WHERE type = 'income' ORDER BY sort_order ASC, name ASC LIMIT 1"
+    );
+    incomeCategoryId = catResult.rows[0]?.id || null;
+
     // สร้างธุรกรรม income จากการชำระ
     await pool.query(
       `INSERT INTO transactions
          (id, project_id, category_id, type, amount, description,
           transaction_date, reference_type, reference_id,
           payment_method, receipt_number, created_by, created_at, updated_at)
-       VALUES (?, ?, NULL, 'income', ?, ?, ?, 'installment', ?, ?, NULL, ?, ?, ?)`,
+       VALUES (?, ?, ?, 'income', ?, ?, ?, 'installment', ?, ?, NULL, ?, ?, ?)`,
       [
         transactionId,
         existing.project_id,
+        incomeCategoryId,
         Number(paid_amount),
         `ชำระงวดที่ ${existing.installment_number} - ${existing.description || ''}`.trim(),
         paid_date || new Date().toISOString().slice(0, 10),
@@ -696,6 +704,50 @@ router.get('/project/:projectId/summary', authenticateToken, async (req, res) =>
       installments_pending_amount: Number(inst.pending_amount),
       category_breakdown: categoryResult.rows,
       transactions: transactionsResult.rows,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
+// EXPORT
+// ============================================================
+
+// GET /export — ส่งออกข้อมูลบัญชี (JSON)
+router.get('/export', authenticateToken, async (req, res) => {
+  try {
+    const { project_id, type, date_from, date_to } = req.query;
+    let clause = '';
+    const params = [];
+    if (project_id) { clause += ' AND t.project_id = ?'; params.push(project_id); }
+    if (type) { clause += ' AND t.type = ?'; params.push(type); }
+    if (date_from) { clause += ' AND t.transaction_date >= ?'; params.push(date_from); }
+    if (date_to) { clause += ' AND t.transaction_date <= ?'; params.push(date_to); }
+
+    const txResult = await pool.query(
+      `SELECT t.*, ac.name AS category_name, p.project_name
+       FROM transactions t
+       LEFT JOIN accounting_categories ac ON t.category_id = ac.id
+       LEFT JOIN projects p ON t.project_id = p.id
+       WHERE 1=1${clause}
+       ORDER BY t.transaction_date DESC`,
+      params
+    );
+
+    const instResult = await pool.query(
+      `SELECT pi.*, ct.contract_number, p.project_name
+       FROM payment_installments pi
+       LEFT JOIN contracts ct ON pi.contract_id = ct.id
+       LEFT JOIN projects p ON pi.project_id = p.id
+       ORDER BY pi.due_date ASC`
+    );
+
+    res.json({
+      transactions: txResult.rows,
+      installments: instResult.rows,
+      exported_at: new Date().toISOString(),
     });
   } catch (error) {
     console.error(error);

@@ -9,21 +9,34 @@ const { logActivity } = require('./activity_logs');
 
 const router = express.Router();
 
-// สร้าง uploads directory ถ้ายังไม่มี
-const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+const defaultUploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
+
+// ดึงที่เก็บไฟล์จาก company_settings (fallback ไปใช้ default)
+async function getUploadsDir() {
+  try {
+    const result = await pool.query("SELECT value FROM company_settings WHERE key = 'storage_path'");
+    const customPath = result.rows[0]?.value;
+    if (customPath && customPath.trim()) {
+      const dir = customPath.trim();
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      return dir;
+    }
+  } catch {}
+  if (!fs.existsSync(defaultUploadsDir)) fs.mkdirSync(defaultUploadsDir, { recursive: true });
+  return defaultUploadsDir;
 }
 
 // ตั้งค่า multer storage
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // สร้าง subdirectory ตาม project_id
-    const projectDir = path.join(uploadsDir, req.body.project_id || 'general');
-    if (!fs.existsSync(projectDir)) {
-      fs.mkdirSync(projectDir, { recursive: true });
+  destination: async (req, file, cb) => {
+    try {
+      const uploadsDir = await getUploadsDir();
+      const projectDir = path.join(uploadsDir, req.body.project_id || 'general');
+      if (!fs.existsSync(projectDir)) fs.mkdirSync(projectDir, { recursive: true });
+      cb(null, projectDir);
+    } catch (err) {
+      cb(err);
     }
-    cb(null, projectDir);
   },
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
@@ -131,6 +144,7 @@ router.get('/download/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบไฟล์' });
     }
 
+    const uploadsDir = await getUploadsDir();
     const filePath = path.resolve(uploadsDir, document.file_path);
     if (!filePath.startsWith(path.resolve(uploadsDir))) {
       return res.status(403).json({ error: 'ไม่อนุญาต' });
@@ -223,6 +237,7 @@ router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, r
 
     // ลบไฟล์จริงถ้ามี
     if (existingDocument.file_path) {
+      const uploadsDir = await getUploadsDir();
       const filePath = path.join(uploadsDir, existingDocument.file_path);
       if (fs.existsSync(filePath)) {
         try { fs.unlinkSync(filePath); } catch {}

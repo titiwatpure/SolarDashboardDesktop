@@ -396,15 +396,13 @@ export default function Documents() {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-1">
                       {document.file_path && (
-                        <a
-                          href={documentsAPI.getDownloadUrl(document.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => documentsAPI.download(document.id, document.document_name)}
                           className="rounded-full p-2 text-blue-500 transition-colors hover:bg-blue-50"
                           title="ดาวน์โหลด"
                         >
                           <Download size={16} />
-                        </a>
+                        </button>
                       )}
                       <button
                         onClick={() => handleDelete(document.id)}

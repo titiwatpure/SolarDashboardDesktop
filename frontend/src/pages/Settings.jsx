@@ -576,6 +576,18 @@ export default function Settings() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">ที่จัดเก็บไฟล์เอกสาร</label>
+              <input
+                type="text"
+                value={company.companyForm.storage_path || ''}
+                onChange={(e) => company.setCompanyForm((p) => ({ ...p, storage_path: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+                placeholder="เช่น D:\Documents\Solar หรือ \\NAS\share\solar (ว่าง = ใช้ค่าเริ่มต้น)"
+              />
+              <p className="mt-1 text-xs text-slate-400">กำหนดไดรฟ์หรือโฟลเดอร์สำหรับจัดเก็บเอกสารอัปโหลด (ว่าง = ใช้โฟลเดอร์ uploads ในโปรเจกต์)</p>
+            </div>
+
             <button
               onClick={company.handleSaveCompany}
               disabled={company.companyLoading}
@@ -917,6 +929,25 @@ export default function Settings() {
 }
 
 const CHANGELOG = [
+  {
+    version: '1.0.5',
+    date: '2026-05-16',
+    changes: [
+      'เพิ่มเมนู "ใบเสนอราคา" ใน Sidebar (โค้ดมีอยู่แล้วแต่ไม่ได้เชื่อม)',
+      'เพิ่ม route /quotations ใน App Router',
+      'เปิด SQLite WAL mode + performance PRAGMAs (เร็วขึ้น 2-3x)',
+      'แก้ schema mismatch: เพิ่ม 10 columns ที่หายไปใน projects table',
+      'แก้ phantom index: เพิ่ม user_id column ใน customers table',
+      'เพิ่ม transaction support ใน database.js (BEGIN/COMMIT/ROLLBACK)',
+      'แก้ query routing รองรับ CTE (WITH ... SELECT)',
+      'แก้ดาวน์โหลดเอกสารไม่ได้ (ใช้ axios + auth header)',
+      'แก้งวดชำระชำระแล้วไม่อัปเดตหน้าบัญชีโครงการ',
+      'เพิ่มปุ่มส่งออกข้อมูลบัญชีเป็น CSV',
+      'เพิ่มฟิลเตอร์บัญชี (โครงการ/ประเภท/วันที่)',
+      'เพิ่มตั้งค่าที่จัดเก็บไฟล์เอกสาร (เลือกไดรฟ์/โฟลเดอร์)',
+      'แก้ไขบันทึกชำระไม่ categorize หมวดหมู่อัตโนมัติ',
+    ],
+  },
   {
     version: '1.0.4',
     date: '2026-05-15',

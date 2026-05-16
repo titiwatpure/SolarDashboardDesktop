@@ -8,8 +8,11 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.error('Failed to open SQLite database:', err.message);
   } else {
     console.log('Connected to SQLite:', dbPath);
-    // C-1: เปิดใช้ Foreign Keys — SQLite ปิดโดย default
     db.run('PRAGMA foreign_keys = ON');
+    db.run('PRAGMA journal_mode = WAL');
+    db.run('PRAGMA synchronous = NORMAL');
+    db.run('PRAGMA busy_timeout = 5000');
+    db.run('PRAGMA cache_size = -64000');
   }
 });
 
@@ -21,37 +24,52 @@ process.on('SIGINT', () => {
   });
 });
 
-// จำลอง interface pool.query() สำหรับ SQLite
-// ใช้ ? เป็น placeholder ตรงตาม SQLite ปกติ
+const isReadQuery = (sql) => /^\s*(SELECT|WITH|PRAGMA)\b/i.test(sql);
+
 const pool = {
   query: (sql, params = []) =>
     new Promise((resolve, reject) => {
-      if (/^\s*SELECT\b/i.test(sql)) {
+      if (isReadQuery(sql)) {
         db.all(sql, params, (err, rows) => {
-          if (err) {
-            console.error('Query Error:', err);
-            reject(err);
-            return;
-          }
+          if (err) { console.error('Query Error:', err); reject(err); return; }
           resolve({ rows: rows || [], rowCount: rows?.length || 0 });
         });
         return;
       }
 
       db.run(sql, params, function onRun(err) {
-        if (err) {
-          console.error('Query Error:', err);
-          reject(err);
-          return;
-        }
-        resolve({
-          rows: [],
-          rowCount: this.changes || 0,
-          changes: this.changes || 0,
-          lastID: this.lastID
-        });
+        if (err) { console.error('Query Error:', err); reject(err); return; }
+        resolve({ rows: [], rowCount: this.changes || 0, changes: this.changes || 0, lastID: this.lastID });
       });
-    })
+    }),
+
+  run: (sql, params = []) =>
+    new Promise((resolve, reject) => {
+      db.run(sql, params, function onRun(err) {
+        if (err) { reject(err); return; }
+        resolve({ changes: this.changes || 0, lastID: this.lastID });
+      });
+    }),
+
+  exec: (sql) =>
+    new Promise((resolve, reject) => {
+      db.exec(sql, (err) => {
+        if (err) { reject(err); return; }
+        resolve();
+      });
+    }),
+
+  transaction: async (fn) => {
+    await pool.run('BEGIN');
+    try {
+      const result = await fn(pool);
+      await pool.run('COMMIT');
+      return result;
+    } catch (err) {
+      await pool.run('ROLLBACK').catch(() => {});
+      throw err;
+    }
+  }
 };
 
 module.exports = pool;

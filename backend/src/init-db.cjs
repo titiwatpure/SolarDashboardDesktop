@@ -55,6 +55,16 @@ const initDB = async () => {
       blocked_by TEXT,
       risk_level TEXT DEFAULT 'low',
       risk_factors TEXT DEFAULT '{}',
+      customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
+      site_address TEXT,
+      site_lat REAL,
+      site_lng REAL,
+      grid_station TEXT,
+      grid_voltage TEXT,
+      contract_number TEXT,
+      contract_value REAL,
+      contract_date TEXT,
+      budget REAL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );`,
@@ -230,6 +240,7 @@ const initDB = async () => {
       tax_id TEXT,
       address TEXT,
       notes TEXT,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );`,
 

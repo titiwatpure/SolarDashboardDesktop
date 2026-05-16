@@ -56,7 +56,7 @@ export function useProfileEdit(user, refreshUser) {
 
 export function useCompanySettings(isAdmin) {
   const [companyForm, setCompanyForm] = useState({
-    company_name: '', address: '', phone: '', email: '', tax_id: '', logo_url: ''
+    company_name: '', address: '', phone: '', email: '', tax_id: '', logo_url: '', storage_path: ''
   });
   const [companyLoading, setCompanyLoading] = useState(false);
   const [companyMessage, setCompanyMessage] = useState({ type: '', text: '' });
@@ -73,6 +73,7 @@ export function useCompanySettings(isAdmin) {
           email: data.email || '',
           tax_id: data.tax_id || '',
           logo_url: data.logo_url || '',
+          storage_path: data.storage_path || '',
         });
       } catch (err) {
         console.error('Failed to load company settings:', err);

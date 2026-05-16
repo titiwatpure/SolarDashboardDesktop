@@ -26,6 +26,8 @@ import {
   CreditCard,
   CalendarClock,
   CheckCircle2,
+  Download,
+  Filter,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { accountingAPI, projectsAPI } from '../utils/api';
@@ -127,7 +129,12 @@ export default function Accounting() {
   /* ---- hooks ---- */
   const overview = useAccountingOverview();
   const projectAcc = useProjectAccounting(selectedProjectId);
-  const installmentAcc = useInstallments();
+  const installmentAcc = useInstallments({
+    onPaymentSuccess: (projectId) => {
+      if (projectId) projectAcc.loadProjectSummary(projectId);
+      overview.loadCompanySummary();
+    },
+  });
 
   /* ---- bulk installment state (not in hook) ---- */
   const [showBulkInstModal, setShowBulkInstModal] = useState(false);
@@ -137,6 +144,55 @@ export default function Accounting() {
   const [bulkRows, setBulkRows] = useState([emptyBulkRow()]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState('');
+
+  /* ---- export state ---- */
+  const [exporting, setExporting] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
+  const [exportDateFrom, setExportDateFrom] = useState('');
+  const [exportDateTo, setExportDateTo] = useState('');
+  const [exportProject, setExportProject] = useState('');
+  const [exportType, setExportType] = useState('');
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = {};
+      if (exportProject) params.project_id = exportProject;
+      if (exportType && exportType !== 'all') params.type = exportType;
+      if (exportDateFrom) params.date_from = exportDateFrom;
+      if (exportDateTo) params.date_to = exportDateTo;
+      const data = await accountingAPI.export(params);
+
+      // Export transactions CSV
+      const txHeaders = ['วันที่', 'ประเภท', 'หมวดหมู่', 'โครงการ', 'จำนวนเงิน', 'รายละเอียด', 'วิธีชำระ', 'เลขที่ใบเสร็จ'];
+      const txRows = (data.transactions || []).map(t => [
+        t.transaction_date || '',
+        t.type === 'income' ? 'รายรับ' : 'รายจ่าย',
+        t.category_name || '',
+        t.project_name || '',
+        t.amount || 0,
+        t.description || '',
+        t.payment_method || '',
+        t.receipt_number || '',
+      ]);
+      const csv = [txHeaders, ...txRows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const BOM = '﻿';
+      const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `accounting_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('ส่งออกไม่สำเร็จ');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   /* ============================================================ */
   /* DATA LOADING                                                  */
@@ -272,7 +328,63 @@ export default function Accounting() {
               </p>
             </div>
           </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilter(!showFilter)}
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <Filter size={16} />
+              ฟิลเตอร์
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <Download size={16} />
+              {exporting ? 'กำลังส่งออก...' : 'ส่งออก CSV'}
+            </button>
+          </div>
         </div>
+
+        {/* Filter panel */}
+        {showFilter && (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <select
+                value={exportProject}
+                onChange={(e) => setExportProject(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+              >
+                <option value="">ทุกโครงการ</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+              </select>
+              <select
+                value={exportType}
+                onChange={(e) => setExportType(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+              >
+                <option value="all">ทุกประเภท</option>
+                <option value="income">รายรับ</option>
+                <option value="expense">รายจ่าย</option>
+              </select>
+              <input
+                type="date"
+                value={exportDateFrom}
+                onChange={(e) => setExportDateFrom(e.target.value)}
+                placeholder="จากวันที่"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+              />
+              <input
+                type="date"
+                value={exportDateTo}
+                onChange={(e) => setExportDateTo(e.target.value)}
+                placeholder="ถึงวันที่"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Tab pills */}
         <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-5">

@@ -228,7 +228,7 @@ export function useProjectAccounting(projectId) {
   };
 }
 
-export function useInstallments() {
+export function useInstallments({ onPaymentSuccess } = {}) {
   const [installments, setInstallments] = useState([]);
   const [installmentsLoading, setInstallmentsLoading] = useState(false);
   const [instStatusFilter, setInstStatusFilter] = useState('');
@@ -312,6 +312,7 @@ export function useInstallments() {
       });
       setShowPayModal(false);
       loadInstallments();
+      if (onPaymentSuccess) onPaymentSuccess(payTarget.project_id);
     } catch (err) {
       setPayError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึกชำระ');
     } finally {

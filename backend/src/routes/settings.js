@@ -23,7 +23,7 @@ router.get('/company', authenticateToken, async (req, res) => {
 // PUT /api/settings/company — อัปเดตข้อมูลบริษัท (Admin only)
 router.put('/company', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
-    const allowedKeys = ['company_name', 'address', 'phone', 'email', 'tax_id', 'logo_url'];
+    const allowedKeys = ['company_name', 'address', 'phone', 'email', 'tax_id', 'logo_url', 'storage_path'];
     const updates = req.body;
 
     for (const key of allowedKeys) {

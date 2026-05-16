@@ -16,7 +16,8 @@ import {
   Zap,
   ShieldCheck,
   LayoutGrid,
-  Wallet
+  Wallet,
+  Receipt
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -29,6 +30,7 @@ const allMenuItems = [
   { id: 'steps', label: 'ปฏิบัติงาน', icon: CheckSquare, path: '/steps', roles: ['admin', 'engineer', 'staff'] },
   { id: 'customers', label: 'ลูกค้า', icon: UserCircle, path: '/customers', roles: ['admin', 'engineer', 'staff'] },
 { id: 'contracts', label: 'สัญญา', icon: ShieldCheck, path: '/contracts', roles: ['admin', 'engineer'] },
+  { id: 'quotations', label: 'ใบเสนอราคา', icon: Receipt, path: '/quotations', roles: ['admin', 'engineer'] },
   { id: 'accounting', label: 'บัญชี', icon: Wallet, path: '/accounting', roles: ['admin', 'engineer'] },
   { id: 'organizations', label: 'หน่วยงาน', icon: Building2, path: '/organizations', roles: ['admin', 'engineer', 'staff'] },
   { id: 'documents', label: 'เอกสาร', icon: FileText, path: '/documents', roles: ['admin', 'engineer', 'staff'] },
