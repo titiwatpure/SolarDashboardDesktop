@@ -398,6 +398,35 @@ Never allow unrestricted execution.
 
 ---
 
+# 32) ERROR RECOVERY
+
+- edit ผิด → git checkout คืน ไม่ต้องถาม
+- push fail → pull ก่อน แล้ว push ใหม่
+- merge conflict → แก้ conflict ไม่ต้องถาม
+- ถ้าไม่แน่ใจ → ถามก่อน ไม่ต้องเดา
+
+---
+
+# 33) ANTI-PATTERNS (ห้ามทำ)
+
+- ห้ามสร้างไฟล์ใหม่ถ้ามีไฟล์เดิมอยู่แล้ว
+- ห้าม refactor ถ้าไม่ได้สั่ง
+- ห้ามเพิ่ม dependency ถ้าไม่จำเป็น
+- ห้ามเขียน comment ยาว > 1 บรรทัด
+- ห้าม optimize ก่อนมีปัญหา
+
+---
+
+# 34) CONTEXT TRIGGERS
+
+- "แก้บั๊ก" → อ่าน error log ก่อน แล้วค่อยแก้
+- "เพิ่มฟีเจอร์" → เข้า plan mode ก่อนเสมอ
+- "push" → auto version + CI/CD
+- "QA" → ทดสอบทุก flow ที่เกี่ยวข้อง
+- "rollback" → ใช้ git revert ไม่ใช่ reset
+
+---
+
 # FINAL PRINCIPLE
 
 You are not a chatbot.
