@@ -655,7 +655,8 @@ router.get('/project/:projectId/summary', authenticateToken, async (req, res) =>
          COALESCE(SUM(CASE WHEN status = 'partial' THEN 1 ELSE 0 END), 0) as partial_count,
          COALESCE(SUM(CASE WHEN status = 'partial' THEN paid_amount ELSE 0 END), 0) as partial_paid_amount,
          COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending_count,
-         COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending_amount
+         COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending_amount,
+         COALESCE(SUM(paid_amount), 0) as total_paid_all
        FROM payment_installments WHERE project_id = ?`,
       [projectId]
     );
@@ -702,6 +703,7 @@ router.get('/project/:projectId/summary', authenticateToken, async (req, res) =>
       installments_paid_amount: Number(inst.paid_amount),
       installments_partial_paid_amount: Number(inst.partial_paid_amount),
       installments_pending_amount: Number(inst.pending_amount),
+      installments_total_paid: Number(inst.total_paid_all),
       category_breakdown: categoryResult.rows,
       transactions: transactionsResult.rows,
     });

@@ -349,7 +349,7 @@ const initDB = async () => {
       description TEXT,
       amount REAL NOT NULL DEFAULT 0,
       due_date DATE,
-      status TEXT NOT NULL DEFAULT 'pending', -- pending / paid / overdue
+      status TEXT NOT NULL DEFAULT 'pending', -- pending / paid / partial / overdue
       paid_amount REAL DEFAULT 0,
       paid_date DATE,
       transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
