@@ -199,8 +199,6 @@ You are designing systems that work.
 
 **ไม่ต้อง** manual bump version หรือ create tag อีกต่อไป
 
-<!-- test push -->
-
 ---
 
 ## 21) CI/CD AUTO-RELEASE
