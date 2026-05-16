@@ -198,3 +198,16 @@ You are designing systems that work.
 4. Publish release → Electron auto-updater push ให้ผู้ใช้ทันที
 
 **ไม่ต้อง** manual bump version หรือ create tag อีกต่อไป
+
+<!-- test push -->
+
+---
+
+## 21) CI/CD AUTO-RELEASE
+ทุกครั้งที่ push ไป `electron` branch — GitHub Actions จะ:
+1. Auto bump version ใน `package.json` (patch +1)
+2. Commit + Tag (`v*`)
+3. Build Electron app
+4. Publish release → Electron auto-updater push ให้ผู้ใช้ทันที
+
+**ไม่ต้อง** manual bump version หรือ create tag อีกต่อไป
