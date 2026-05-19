@@ -16,6 +16,30 @@ const { autoUpdater } = require('electron-updater');
 // IPC: expose app version to renderer
 ipcMain.handle('get-app-version', () => app.getVersion());
 
+// IPC: folder picker
+ipcMain.handle('select-folder', async (_event, options = {}) => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+    defaultPath: options.defaultPath || undefined,
+    title: options.title || 'เลือกโฟลเดอร์',
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+// IPC: save file dialog
+ipcMain.handle('save-file', async (_event, options = {}) => {
+  const result = await dialog.showSaveDialog({
+    defaultPath: options.defaultPath || 'document',
+    title: options.title || 'บันทึกไฟล์',
+  });
+  return result.canceled ? null : result.filePath;
+});
+
+// IPC: open path in file explorer
+ipcMain.handle('open-path', async (_event, filePath) => {
+  await shell.openPath(filePath);
+});
+
 // ──────────────────────────────────────────────
 // 1. Resolve all data paths to userData
 // ──────────────────────────────────────────────

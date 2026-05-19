@@ -31,16 +31,38 @@ const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       const uploadsDir = await getUploadsDir();
-      const projectDir = path.join(uploadsDir, req.body.project_id || 'general');
+      let folderName = req.body.project_id || 'general';
+      if (req.body.project_id) {
+        try {
+          const proj = await pool.query('SELECT project_name, project_code FROM projects WHERE id = ?', [req.body.project_id]);
+          if (proj.rows[0]) {
+            folderName = sanitizeFolderName(proj.rows[0].project_name, proj.rows[0].project_code);
+          }
+        } catch {}
+      }
+      const projectDir = path.join(uploadsDir, folderName);
       if (!fs.existsSync(projectDir)) fs.mkdirSync(projectDir, { recursive: true });
+      req._uploadDir = projectDir;
       cb(null, projectDir);
     } catch (err) {
       cb(err);
     }
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
+    const ext = path.extname(file.originalname);
+    let base = path.basename(file.originalname, ext)
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/[\s.]+$/g, '')
+      .trim();
+    if (!base) base = 'file';
+    if (base.length > 200) base = base.substring(0, 200);
+    let finalName = `${base}${ext}`;
+    let counter = 1;
+    while (req._uploadDir && fs.existsSync(path.join(req._uploadDir, finalName))) {
+      finalName = `${base}_${counter}${ext}`;
+      counter++;
+    }
+    cb(null, finalName);
   }
 });
 
@@ -77,29 +99,59 @@ const upload = multer({
   }
 });
 
+function sanitizeFolderName(projectName, projectCode) {
+  let safe = projectName.replace(/[\\/:*?"<>|]/g, '_').replace(/[\s.]+$/g, '').trim();
+  if (!safe) safe = 'project';
+  if (safe.length > 100) safe = safe.substring(0, 100);
+  return `${safe}_${projectCode}`;
+}
+
 const getDocumentById = async (id) => {
   const result = await pool.query('SELECT * FROM documents WHERE id = ?', [id]);
   return result.rows[0] || null;
 };
 
-// GET /api/documents — ดึงเอกสารทั้งหมด (paginated)
+// GET /api/documents/summary — สรุปจำนวนเอกสารตามโครงการ
+router.get('/summary', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT d.project_id, p.project_name, p.project_code, COUNT(*) as count
+       FROM documents d
+       LEFT JOIN projects p ON d.project_id = p.id
+       GROUP BY d.project_id
+       ORDER BY count DESC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// GET /api/documents — ดึงเอกสารทั้งหมด (paginated, filter ตาม project_id ได้)
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
     const offset = (page - 1) * limit;
+    const projectId = req.query.project_id;
+
+    const where = projectId ? 'WHERE d.project_id = ?' : '';
+    const params = projectId ? [projectId, limit, offset] : [limit, offset];
+    const countParams = projectId ? [projectId] : [];
 
     const result = await pool.query(
       `SELECT d.*, p.project_name, u.full_name as uploaded_by_name
        FROM documents d
        LEFT JOIN projects p ON d.project_id = p.id
        LEFT JOIN users u ON d.upload_by = u.id
+       ${where}
        ORDER BY d.uploaded_at DESC
        LIMIT ? OFFSET ?`,
-      [limit, offset]
+      params
     );
 
-    const countResult = await pool.query('SELECT COUNT(*) as count FROM documents');
+    const countResult = await pool.query(`SELECT COUNT(*) as count FROM documents d ${where}`, countParams);
     const total = parseInt(countResult.rows[0]?.count || '0', 10);
 
     res.json({
@@ -180,6 +232,11 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'ข้อมูลเอกสารไม่ครบถ้วน' });
     }
 
+    if (document_name.length > 500) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'ชื่อเอกสารยาวเกินไป (สูงสุด 500 ตัวอักษร)' });
+    }
+
     const validDocTypes = ['sld', 'permit', 'test_report', 'other'];
     if (!validDocTypes.includes(document_type)) {
       if (req.file) {
@@ -204,7 +261,12 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
     let fileSize = null;
 
     if (req.file) {
-      filePath = path.join(project_id, req.file.filename).replace(/\\/g, '/');
+      const proj = await pool.query('SELECT project_name, project_code FROM projects WHERE id = ?', [project_id]);
+      let folderName = project_id;
+      if (proj.rows[0]) {
+        folderName = sanitizeFolderName(proj.rows[0].project_name, proj.rows[0].project_code);
+      }
+      filePath = path.join(folderName, req.file.filename).replace(/\\/g, '/');
       fileSize = req.file.size;
     }
 
@@ -247,6 +309,33 @@ router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, r
     await pool.query('DELETE FROM documents WHERE id = ?', [req.params.id]);
     logActivity(req.user.id, 'delete', 'document', req.params.id, { document_name: existingDocument.document_name });
     res.json({ message: 'ลบเอกสารสำเร็จ' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// POST /api/documents/download-to — ดาวน์โหลดไฟล์ไปยัง path ที่ระบุ (สำหรับ Electron)
+router.post('/download-to', authenticateToken, async (req, res) => {
+  try {
+    const { document_id, save_path } = req.body;
+    if (!document_id || !save_path) {
+      return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
+    }
+    const document = await getDocumentById(document_id);
+    if (!document || !document.file_path) {
+      return res.status(404).json({ error: 'ไม่พบไฟล์' });
+    }
+    const uploadsDir = await getUploadsDir();
+    const filePath = path.resolve(uploadsDir, document.file_path);
+    if (!filePath.startsWith(path.resolve(uploadsDir)) || !fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'ไฟล์ไม่อยู่ในระบบ' });
+    }
+    fs.copyFileSync(filePath, save_path);
+    logActivity(req.user.id, 'download', 'document', document_id, {
+      document_name: document.document_name, project_id: document.project_id,
+    }, req.ip || req.socket?.remoteAddress);
+    res.json({ success: true, path: save_path });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

@@ -1,4 +1,4 @@
-import { FileCog, FileText, FileUp, FolderOpen, Trash2, Download, Upload } from 'lucide-react';
+import { FileText, FileUp, FolderOpen, Trash2, Download, Upload } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { documentsAPI, projectsAPI } from '../utils/api';
 import { DOCUMENT_TYPES } from '../utils/constants';
@@ -35,16 +35,25 @@ export default function Documents() {
     file_size: '',
     description: ''
   });
+  const [filterProject, setFilterProject] = useState('');
+  const [projectSummary, setProjectSummary] = useState([]);
 
   useEffect(() => {
     loadPageData();
+    documentsAPI.getSummary().then(setProjectSummary).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadPageData(1);
+  }, [filterProject]);
 
   const loadPageData = async (page = 1) => {
     try {
       setLoading(true);
+      const params = { page, limit: 20 };
+      if (filterProject) params.project_id = filterProject;
       const [documentResult, projectResponse] = await Promise.all([
-        documentsAPI.getAll({ page, limit: 20 }),
+        documentsAPI.getAll(params),
         projectsAPI.getAll({ page: 1, limit: 1000 })
       ]);
 
@@ -74,13 +83,13 @@ export default function Documents() {
       setSaving(true);
 
       if (selectedFile) {
-        // ส่งไฟล์จริงผ่าน FormData
+        // ส่ง field ปกติก่อน แล้วค่อยส่ง file (multer parse ตามลำดับ)
         const formDataObj = new FormData();
-        formDataObj.append('file', selectedFile);
         formDataObj.append('project_id', formData.project_id);
         formDataObj.append('document_name', formData.document_name || selectedFile.name);
         formDataObj.append('document_type', formData.document_type);
         formDataObj.append('description', formData.description);
+        formDataObj.append('file', selectedFile);
 
         await documentsAPI.upload(formDataObj);
       } else {
@@ -102,6 +111,7 @@ export default function Documents() {
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       loadPageData();
+      documentsAPI.getSummary().then(setProjectSummary).catch(() => {});
     } catch (error) {
       console.error('Failed to create document:', error);
       alert(error.response?.data?.error || 'บันทึกเอกสารไม่สำเร็จ');
@@ -153,15 +163,11 @@ export default function Documents() {
     try {
       await documentsAPI.delete(id);
       loadPageData();
+      documentsAPI.getSummary().then(setProjectSummary).catch(() => {});
     } catch (error) {
       console.error('Failed to delete document:', error);
     }
   };
-
-  const summaryByType = Object.keys(DOCUMENT_TYPES).reduce((acc, key) => {
-    acc[key] = documents.filter((document) => document.document_type === key).length;
-    return acc;
-  }, {});
 
   return (
     <div className="space-y-6">
@@ -323,42 +329,60 @@ export default function Documents() {
         <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-              <FileCog size={20} />
+              <FolderOpen size={20} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">สรุปตามประเภทเอกสาร</h2>
-              <p className="text-sm text-slate-500">นับจำนวนเอกสารในแต่ละหมวดเพื่อดูภาพรวมอย่างรวดเร็ว</p>
+              <h2 className="text-xl font-bold text-slate-900">เอกสารตามโครงการ</h2>
+              <p className="text-sm text-slate-500">คลิกเพื่อกรองเอกสารของโครงการนั้น</p>
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
-            {Object.entries(DOCUMENT_TYPES).map(([key, label]) => (
-              <div key={key} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1 max-h-[420px] overflow-y-auto pr-1">
+            {projectSummary.length === 0 && (
+              <p className="text-sm text-slate-400 text-center py-4">ยังไม่มีเอกสาร</p>
+            )}
+            {projectSummary.map((item) => (
+              <button
+                key={item.project_id}
+                onClick={() => setFilterProject(filterProject === item.project_id ? '' : item.project_id)}
+                className={`w-full text-left rounded-2xl border p-4 transition ${
+                  filterProject === item.project_id
+                    ? 'border-blue-400 bg-blue-50'
+                    : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                }`}
+              >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
-                      <FileText size={18} />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-900">{label}</p>
-                      <p className="text-sm text-slate-500">จำนวนไฟล์ในระบบ</p>
-                    </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 truncate">{item.project_name || 'ไม่ระบุโครงการ'}</p>
+                    <p className="text-xs text-slate-500">{item.project_code}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-slate-900">{summaryByType[key] || 0}</p>
+                  <div className="shrink-0 ml-3 text-right">
+                    <p className="text-2xl font-bold text-slate-900">{item.count}</p>
                     <p className="text-xs text-slate-500">ไฟล์</p>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>
       </section>
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-slate-900">รายการเอกสาร</h2>
-          <p className="mt-1 text-sm text-slate-500">เอกสารที่ถูกเพิ่มเข้าสู่ระบบล่าสุด พร้อมรายละเอียดโครงการที่เกี่ยวข้อง</p>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">รายการเอกสาร</h2>
+            <p className="mt-1 text-sm text-slate-500">เอกสารที่ถูกเพิ่มเข้าสู่ระบบล่าสุด พร้อมรายละเอียดโครงการที่เกี่ยวข้อง</p>
+          </div>
+          <select
+            value={filterProject}
+            onChange={(e) => setFilterProject(e.target.value)}
+            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+          >
+            <option value="">ทุกโครงการ</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.project_name}</option>
+            ))}
+          </select>
         </div>
 
         <div className="overflow-x-auto">

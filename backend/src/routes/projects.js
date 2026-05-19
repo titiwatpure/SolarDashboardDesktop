@@ -347,6 +347,24 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// สร้างรหัสโครงการอัตโนมัติ: P6805-001, P6805-002, P6806-001, ...
+async function generateProjectCode() {
+  const now = new Date();
+  const yy = String(now.getFullYear() + 543).slice(-2); // 2 หลักท้าย พ.ศ.
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const prefix = `P${yy}${mm}-%`;
+  const result = await pool.query(
+    "SELECT project_code FROM projects WHERE project_code LIKE ? ORDER BY project_code DESC LIMIT 1",
+    [prefix]
+  );
+  let seq = 1;
+  if (result.rows[0]) {
+    const match = result.rows[0].project_code.match(/-(\d+)$/);
+    if (match) seq = parseInt(match[1], 10) + 1;
+  }
+  return `P${yy}${mm}-${String(seq).padStart(3, '0')}`;
+}
+
 // POST /api/projects
 router.post('/', authenticateToken, authorizePermission('project.create'), async (req, res) => {
   try {
@@ -356,7 +374,7 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
       scope_start, scope_end, expected_cod_date, actual_cod_date,
     } = req.body;
 
-    if (!project_name || !project_code || !size_kw || !province) {
+    if (!project_name || !size_kw || !province) {
       return res.status(400).json({ error: 'ข้อมูลโครงการไม่ครบถ้วน' });
     }
 
@@ -376,8 +394,15 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
       if (userCheck.rows.length === 0) return res.status(400).json({ error: 'ไม่พบผู้รับผิดชอบ' });
     }
 
-    const duplicate = await pool.query('SELECT id FROM projects WHERE project_code = ?', [project_code]);
-    if (duplicate.rows.length > 0) return res.status(400).json({ error: 'รหัสโครงการมีอยู่แล้ว' });
+    // สร้างรหัสโครงการอัตโนมัติ
+    const autoCode = await generateProjectCode();
+    const finalCode = project_code || autoCode;
+
+    // ตรวจซ้ำเฉพาะกรณีที่ user กรอกเอง
+    if (project_code) {
+      const duplicate = await pool.query('SELECT id FROM projects WHERE project_code = ?', [project_code]);
+      if (duplicate.rows.length > 0) return res.status(400).json({ error: 'รหัสโครงการมีอยู่แล้ว' });
+    }
 
     let requiresPermit = false;
     let permitType = null;
@@ -403,7 +428,7 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
         risk_level, risk_factors
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id, project_name, project_code, Number(size_kw),
+        id, project_name, finalCode, Number(size_kw),
         size_kva ? Number(size_kva) : null, province,
         responsible_user || null, description || null,
         has_power_selling ? 1 : 0, requiresPermit ? 1 : 0,
@@ -419,7 +444,7 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
     await createDefaultCheckpoints(id, 'survey', req.user.id);
 
     const project = await getProjectById(id);
-    logActivity(req.user.id, 'create', 'project', id, { project_name, project_code });
+    logActivity(req.user.id, 'create', 'project', id, { project_name, project_code: finalCode });
     res.status(201).json(project);
   } catch (error) {
     console.error(error);

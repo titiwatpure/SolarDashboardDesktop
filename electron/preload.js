@@ -10,4 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeUpdateListener: () => {
     ipcRenderer.removeAllListeners('update-status');
   },
+  selectFolder: (options) => ipcRenderer.invoke('select-folder', options),
+  saveFile: (options) => ipcRenderer.invoke('save-file', options),
+  openPath: (filePath) => ipcRenderer.invoke('open-path', filePath),
 });

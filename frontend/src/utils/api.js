@@ -212,6 +212,7 @@ export const usersAPI = {
 export const documentsAPI = {
   getAll: (params) => apiCall('GET', `/documents?${new URLSearchParams(params || {})}`),
   getByProject: (projectId) => apiCall('GET', `/documents/project/${projectId}`),
+  getSummary: () => apiCall('GET', '/documents/summary'),
   upload: (data) => {
     // ถ้าเป็น FormData (มีไฟล์) ให้ส่งเป็น multipart
     if (data instanceof FormData) {
@@ -228,6 +229,20 @@ export const documentsAPI = {
   delete: (id) => apiCall('DELETE', `/documents/${id}`),
   getDownloadUrl: (id) => `${API_BASE_URL}/documents/download/${id}`,
   download: async (id, filename) => {
+    const isElectron = typeof window !== 'undefined' && window.electronAPI?.isElectron;
+    if (isElectron) {
+      const savePath = await window.electronAPI.saveFile({
+        defaultPath: filename || 'document',
+        title: 'บันทึกเอกสาร',
+      });
+      if (!savePath) return;
+      const token = getToken();
+      await axios.post(`${API_BASE_URL}/documents/download-to`, {
+        document_id: id,
+        save_path: savePath,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      return;
+    }
     const token = getToken();
     const res = await axios.get(`${API_BASE_URL}/documents/download/${id}`, {
       headers: { Authorization: `Bearer ${token}` },

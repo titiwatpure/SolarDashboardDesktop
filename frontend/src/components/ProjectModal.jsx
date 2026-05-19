@@ -5,7 +5,6 @@ import { PROVINCES, STEP_LABELS, STEP_ORDER } from '../utils/constants';
 
 const emptyForm = {
   project_name: '',
-  project_code: '',
   size_kw: '',
   size_kva: '',
   province: '',
@@ -129,10 +128,15 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, projec
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">รหัสโครงการ *</label>
-              <input type="text" name="project_code" value={formData.project_code} onChange={handleChange}
-                required disabled={Boolean(project)}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100" />
+              <label className="block text-sm font-medium text-gray-700 mb-2">รหัสโครงการ</label>
+              {project ? (
+                <input type="text" value={project.project_code} disabled
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-500" />
+              ) : (
+                <p className="px-4 py-2 text-sm text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                  สร้างอัตโนมัติเมื่อบันทึก
+                </p>
+              )}
             </div>
 
             <div>

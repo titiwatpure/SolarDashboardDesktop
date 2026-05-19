@@ -578,13 +578,30 @@ export default function Settings() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">ที่จัดเก็บไฟล์เอกสาร</label>
-              <input
-                type="text"
-                value={company.companyForm.storage_path || ''}
-                onChange={(e) => company.setCompanyForm((p) => ({ ...p, storage_path: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
-                placeholder="เช่น D:\Documents\Solar หรือ \\NAS\share\solar (ว่าง = ใช้ค่าเริ่มต้น)"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={company.companyForm.storage_path || ''}
+                  onChange={(e) => company.setCompanyForm((p) => ({ ...p, storage_path: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+                  placeholder="เช่น D:\Documents\Solar หรือ \\NAS\share\solar (ว่าง = ใช้ค่าเริ่มต้น)"
+                />
+                {typeof window !== 'undefined' && window.electronAPI?.isElectron && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const folder = await window.electronAPI.selectFolder({
+                        title: 'เลือกโฟลเดอร์จัดเก็บเอกสาร',
+                        defaultPath: company.companyForm.storage_path || undefined,
+                      });
+                      if (folder) company.setCompanyForm((p) => ({ ...p, storage_path: folder }));
+                    }}
+                    className="shrink-0 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-600 hover:bg-slate-50"
+                  >
+                    เลือก...
+                  </button>
+                )}
+              </div>
               <p className="mt-1 text-xs text-slate-400">กำหนดไดรฟ์หรือโฟลเดอร์สำหรับจัดเก็บเอกสารอัปโหลด (ว่าง = ใช้โฟลเดอร์ uploads ในโปรเจกต์)</p>
             </div>
 
@@ -930,43 +947,85 @@ export default function Settings() {
 
 const CHANGELOG = [
   {
+    version: '1.0.11',
+    date: '2026-05-19',
+    changes: [
+      'แยกโฟลเดอร์เอกสารตามชื่อโครงการ + รหัส',
+      'เก็บชื่อไฟล์เดิมบนดิสก์ (ไม่ใช้ UUID) + จัดการชื่อซ้ำ',
+      'ดาวน์โหลดไฟล์ผ่าน native save dialog ใน Electron',
+      'เพิ่มปุ่มเลือกโฟลเดอร์จัดเก็บในหน้าตั้งค่า',
+      'กรองเอกสารตามโครงการ + การ์ดสรุปตามโครงการ',
+      'สร้างรหัสโครงการอัตโนมัติ (P6905-001)',
+    ],
+  },
+  {
+    version: '1.0.10',
+    date: '2026-05-19',
+    changes: [
+      'แก้ไข QA/QC ระบบอัปโหลดเอกสาร',
+      'แก้ชื่อไฟล์ว่างสำหรับ dotfiles',
+      'จำกัดความยาวชื่อไฟล์/โฟลเดอร์/เอกสาร',
+    ],
+  },
+  {
+    version: '1.0.9',
+    date: '2026-05-18',
+    changes: [
+      'ลบ test comment',
+      'อัปเดตเอกสาร CLAUDE.md',
+    ],
+  },
+  {
+    version: '1.0.8',
+    date: '2026-05-17',
+    changes: [
+      'ทดสอบ CI/CD auto-version workflow',
+      'ใช้ npm version patch แทน manual parsing',
+    ],
+  },
+  {
+    version: '1.0.7',
+    date: '2026-05-16',
+    changes: [
+      'อัปเดต rule สำหรับ CI/CD auto-release',
+      'เพิ่ม auto-version + auto-release workflow',
+    ],
+  },
+  {
+    version: '1.0.6',
+    date: '2026-05-15',
+    changes: [
+      'แก้ไขยอดรวมงวดชำระไม่ครบ เพิ่ม installments_total_paid',
+    ],
+  },
+  {
     version: '1.0.5',
     date: '2026-05-16',
     changes: [
-      'เพิ่มเมนู "ใบเสนอราคา" ใน Sidebar (โค้ดมีอยู่แล้วแต่ไม่ได้เชื่อม)',
-      'เพิ่ม route /quotations ใน App Router',
-      'เปิด SQLite WAL mode + performance PRAGMAs (เร็วขึ้น 2-3x)',
-      'แก้ schema mismatch: เพิ่ม 10 columns ที่หายไปใน projects table',
-      'แก้ phantom index: เพิ่ม user_id column ใน customers table',
-      'เพิ่ม transaction support ใน database.js (BEGIN/COMMIT/ROLLBACK)',
-      'แก้ query routing รองรับ CTE (WITH ... SELECT)',
-      'แก้ดาวน์โหลดเอกสารไม่ได้ (ใช้ axios + auth header)',
-      'แก้งวดชำระชำระแล้วไม่อัปเดตหน้าบัญชีโครงการ',
+      'เพิ่มเมนู "ใบเสนอราคา" ใน Sidebar',
+      'เปิด SQLite WAL mode + performance PRAGMAs',
+      'แก้ schema mismatch: เพิ่ม 10 columns ที่หายไป',
+      'เพิ่ม transaction support (BEGIN/COMMIT/ROLLBACK)',
+      'แก้ดาวน์โหลดเอกสารไม่ได้',
       'เพิ่มปุ่มส่งออกข้อมูลบัญชีเป็น CSV',
-      'เพิ่มฟิลเตอร์บัญชี (โครงการ/ประเภท/วันที่)',
-      'เพิ่มตั้งค่าที่จัดเก็บไฟล์เอกสาร (เลือกไดรฟ์/โฟลเดอร์)',
-      'แก้ไขบันทึกชำระไม่ categorize หมวดหมู่อัตโนมัติ',
+      'เพิ่มตั้งค่าที่จัดเก็บไฟล์เอกสาร',
     ],
   },
   {
     version: '1.0.4',
     date: '2026-05-15',
     changes: [
-      'แก้ไขระบบหน่วยงาน: เพิ่มปุ่มอนุมัติ/ปฏิเสธ + แสดงสถานะอนุมัติ',
+      'แก้ไขระบบหน่วยงาน: เพิ่มปุ่มอนุมัติ/ปฏิเสธ',
       'เพิ่ม notification เมื่ออนุมัติ/ปฏิเสธหน่วยงาน',
-      'เพิ่ม GET /api/organizations/:id endpoint',
       'validate ประเภทหน่วยงาน (org_type) ที่ backend',
-      'ปรับปรุง error handling และ loading state ทั้งระบบ',
     ],
   },
   {
     version: '1.0.3',
     date: '2026-05-15',
     changes: [
-      'เพิ่ม composite indexes สำหรับ report queries ที่ช้า',
-      'เพิ่ม auto-vacuum ทุกเดือน (บีบอัดไฟล์ DB อัตโนมัติ)',
-      'เพิ่ม auto-cleanup logs เก่าเกิน 1 ปี',
-      'เพิ่ม API endpoints สำหรับ manual vacuum/cleanup (admin only)',
+      'เพิ่ม composite indexes สำหรับ report queries',
+      'เพิ่ม auto-vacuum + auto-cleanup logs',
     ],
   },
   {
@@ -974,7 +1033,6 @@ const CHANGELOG = [
     date: '2026-05-14',
     changes: [
       'แก้ bug migration ไม่ทำงานตอนอัปเดตแอพ',
-      'รัน migration ทุกครั้งที่เปิดแอพ (ปลอดภัยสำหรับ db เดิม)',
     ],
   },
   {
@@ -982,7 +1040,7 @@ const CHANGELOG = [
     date: '2026-05-14',
     changes: [
       'เพิ่มระบบอัปเดตอัตโนมัติ (electron-updater)',
-      'เพิ่ม GitHub Actions สำหรับ build & release อัตโนมัติ',
+      'เพิ่ม GitHub Actions สำหรับ build & release',
       'แสดงเวอร์ชันปัจจุบันที่ Sidebar',
       'เพิ่มประวัติเวอร์ชันในหน้าตั้งค่า',
     ],
