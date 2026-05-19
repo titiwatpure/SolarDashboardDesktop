@@ -45,7 +45,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, projec
       .then((res) => setUsers(res.data || []))
       .catch(() => {});
     customersAPI.getAll({ limit: 200 })
-      .then((res) => setCustomers(res || []))
+      .then((res) => setCustomers(Array.isArray(res) ? res : (res.data || [])))
       .catch(() => {});
     setShowCustomerForm(false);
 
