@@ -172,16 +172,31 @@ router.get('/', authenticateToken, async (req, res) => {
 // GET /api/documents/project/:project_id — ดึงเอกสารตามโครงการ
 router.get('/project/:project_id', authenticateToken, async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const offset = (page - 1) * limit;
+
     const result = await pool.query(
       `SELECT d.*, p.project_name, u.full_name as uploaded_by_name
        FROM documents d
        LEFT JOIN projects p ON d.project_id = p.id
        LEFT JOIN users u ON d.upload_by = u.id
        WHERE d.project_id = ?
-       ORDER BY d.uploaded_at DESC`,
+       ORDER BY d.uploaded_at DESC
+       LIMIT ? OFFSET ?`,
+      [req.params.project_id, limit, offset]
+    );
+
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as count FROM documents WHERE project_id = ?',
       [req.params.project_id]
     );
-    res.json(result.rows);
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    res.json({
+      data: result.rows,
+      pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

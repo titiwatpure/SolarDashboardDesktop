@@ -21,8 +21,8 @@ export default function Customers() {
   const loadCustomers = async () => {
     setLoading(true);
     try {
-      const data = await customersAPI.getAll({ search, limit: 200 });
-      setCustomers(data || []);
+      const data = await customersAPI.getAll({ search, limit: 100 });
+      setCustomers(Array.isArray(data) ? data : (data.data || []));
     } catch (err) {
       console.error(err);
     } finally {

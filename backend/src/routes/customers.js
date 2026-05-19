@@ -15,7 +15,9 @@ const getCustomerById = async (id) => {
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const search = req.query.search || '';
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const offset = (page - 1) * limit;
 
     let clause = '';
     const params = [];
@@ -31,10 +33,20 @@ router.get('/', authenticateToken, async (req, res) => {
        WHERE 1=1${clause}
        GROUP BY c.id
        ORDER BY c.customer_name
-       LIMIT ?`,
-      [...params, limit]
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
     );
-    res.json(result.rows);
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as count FROM customers c WHERE 1=1${clause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    res.json({
+      data: result.rows,
+      pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

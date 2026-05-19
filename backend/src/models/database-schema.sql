@@ -296,3 +296,10 @@ CREATE INDEX IF NOT EXISTS idx_quotation_items_quotation_id ON quotation_items(q
 CREATE INDEX IF NOT EXISTS idx_contracts_project_id ON contracts(project_id);
 CREATE INDEX IF NOT EXISTS idx_contracts_customer_id ON contracts(customer_id);
 CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status);
+
+-- Composite indexes สำหรับ query ที่ใช้บ่อย
+CREATE INDEX IF NOT EXISTS idx_documents_type_project ON documents(document_type, project_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_entity ON activity_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_action_created ON activity_logs(action, created_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_status_project ON tasks(status, project_id);
+CREATE INDEX IF NOT EXISTS idx_projects_status_step ON projects(status, current_step);

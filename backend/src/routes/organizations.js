@@ -14,16 +14,28 @@ const getOrganizationById = async (id) => {
 };
 
 // GET /api/organizations — ดึงหน่วยงานทั้งหมด (พร้อมจำนวนโครงการ)
-router.get('/', authenticateToken, async (_req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const offset = (page - 1) * limit;
+
     const result = await pool.query(`
       SELECT o.*, COUNT(po.id) as project_count
       FROM organizations o
       LEFT JOIN project_organizations po ON po.org_id = o.id
       GROUP BY o.id
       ORDER BY o.org_name
-    `);
-    res.json(result.rows);
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const countResult = await pool.query('SELECT COUNT(*) as count FROM organizations');
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    res.json({
+      data: result.rows,
+      pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

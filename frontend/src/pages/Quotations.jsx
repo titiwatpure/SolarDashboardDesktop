@@ -74,8 +74,8 @@ export default function Quotations() {
 
   const loadCustomers = useCallback(async () => {
     try {
-      const data = await customersAPI.getAll({ limit: 500 });
-      setCustomers(data || []);
+      const data = await customersAPI.getAll({ limit: 100 });
+      setCustomers(Array.isArray(data) ? data : (data.data || []));
     } catch (err) {
       console.error('Failed to load customers:', err);
     }

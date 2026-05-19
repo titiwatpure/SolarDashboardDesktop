@@ -25,12 +25,16 @@ process.on('SIGINT', () => {
 });
 
 const isReadQuery = (sql) => /^\s*(SELECT|WITH|PRAGMA)\b/i.test(sql);
+const SLOW_QUERY_MS = 100;
 
 const pool = {
   query: (sql, params = []) =>
     new Promise((resolve, reject) => {
+      const start = Date.now();
       if (isReadQuery(sql)) {
         db.all(sql, params, (err, rows) => {
+          const elapsed = Date.now() - start;
+          if (elapsed >= SLOW_QUERY_MS) console.warn(`[SLOW QUERY ${elapsed}ms]`, sql.substring(0, 120));
           if (err) { console.error('Query Error:', err); reject(err); return; }
           resolve({ rows: rows || [], rowCount: rows?.length || 0 });
         });
@@ -38,6 +42,8 @@ const pool = {
       }
 
       db.run(sql, params, function onRun(err) {
+        const elapsed = Date.now() - start;
+        if (elapsed >= SLOW_QUERY_MS) console.warn(`[SLOW QUERY ${elapsed}ms]`, sql.substring(0, 120));
         if (err) { console.error('Query Error:', err); reject(err); return; }
         resolve({ rows: [], rowCount: this.changes || 0, changes: this.changes || 0, lastID: this.lastID });
       });
