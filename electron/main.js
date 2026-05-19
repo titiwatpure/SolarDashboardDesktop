@@ -16,9 +16,10 @@ const { autoUpdater } = require('electron-updater');
 // IPC: expose app version to renderer
 ipcMain.handle('get-app-version', () => app.getVersion());
 
-// IPC: folder picker
+// IPC: folder picker (ต้องส่ง mainWindow เพื่อไม่ให้ค้าง)
 ipcMain.handle('select-folder', async (_event, options = {}) => {
-  const result = await dialog.showOpenDialog({
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const result = await dialog.showOpenDialog(win, {
     properties: ['openDirectory'],
     defaultPath: options.defaultPath || undefined,
     title: options.title || 'เลือกโฟลเดอร์',
@@ -26,9 +27,10 @@ ipcMain.handle('select-folder', async (_event, options = {}) => {
   return result.canceled ? null : result.filePaths[0];
 });
 
-// IPC: save file dialog
+// IPC: save file dialog (ต้องส่ง mainWindow เพื่อไม่ให้ค้าง)
 ipcMain.handle('save-file', async (_event, options = {}) => {
-  const result = await dialog.showSaveDialog({
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const result = await dialog.showSaveDialog(win, {
     defaultPath: options.defaultPath || 'document',
     title: options.title || 'บันทึกไฟล์',
   });
