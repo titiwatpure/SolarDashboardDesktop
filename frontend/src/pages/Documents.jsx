@@ -24,6 +24,7 @@ export default function Documents() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -31,8 +32,6 @@ export default function Documents() {
     project_id: '',
     document_name: '',
     document_type: 'other',
-    file_path: '',
-    file_size: '',
     description: ''
   });
   const [filterProject, setFilterProject] = useState('');
@@ -40,7 +39,7 @@ export default function Documents() {
 
   useEffect(() => {
     loadPageData();
-    documentsAPI.getSummary().then(setProjectSummary).catch(() => {});
+    documentsAPI.getSummary().then(res => setProjectSummary(Array.isArray(res) ? res : (res.data || []))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -54,7 +53,7 @@ export default function Documents() {
       if (filterProject) params.project_id = filterProject;
       const [documentResult, projectResponse] = await Promise.all([
         documentsAPI.getAll(params),
-        projectsAPI.getAll({ page: 1, limit: 1000 })
+        projectsAPI.getAll({ page: 1, limit: 5000 })
       ]);
 
       const docList = Array.isArray(documentResult) ? documentResult : (documentResult.data || []);
@@ -91,32 +90,31 @@ export default function Documents() {
         formDataObj.append('description', formData.description);
         formDataObj.append('file', selectedFile);
 
-        await documentsAPI.upload(formDataObj);
+        await documentsAPI.upload(formDataObj, (progressEvent) => {
+          const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+          setUploadProgress(percent);
+        });
       } else {
         // ส่งแค่ metadata (ไม่มีไฟล์)
-        await documentsAPI.upload({
-          ...formData,
-          file_size: formData.file_size ? Number(formData.file_size) : null
-        });
+        await documentsAPI.upload(formData);
       }
 
       setFormData({
         project_id: '',
         document_name: '',
         document_type: 'other',
-        file_path: '',
-        file_size: '',
         description: ''
       });
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       loadPageData();
-      documentsAPI.getSummary().then(setProjectSummary).catch(() => {});
+      documentsAPI.getSummary().then(res => setProjectSummary(Array.isArray(res) ? res : (res.data || []))).catch(() => {});
     } catch (error) {
       console.error('Failed to create document:', error);
       alert(error.response?.data?.error || 'บันทึกเอกสารไม่สำเร็จ');
     } finally {
       setSaving(false);
+      setUploadProgress(0);
     }
   };
 
@@ -163,7 +161,7 @@ export default function Documents() {
     try {
       await documentsAPI.delete(id);
       loadPageData();
-      documentsAPI.getSummary().then(setProjectSummary).catch(() => {});
+      documentsAPI.getSummary().then(res => setProjectSummary(Array.isArray(res) ? res : (res.data || []))).catch(() => {});
     } catch (error) {
       console.error('Failed to delete document:', error);
     }
@@ -240,24 +238,6 @@ export default function Documents() {
 
             <input
               type="text"
-              name="file_path"
-              value={formData.file_path}
-              onChange={handleChange}
-              placeholder="URL หรือ file path (ถ้าไม่อัปโหลดไฟล์)"
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white"
-            />
-
-            <input
-              type="number"
-              name="file_size"
-              value={formData.file_size}
-              onChange={handleChange}
-              placeholder="ขนาดไฟล์ (bytes)"
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white"
-            />
-
-            <input
-              type="text"
               name="description"
               value={formData.description}
               onChange={handleChange}
@@ -315,6 +295,18 @@ export default function Documents() {
               onChange={(e) => handleFileSelect(e.target.files?.[0])}
             />
           </div>
+
+          {saving && uploadProgress > 0 && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                <span>กำลังอัปโหลด...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-2">
+                <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -421,7 +413,13 @@ export default function Documents() {
                     <div className="flex items-center gap-1">
                       {document.file_path && (
                         <button
-                          onClick={() => documentsAPI.download(document.id, document.document_name)}
+                          onClick={async () => {
+                            try {
+                              await documentsAPI.download(document.id, document.document_name);
+                            } catch (err) {
+                              alert('ดาวน์โหลดไม่สำเร็จ: ' + (err.response?.data?.error || err.message));
+                            }
+                          }}
                           className="rounded-full p-2 text-blue-500 transition-colors hover:bg-blue-50"
                           title="ดาวน์โหลด"
                         >

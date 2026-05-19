@@ -11,18 +11,34 @@ const router = express.Router();
 
 const defaultUploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
 
-// ดึงที่เก็บไฟล์จาก company_settings (fallback ไปใช้ default)
+// Cache uploadsDir to avoid DB query on every request
+let _uploadsDirCache = null;
+let _uploadsDirCacheTime = 0;
+const UPLOADS_DIR_CACHE_TTL = 30_000; // 30 seconds
+
+function invalidateUploadsDirCache() {
+  _uploadsDirCache = null;
+  _uploadsDirCacheTime = 0;
+}
+
 async function getUploadsDir() {
+  if (_uploadsDirCache && Date.now() - _uploadsDirCacheTime < UPLOADS_DIR_CACHE_TTL) {
+    return _uploadsDirCache;
+  }
   try {
     const result = await pool.query("SELECT value FROM company_settings WHERE key = 'storage_path'");
     const customPath = result.rows[0]?.value;
     if (customPath && customPath.trim()) {
       const dir = customPath.trim();
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      _uploadsDirCache = dir;
+      _uploadsDirCacheTime = Date.now();
       return dir;
     }
-  } catch {}
+  } catch (e) { console.warn('[UPLOADS_DIR] DB query failed, using default:', e.message); }
   if (!fs.existsSync(defaultUploadsDir)) fs.mkdirSync(defaultUploadsDir, { recursive: true });
+  _uploadsDirCache = defaultUploadsDir;
+  _uploadsDirCacheTime = Date.now();
   return defaultUploadsDir;
 }
 
@@ -38,11 +54,12 @@ const storage = multer.diskStorage({
           if (proj.rows[0]) {
             folderName = sanitizeFolderName(proj.rows[0].project_name, proj.rows[0].project_code);
           }
-        } catch {}
+        } catch (e) { console.warn('[UPLOAD_DEST] Project lookup failed:', e.message); }
       }
       const projectDir = path.join(uploadsDir, folderName);
       if (!fs.existsSync(projectDir)) fs.mkdirSync(projectDir, { recursive: true });
       req._uploadDir = projectDir;
+      req._uploadFolderName = folderName;
       cb(null, projectDir);
     } catch (err) {
       cb(err);
@@ -56,12 +73,8 @@ const storage = multer.diskStorage({
       .trim();
     if (!base) base = 'file';
     if (base.length > 200) base = base.substring(0, 200);
-    let finalName = `${base}${ext}`;
-    let counter = 1;
-    while (req._uploadDir && fs.existsSync(path.join(req._uploadDir, finalName))) {
-      finalName = `${base}_${counter}${ext}`;
-      counter++;
-    }
+    const uniqueId = uuidv4().substring(0, 8);
+    const finalName = `${base}_${uniqueId}${ext}`;
     cb(null, finalName);
   }
 });
@@ -100,10 +113,12 @@ const upload = multer({
 });
 
 function sanitizeFolderName(projectName, projectCode) {
-  let safe = projectName.replace(/[\\/:*?"<>|]/g, '_').replace(/[\s.]+$/g, '').trim();
+  const name = projectName || 'project';
+  const code = projectCode || 'unknown';
+  let safe = name.replace(/[\\/:*?"<>|]/g, '_').replace(/[\s.]+$/g, '').trim();
   if (!safe) safe = 'project';
   if (safe.length > 100) safe = safe.substring(0, 100);
-  return `${safe}_${projectCode}`;
+  return `${safe}_${code}`;
 }
 
 const getDocumentById = async (id) => {
@@ -114,17 +129,32 @@ const getDocumentById = async (id) => {
 // GET /api/documents/summary — สรุปจำนวนเอกสารตามโครงการ
 router.get('/summary', authenticateToken, async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const offset = (page - 1) * limit;
+
     const result = await pool.query(
       `SELECT d.project_id, p.project_name, p.project_code, COUNT(*) as count
        FROM documents d
        LEFT JOIN projects p ON d.project_id = p.id
        GROUP BY d.project_id
-       ORDER BY count DESC`
+       ORDER BY count DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
     );
-    res.json(result.rows);
+
+    const countResult = await pool.query(
+      'SELECT COUNT(DISTINCT project_id) as count FROM documents'
+    );
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    res.json({
+      data: result.rows,
+      pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) }
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    console.error('[DOC_SUMMARY]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการดึงสรุปเอกสาร' });
   }
 });
 
@@ -164,8 +194,8 @@ router.get('/', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    console.error('[DOC_LIST]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการดึงรายการเอกสาร' });
   }
 });
 
@@ -198,8 +228,8 @@ router.get('/project/:project_id', authenticateToken, async (req, res) => {
       pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    console.error('[DOC_PROJECT_LIST]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการดึงเอกสารตามโครงการ' });
   }
 });
 
@@ -222,50 +252,52 @@ router.get('/download/:id', authenticateToken, async (req, res) => {
 
     // Log the download
     const ipAddress = req.ip || req.socket?.remoteAddress;
-    logActivity(req.user.id, 'download', 'document', req.params.id, {
+    await logActivity(req.user.id, 'download', 'document', req.params.id, {
       document_name: document.document_name,
       project_id: document.project_id,
     }, ipAddress);
 
-    res.download(filePath, document.document_name + path.extname(filePath));
+    const ext = path.extname(filePath);
+    const downloadName = document.document_name.endsWith(ext)
+      ? document.document_name
+      : document.document_name + ext;
+    const encodedName = encodeURIComponent(downloadName);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedName}`);
+    res.download(filePath);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    console.error('[DOC_DOWNLOAD]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการดาวน์โหลด' });
   }
 });
 
 // POST /api/documents — เพิ่มเอกสารใหม่ (รองรับ file upload)
 router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
   try {
-    const { project_id, document_name, document_type, description } = req.body;
+    const { project_id, document_type, description } = req.body;
+    const document_name = req.body.document_name?.trim();
+
+    const cleanupFile = (filePath) => { try { if (filePath) fs.unlinkSync(filePath); } catch {} };
 
     if (!project_id || !document_name || !document_type) {
-      // ลบไฟล์ที่อัปโหลดมาถ้าข้อมูลไม่ครบ
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
+      cleanupFile(req.file?.path);
       return res.status(400).json({ error: 'ข้อมูลเอกสารไม่ครบถ้วน' });
     }
 
     if (document_name.length > 500) {
-      if (req.file) fs.unlinkSync(req.file.path);
+      cleanupFile(req.file?.path);
       return res.status(400).json({ error: 'ชื่อเอกสารยาวเกินไป (สูงสุด 500 ตัวอักษร)' });
     }
 
     const validDocTypes = ['sld', 'permit', 'test_report', 'other'];
     if (!validDocTypes.includes(document_type)) {
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
+      cleanupFile(req.file?.path);
       return res.status(400).json({ error: 'ประเภทเอกสารไม่ถูกต้อง' });
     }
 
     // ตรวจสอบว่า project_id มีอยู่จริง
     const projectCheck = await pool.query('SELECT id FROM projects WHERE id = ?', [project_id]);
     if (projectCheck.rows.length === 0) {
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
+      cleanupFile(req.file?.path);
       return res.status(404).json({ error: 'ไม่พบโครงการ' });
     }
 
@@ -276,11 +308,7 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
     let fileSize = null;
 
     if (req.file) {
-      const proj = await pool.query('SELECT project_name, project_code FROM projects WHERE id = ?', [project_id]);
-      let folderName = project_id;
-      if (proj.rows[0]) {
-        folderName = sanitizeFolderName(proj.rows[0].project_name, proj.rows[0].project_code);
-      }
+      const folderName = req._uploadFolderName || project_id;
       filePath = path.join(folderName, req.file.filename).replace(/\\/g, '/');
       fileSize = req.file.size;
     }
@@ -292,15 +320,15 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
     );
 
     const document = await getDocumentById(id);
-    logActivity(req.user.id, 'create', 'document', id, { document_name, project_id });
+    await logActivity(req.user.id, 'create', 'document', id, { document_name, project_id });
     res.status(201).json(document);
   } catch (error) {
     // ลบไฟล์ถ้ามี error
     if (req.file) {
       try { fs.unlinkSync(req.file.path); } catch {}
     }
-    console.error(error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    console.error('[DOC_UPLOAD]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการอัปโหลด' });
   }
 });
 
@@ -322,11 +350,11 @@ router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, r
     }
 
     await pool.query('DELETE FROM documents WHERE id = ?', [req.params.id]);
-    logActivity(req.user.id, 'delete', 'document', req.params.id, { document_name: existingDocument.document_name });
+    await logActivity(req.user.id, 'delete', 'document', req.params.id, { document_name: existingDocument.document_name });
     res.json({ message: 'ลบเอกสารสำเร็จ' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    console.error('[DOC_DELETE]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการลบเอกสาร' });
   }
 });
 
@@ -346,14 +374,25 @@ router.post('/download-to', authenticateToken, async (req, res) => {
     if (!filePath.startsWith(path.resolve(uploadsDir)) || !fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'ไฟล์ไม่อยู่ในระบบ' });
     }
-    fs.copyFileSync(filePath, save_path);
-    logActivity(req.user.id, 'download', 'document', document_id, {
+    // Validate save_path is not targeting system directories
+    const resolvedSavePath = path.resolve(save_path);
+    const dangerousPaths = ['C:\\Windows', 'C:\\Program Files', '/etc', '/usr', '/bin', '/sbin'];
+    if (dangerousPaths.some(p => resolvedSavePath.toLowerCase().startsWith(p.toLowerCase()))) {
+      return res.status(403).json({ error: 'ไม่อนุญาตเขียนไฟล์ไปยังตำแหน่งนี้' });
+    }
+    // Ensure parent directory exists
+    const saveDir = path.dirname(resolvedSavePath);
+    if (!fs.existsSync(saveDir)) {
+      return res.status(400).json({ error: 'ไม่พบโฟลเดอร์ปลายทาง' });
+    }
+    await fs.promises.copyFile(filePath, resolvedSavePath);
+    await logActivity(req.user.id, 'download', 'document', document_id, {
       document_name: document.document_name, project_id: document.project_id,
     }, req.ip || req.socket?.remoteAddress);
     res.json({ success: true, path: save_path });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    console.error('[DOC_DOWNLOAD_TO]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการดาวน์โหลดไฟล์' });
   }
 });
 
@@ -372,3 +411,4 @@ router.use((err, req, res, next) => {
 });
 
 module.exports = router;
+module.exports.invalidateUploadsDirCache = invalidateUploadsDirCache;

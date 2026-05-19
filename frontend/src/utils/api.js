@@ -213,7 +213,7 @@ export const documentsAPI = {
   getAll: (params) => apiCall('GET', `/documents?${new URLSearchParams(params || {})}`),
   getByProject: (projectId) => apiCall('GET', `/documents/project/${projectId}`),
   getSummary: () => apiCall('GET', '/documents/summary'),
-  upload: (data) => {
+  upload: (data, onProgress) => {
     // ถ้าเป็น FormData (มีไฟล์) ให้ส่งเป็น multipart
     if (data instanceof FormData) {
       const token = localStorage.getItem('token');
@@ -222,6 +222,7 @@ export const documentsAPI = {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'multipart/form-data',
         },
+        onUploadProgress: onProgress || undefined,
       }).then((res) => res.data);
     }
     return apiCall('POST', '/documents', data);
@@ -248,10 +249,21 @@ export const documentsAPI = {
       headers: { Authorization: `Bearer ${token}` },
       responseType: 'blob',
     });
+    // Parse filename from Content-Disposition header
+    const disposition = res.headers['content-disposition'];
+    let downloadName = filename || 'document';
+    if (disposition) {
+      const utf8Match = disposition.match(/filename\*=UTF-8''(.+)/i);
+      if (utf8Match) downloadName = decodeURIComponent(utf8Match[1]);
+      else {
+        const plainMatch = disposition.match(/filename="?([^";\n]+)"?/);
+        if (plainMatch) downloadName = plainMatch[1];
+      }
+    }
     const url = URL.createObjectURL(res.data);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename || 'document';
+    a.download = downloadName;
     document.body.appendChild(a);
     a.click();
     a.remove();
