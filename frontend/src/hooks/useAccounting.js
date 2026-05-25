@@ -73,7 +73,7 @@ export function useAccountingOverview() {
   };
 }
 
-export function useProjectAccounting(projectId) {
+export function useProjectAccounting(projectId, { onDataChange } = {}) {
   const [projectSummary, setProjectSummary] = useState(null);
   const [projectLoading, setProjectLoading] = useState(false);
   const [txFilter, setTxFilter] = useState('all');
@@ -184,22 +184,24 @@ export function useProjectAccounting(projectId) {
       }
       setShowTxModal(false);
       loadProjectSummary(projectId);
+      onDataChange?.();
     } catch (err) {
       setTxError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึก');
     } finally {
       setTxSaving(false);
     }
-  }, [txForm, editTx, projectId, loadProjectSummary]);
+  }, [txForm, editTx, projectId, loadProjectSummary, onDataChange]);
 
   const handleTxDelete = useCallback(async (id) => {
     if (!window.confirm('ต้องการลบรายการนี้?')) return;
     try {
       await accountingAPI.deleteTransaction(id);
       loadProjectSummary(projectId);
+      onDataChange?.();
     } catch (err) {
       console.error('Failed to delete transaction:', err);
     }
-  }, [projectId, loadProjectSummary]);
+  }, [projectId, loadProjectSummary, onDataChange]);
 
   return {
     projectSummary,
@@ -228,7 +230,7 @@ export function useProjectAccounting(projectId) {
   };
 }
 
-export function useInstallments({ onPaymentSuccess } = {}) {
+export function useInstallments({ onPaymentSuccess, onDeleteSuccess } = {}) {
   const [installments, setInstallments] = useState([]);
   const [installmentsLoading, setInstallmentsLoading] = useState(false);
   const [instStatusFilter, setInstStatusFilter] = useState('');
@@ -274,6 +276,7 @@ export function useInstallments({ onPaymentSuccess } = {}) {
     try {
       await accountingAPI.deleteInstallment(id);
       loadInstallments();
+      onDeleteSuccess?.();
     } catch (err) {
       const data = err.response?.data;
       const msg = data?.error || 'เกิดข้อผิดพลาด';
@@ -286,6 +289,7 @@ export function useInstallments({ onPaymentSuccess } = {}) {
           try {
             await accountingAPI.deleteInstallment(id, true);
             loadInstallments();
+            onDeleteSuccess?.();
           } catch (err2) {
             alert(err2.response?.data?.error || 'เกิดข้อผิดพลาด');
           }
@@ -294,7 +298,7 @@ export function useInstallments({ onPaymentSuccess } = {}) {
         alert(msg);
       }
     }
-  }, [loadInstallments]);
+  }, [loadInstallments, onDeleteSuccess]);
 
   const openPayModal = useCallback((inst) => {
     setPayTarget(inst);

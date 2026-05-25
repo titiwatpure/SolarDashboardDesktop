@@ -128,11 +128,17 @@ export default function Accounting() {
 
   /* ---- hooks ---- */
   const overview = useAccountingOverview();
-  const projectAcc = useProjectAccounting(selectedProjectId);
+  const projectAcc = useProjectAccounting(selectedProjectId, {
+    onDataChange: () => overview.loadCompanySummary(),
+  });
   const installmentAcc = useInstallments({
     onPaymentSuccess: (projectId) => {
       if (projectId) projectAcc.loadProjectSummary(projectId);
       overview.loadCompanySummary();
+    },
+    onDeleteSuccess: () => {
+      overview.loadCompanySummary();
+      if (selectedProjectId) projectAcc.loadProjectSummary(selectedProjectId);
     },
   });
 
