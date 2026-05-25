@@ -43,23 +43,26 @@ app.use(helmet({
   contentSecurityPolicy: process.env.ELECTRON_MODE ? false : undefined,
 }));
 
-// Rate limiting - ป้องกัน brute-force
-const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 นาที
-  max: 200, // สูงสุด 200 requests ต่อ IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'มีคำขอมากเกินไป กรุณารอสักครู่' }
-});
-app.use('/api/', limiter);
+// Rate limiting - ป้องกัน brute-force (skip ใน Electron mode)
+const isElectron = !!process.env.ELECTRON_MODE;
 
-// Rate limit เข้มงวดสำหรับ login
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: 'เข้าสู่ระบบล้มเหลวหลายครั้ง กรุณารอ 15 นาที' }
-});
-app.use('/api/auth/login', loginLimiter);
+if (!isElectron) {
+  const limiter = rateLimit({
+    windowMs: 1 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'มีคำขอมากเกินไป กรุณารอสักครู่' }
+  });
+  app.use('/api/', limiter);
+
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    message: { error: 'เข้าสู่ระบบล้มเหลวหลายครั้ง กรุณารอ 15 นาที' }
+  });
+  app.use('/api/auth/login', loginLimiter);
+}
 
 // CORS: อนุญาตการร้องขอจากโดเมนต่างๆ
 app.use(cors({
