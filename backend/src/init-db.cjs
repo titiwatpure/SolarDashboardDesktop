@@ -461,7 +461,7 @@ const initDB = async () => {
 
   try {
     const adminId = uuidv4();
-    const hashedPassword = await bcrypt.hash('admin', 12);
+    const hashedPassword = await bcrypt.hash('admin', 10);
 
     // สร้าง admin user หรือ reset password ถ้ามีอยู่แล้ว
     await runInsert(
@@ -484,7 +484,7 @@ const initDB = async () => {
     ];
     for (const u of demoUsers) {
       const id = uuidv4();
-      const pw = await bcrypt.hash(u.username, 12);
+      const pw = await bcrypt.hash(u.username, 10);
       await runInsert(
         `INSERT OR IGNORE INTO users (id, username, email, password, full_name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [id, u.username, u.email, pw, u.full_name, u.role, 'active']

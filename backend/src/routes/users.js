@@ -86,7 +86,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     await pool.query(
       'UPDATE users SET password = ?, updated_at = ? WHERE id = ?',
       [hashedPassword, new Date().toISOString(), req.user.id]
@@ -183,7 +183,7 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) =
     }
 
     const id = uuidv4();
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     await pool.query(
       'INSERT INTO users (id, username, email, password, full_name, role) VALUES (?, ?, ?, ?, ?, ?)',

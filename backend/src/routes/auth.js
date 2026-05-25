@@ -12,6 +12,7 @@ const router = express.Router();
 // Token expiry configuration
 const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY || '15m';
 const REFRESH_TOKEN_EXPIRY_DAYS = parseInt(process.env.REFRESH_TOKEN_EXPIRY_DAYS || '30', 10);
+const BCRYPT_COST = 10;
 
 // ---------------------------------------------------------------------------
 // Helpers — refresh token CRUD
@@ -121,6 +122,14 @@ router.post('/login', async (req, res) => {
       const ipAddress = req.ip || req.socket?.remoteAddress;
       logActivity(user.id, 'login_failed', 'user', user.id, { username, reason: 'invalid_password' }, ipAddress, 'warning');
       return res.status(401).json({ error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
+    }
+
+    // Lazy re-hash: if stored hash uses higher cost, re-hash in background for faster future logins
+    const currentCost = bcrypt.getRounds(user.password);
+    if (currentCost > BCRYPT_COST) {
+      bcrypt.hash(password, BCRYPT_COST).then((newHash) => {
+        pool.query('UPDATE users SET password = ? WHERE id = ?', [newHash, user.id]).catch(() => {});
+      });
     }
 
     // Generate short-lived access token (JWT)
@@ -322,7 +331,7 @@ router.post(
       }
 
       const id = uuidv4();
-      const hashedPassword = await bcrypt.hash(password, 12);
+      const hashedPassword = await bcrypt.hash(password, BCRYPT_COST);
 
       await pool.query(
         'INSERT INTO users (id, username, email, password, full_name, role) VALUES (?, ?, ?, ?, ?, ?)',

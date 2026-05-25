@@ -12,10 +12,12 @@ let SQL = null;
 const sqlReady = initSqlJs().then(sql => { SQL = sql; });
 
 class CompatDatabase {
-  constructor(dbPath, mode, callback) {
+  constructor(dbPath, modeOrCallback, callback) {
+    // Support both (dbPath, callback) and (dbPath, mode, callback)
+    const cb = typeof modeOrCallback === 'function' ? modeOrCallback : callback;
     this._dbPath = dbPath;
     this._db = null;
-    this._ready = this._doInit(callback);
+    this._ready = this._doInit(cb);
   }
 
   async _doInit(callback) {
