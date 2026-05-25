@@ -17,7 +17,8 @@ import {
   ShieldCheck,
   LayoutGrid,
   Wallet,
-  Receipt
+  Receipt,
+  BookOpen
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +39,7 @@ const allMenuItems = [
   { id: 'reports', label: 'รายงาน', icon: BarChart3, path: '/reports', roles: ['admin', 'engineer', 'staff'] },
   { id: 'network-map', label: 'แผนที่โครง', icon: Map, path: '/network-map', roles: ['admin', 'engineer', 'staff'] },
   { id: 'users', label: 'ผู้ใช้งาน', icon: Users, path: '/users', roles: ['admin'] },
+  { id: 'help', label: 'คู่มือ', icon: BookOpen, path: '/help', roles: ['admin', 'engineer', 'staff', 'client'] },
   { id: 'settings', label: 'ตั้งค่า', icon: Settings, path: '/settings', roles: ['admin', 'engineer', 'staff', 'client'] }
 ];
 

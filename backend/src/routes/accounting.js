@@ -588,19 +588,31 @@ router.post('/installments/:id/pay', authenticateToken, authorizeRole(['admin', 
   }
 });
 
-// DELETE /installments/:id — ลบงวดชำระ (บังคับลบ transaction ก่อนถ้ามี)
+// DELETE /installments/:id — ลบงวดชำระ (ใช้ ?force=true เพื่อลบ transaction ที่เชื่อมด้วย)
 router.delete('/installments/:id', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     const existing = await getInstallmentById(req.params.id);
     if (!existing) return res.status(404).json({ error: 'ไม่พบงวดชำระ' });
 
-    // ถ้างวดชำระมี transaction เชื่อมอยู่ ต้องลบ transaction ก่อน
+    // ถ้างวดชำระมี transaction เชื่อมอยู่
     if (existing.transaction_id) {
-      const txExists = await pool.query('SELECT id FROM transactions WHERE id = ?', [existing.transaction_id]);
+      const txExists = await pool.query('SELECT id, type, amount, description FROM transactions WHERE id = ?', [existing.transaction_id]);
       if (txExists.rows.length > 0) {
-        return res.status(400).json({
-          error: 'งวดชำระนี้มีรายการบัญชีเชื่อมอยู่ กรุณาลบรายการบัญชีก่อน',
-          transaction_id: existing.transaction_id,
+        // ถ้าไม่ได้ส่ง force=true ให้แจ้ง error พร้อมข้อมูล transaction
+        if (req.query.force !== 'true') {
+          const tx = txExists.rows[0];
+          return res.status(400).json({
+            error: 'งวดชำระนี้มีรายการบัญชีเชื่อมอยู่ กรุณาลบรายการบัญชีก่อน',
+            transaction_id: existing.transaction_id,
+            transaction_info: { type: tx.type, amount: tx.amount, description: tx.description },
+          });
+        }
+        // force=true: ลบ transaction ก่อน
+        await pool.query('DELETE FROM transactions WHERE id = ?', [existing.transaction_id]);
+        logActivity(req.user.id, 'delete', 'transaction', existing.transaction_id, {
+          type: txExists.rows[0].type,
+          amount: txExists.rows[0].amount,
+          reason: 'force delete with installment',
         });
       }
     }

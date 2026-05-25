@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, Shield, Globe, User, Lock, Eye, EyeOff, Database, Download, Trash2, RefreshCw, HardDrive, AlertTriangle, CheckCircle, Edit3, X, Save, Building2, Monitor, Users as UsersIcon, ChevronDown, ChevronUp, LogOut, History } from 'lucide-react';
+import { Bell, Shield, Globe, User, Lock, Eye, EyeOff, Database, Download, Trash2, RefreshCw, HardDrive, AlertTriangle, CheckCircle, Edit3, X, Save, Building2, Monitor, Users as UsersIcon, ChevronDown, ChevronUp, LogOut, History, Upload } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { authAPI, usersAPI, backupAPI } from '../utils/api';
+import { authAPI, usersAPI, backupAPI, settingsAPI } from '../utils/api';
 import { ROLES } from '../utils/constants';
 import { useProfileEdit, useCompanySettings, useBackupManagement } from '../hooks/useSettings';
 
@@ -81,10 +81,36 @@ export default function Settings() {
 
   const isAdmin = user?.role === 'admin';
 
+  // General settings state
+  const [generalForm, setGeneralForm] = useState({ language: 'th', theme: 'light', date_format: 'th-TH', timezone: 'Asia/Bangkok' });
+  const [generalLoading, setGeneralLoading] = useState(false);
+  const [generalMessage, setGeneralMessage] = useState({ type: '', text: '' });
+
+  // Changelog state
+  const [changelog, setChangelog] = useState([]);
+
   // Hooks
   const profile = useProfileEdit(user, refreshUser);
   const company = useCompanySettings(isAdmin);
   const backup = useBackupManagement(isAdmin);
+
+  // Load general settings from company settings
+  useEffect(() => {
+    if (!isAdmin) return;
+    settingsAPI.getCompany().then((data) => {
+      setGeneralForm({
+        language: data.language || 'th',
+        theme: data.theme || 'light',
+        date_format: data.date_format || 'th-TH',
+        timezone: data.timezone || 'Asia/Bangkok',
+      });
+    }).catch(() => {});
+  }, [isAdmin]);
+
+  // Load changelog
+  useEffect(() => {
+    settingsAPI.getChangelog().then(setChangelog).catch(() => {});
+  }, []);
 
   // ========================
   // Password
@@ -565,14 +591,32 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">URL โลโก้</label>
-                <input
-                  type="url"
-                  value={company.companyForm.logo_url}
-                  onChange={(e) => company.setCompanyForm((p) => ({ ...p, logo_url: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
-                  placeholder="https://..."
-                />
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">โลโก้บริษัท</label>
+                <div className="flex items-center gap-4">
+                  {company.companyForm.logo_url && (
+                    <img src={company.companyForm.logo_url} alt="Logo" className="h-16 w-16 rounded-xl object-contain border border-slate-200" />
+                  )}
+                  <label className="cursor-pointer inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-600 hover:bg-slate-50">
+                    <Upload size={16} />
+                    เลือกไฟล์โลโก้
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/svg+xml,image/webp"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const result = await settingsAPI.uploadLogo(file);
+                          company.setCompanyForm((p) => ({ ...p, logo_url: result.logo_url }));
+                        } catch (err) {
+                          alert(err.response?.data?.error || 'อัปโหลดไม่สำเร็จ');
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">JPG, PNG, SVG, WebP ขนาดไม่เกิน 5MB</p>
               </div>
             </div>
 
@@ -614,6 +658,98 @@ export default function Settings() {
               {company.companyLoading ? 'กำลังบันทึก...' : 'บันทึกข้อมูลบริษัท'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ======================== */}
+      {/* 5b. General Settings     */}
+      {/* ======================== */}
+      {isAdmin && (
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <Globe size={24} className="text-blue-600" />
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">ตั้งค่าทั่วไป</h2>
+              <p className="text-xs text-slate-400">ภาษา, ธีม, รูปแบบวันที่, เขตเวลา (มีผลทั้งระบบ)</p>
+            </div>
+          </div>
+
+          {generalMessage.text && (
+            <div className={`mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm ${
+              generalMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+            }`}>
+              {generalMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+              {generalMessage.text}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">ภาษา</label>
+              <select
+                value={generalForm.language}
+                onChange={(e) => setGeneralForm((p) => ({ ...p, language: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+              >
+                <option value="th">ภาษาไทย</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">ธีม</label>
+              <select
+                value={generalForm.theme}
+                onChange={(e) => setGeneralForm((p) => ({ ...p, theme: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+              >
+                <option value="light">สว่าง (Light)</option>
+                <option value="dark">มืด (Dark)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">รูปแบบวันที่</label>
+              <select
+                value={generalForm.date_format}
+                onChange={(e) => setGeneralForm((p) => ({ ...p, date_format: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+              >
+                <option value="th-TH">ภาษาไทย (พ.ศ.)</option>
+                <option value="en-US">อังกฤษ (ค.ศ.)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">เขตเวลา</label>
+              <select
+                value={generalForm.timezone}
+                onChange={(e) => setGeneralForm((p) => ({ ...p, timezone: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+              >
+                <option value="Asia/Bangkok">ไทย (UTC+7)</option>
+                <option value="UTC">UTC</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            onClick={async () => {
+              setGeneralLoading(true);
+              setGeneralMessage({ type: '', text: '' });
+              try {
+                await settingsAPI.updateCompany(generalForm);
+                setGeneralMessage({ type: 'success', text: 'บันทึกการตั้งค่าสำเร็จ' });
+                setTimeout(() => setGeneralMessage({ type: '', text: '' }), 3000);
+              } catch {
+                setGeneralMessage({ type: 'error', text: 'เกิดข้อผิดพลาด' });
+              } finally {
+                setGeneralLoading(false);
+              }
+            }}
+            disabled={generalLoading}
+            className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+          >
+            <Save size={16} />
+            {generalLoading ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}
+          </button>
         </div>
       )}
 
@@ -925,8 +1061,8 @@ export default function Settings() {
         </div>
 
         <div className="space-y-4">
-          {CHANGELOG.map((entry, idx) => (
-            <div key={entry.version} className={`relative pl-8 ${idx < CHANGELOG.length - 1 ? 'pb-4 border-l-2 border-slate-200 ml-3' : 'ml-3'}`}>
+          {changelog.map((entry, idx) => (
+            <div key={entry.version} className={`relative pl-8 ${idx < changelog.length - 1 ? 'pb-4 border-l-2 border-slate-200 ml-3' : 'ml-3'}`}>
               <div className="absolute left-[-7px] top-1 h-3 w-3 rounded-full border-2 border-blue-600 bg-white" />
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-bold text-slate-900">v{entry.version}</span>
@@ -944,116 +1080,3 @@ export default function Settings() {
     </div>
   );
 }
-
-const CHANGELOG = [
-  {
-    version: '1.0.11',
-    date: '2026-05-19',
-    changes: [
-      'แยกโฟลเดอร์เอกสารตามชื่อโครงการ + รหัส',
-      'เก็บชื่อไฟล์เดิมบนดิสก์ (ไม่ใช้ UUID) + จัดการชื่อซ้ำ',
-      'ดาวน์โหลดไฟล์ผ่าน native save dialog ใน Electron',
-      'เพิ่มปุ่มเลือกโฟลเดอร์จัดเก็บในหน้าตั้งค่า',
-      'กรองเอกสารตามโครงการ + การ์ดสรุปตามโครงการ',
-      'สร้างรหัสโครงการอัตโนมัติ (P6905-001)',
-    ],
-  },
-  {
-    version: '1.0.10',
-    date: '2026-05-19',
-    changes: [
-      'แก้ไข QA/QC ระบบอัปโหลดเอกสาร',
-      'แก้ชื่อไฟล์ว่างสำหรับ dotfiles',
-      'จำกัดความยาวชื่อไฟล์/โฟลเดอร์/เอกสาร',
-    ],
-  },
-  {
-    version: '1.0.9',
-    date: '2026-05-18',
-    changes: [
-      'ลบ test comment',
-      'อัปเดตเอกสาร CLAUDE.md',
-    ],
-  },
-  {
-    version: '1.0.8',
-    date: '2026-05-17',
-    changes: [
-      'ทดสอบ CI/CD auto-version workflow',
-      'ใช้ npm version patch แทน manual parsing',
-    ],
-  },
-  {
-    version: '1.0.7',
-    date: '2026-05-16',
-    changes: [
-      'อัปเดต rule สำหรับ CI/CD auto-release',
-      'เพิ่ม auto-version + auto-release workflow',
-    ],
-  },
-  {
-    version: '1.0.6',
-    date: '2026-05-15',
-    changes: [
-      'แก้ไขยอดรวมงวดชำระไม่ครบ เพิ่ม installments_total_paid',
-    ],
-  },
-  {
-    version: '1.0.5',
-    date: '2026-05-16',
-    changes: [
-      'เพิ่มเมนู "ใบเสนอราคา" ใน Sidebar',
-      'เปิด SQLite WAL mode + performance PRAGMAs',
-      'แก้ schema mismatch: เพิ่ม 10 columns ที่หายไป',
-      'เพิ่ม transaction support (BEGIN/COMMIT/ROLLBACK)',
-      'แก้ดาวน์โหลดเอกสารไม่ได้',
-      'เพิ่มปุ่มส่งออกข้อมูลบัญชีเป็น CSV',
-      'เพิ่มตั้งค่าที่จัดเก็บไฟล์เอกสาร',
-    ],
-  },
-  {
-    version: '1.0.4',
-    date: '2026-05-15',
-    changes: [
-      'แก้ไขระบบหน่วยงาน: เพิ่มปุ่มอนุมัติ/ปฏิเสธ',
-      'เพิ่ม notification เมื่ออนุมัติ/ปฏิเสธหน่วยงาน',
-      'validate ประเภทหน่วยงาน (org_type) ที่ backend',
-    ],
-  },
-  {
-    version: '1.0.3',
-    date: '2026-05-15',
-    changes: [
-      'เพิ่ม composite indexes สำหรับ report queries',
-      'เพิ่ม auto-vacuum + auto-cleanup logs',
-    ],
-  },
-  {
-    version: '1.0.2',
-    date: '2026-05-14',
-    changes: [
-      'แก้ bug migration ไม่ทำงานตอนอัปเดตแอพ',
-    ],
-  },
-  {
-    version: '1.0.1',
-    date: '2026-05-14',
-    changes: [
-      'เพิ่มระบบอัปเดตอัตโนมัติ (electron-updater)',
-      'เพิ่ม GitHub Actions สำหรับ build & release',
-      'แสดงเวอร์ชันปัจจุบันที่ Sidebar',
-      'เพิ่มประวัติเวอร์ชันในหน้าตั้งค่า',
-    ],
-  },
-  {
-    version: '1.0.0',
-    date: '2026-05-14',
-    changes: [
-      'เปิดตัว Solar Dashboard Desktop App',
-      'ระบบติดตามโครงการ Solar ครบวงจร',
-      'รองรับ 4 บทบาท: Admin, Engineer, Staff, Client',
-      'ขั้นตอนดำเนินงาน 7 ขั้น: Survey → COD',
-      'แผนที่เครือข่าย, รายงาน, สัญญา, บัญชี',
-    ],
-  },
-];

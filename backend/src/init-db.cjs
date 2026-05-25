@@ -494,24 +494,31 @@ const initDB = async () => {
 
     // เพิ่มหน่วยงาน demo
     const orgs = [
-      { id: uuidv4(), name: 'สำนักงานคณะกรรมการกำกับพลังงาน (กกพ.)', type: 'erc' },
-      { id: uuidv4(), name: 'บริษัท การไฟฟ้าส่วนภูมิภาค (PEA)', type: 'pea' },
-      { id: uuidv4(), name: 'บริษัท การไฟฟ้านครหลวง (MEA)', type: 'mea' },
-      { id: uuidv4(), name: 'กรมโรงงานอุตสาหกรรม', type: 'factory' },
-      { id: uuidv4(), name: 'การนิคมอุตสาหกรรมแห่งประเทศไทย', type: 'industrial' },
-      { id: uuidv4(), name: 'เทศบาล', type: 'municipal' },
-      { id: uuidv4(), name: 'องค์การบริหารส่วนตำบล (อบต.)', type: 'tambon' }
+      { name: 'สำนักงานคณะกรรมการกำกับพลังงาน (กกพ.)', type: 'erc' },
+      { name: 'บริษัท การไฟฟ้าส่วนภูมิภาค (PEA)', type: 'pea' },
+      { name: 'บริษัท การไฟฟ้านครหลวง (MEA)', type: 'mea' },
+      { name: 'กรมโรงงานอุตสาหกรรม', type: 'factory' },
+      { name: 'การนิคมอุตสาหกรรมแห่งประเทศไทย', type: 'industrial' },
+      { name: 'เทศบาล', type: 'municipal' },
+      { name: 'องค์การบริหารส่วนตำบล (อบต.)', type: 'tambon' }
     ];
 
     for (const org of orgs) {
-      await runInsert(
-        `INSERT OR IGNORE INTO organizations (id, org_name, org_type, status) VALUES (?, ?, ?, ?)`,
-        [org.id, org.name, org.type, 'active']
-      );
+      const existing = await new Promise((resolve, reject) => {
+        db.all('SELECT id FROM organizations WHERE org_name = ?', [org.name], (err, rows) => {
+          if (err) reject(err); else resolve(rows);
+        });
+      });
+      if (existing.length === 0) {
+        await runInsert(
+          'INSERT INTO organizations (id, org_name, org_type, status) VALUES (?, ?, ?, ?)',
+          [uuidv4(), org.name, org.type, 'active']
+        );
+      }
     }
     console.log('✅ เพิ่มหน่วยงาน demo สำเร็จ');
 
-    // เพิ่มหมวดหมู่บัญชีเริ่มต้น
+    // เพิ่มหมวดหมู่บัญชีเริ่มต้น (ใช้ชื่อเป็น unique key เพื่อไม่ให้ซ้ำ)
     const categories = [
       { name: 'เงินมัดจำ', type: 'income', icon: '💰', sort: 1 },
       { name: 'งวดระหว่างงาน', type: 'income', icon: '💵', sort: 2 },
@@ -524,10 +531,17 @@ const initDB = async () => {
       { name: 'ค่าใช้จ่ายอื่นๆ', type: 'expense', icon: '📦', sort: 5 },
     ];
     for (const cat of categories) {
-      await runInsert(
-        `INSERT OR IGNORE INTO accounting_categories (id, name, type, icon, sort_order) VALUES (?, ?, ?, ?, ?)`,
-        [uuidv4(), cat.name, cat.type, cat.icon, cat.sort]
-      );
+      const existing = await new Promise((resolve, reject) => {
+        db.all('SELECT id FROM accounting_categories WHERE name = ? AND type = ?', [cat.name, cat.type], (err, rows) => {
+          if (err) reject(err); else resolve(rows);
+        });
+      });
+      if (existing.length === 0) {
+        await runInsert(
+          'INSERT INTO accounting_categories (id, name, type, icon, sort_order) VALUES (?, ?, ?, ?, ?)',
+          [uuidv4(), cat.name, cat.type, cat.icon, cat.sort]
+        );
+      }
     }
     console.log('✅ เพิ่มหมวดหมู่บัญชีสำเร็จ');
   } catch (err) {

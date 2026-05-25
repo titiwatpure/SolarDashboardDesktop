@@ -275,8 +275,24 @@ export function useInstallments({ onPaymentSuccess } = {}) {
       await accountingAPI.deleteInstallment(id);
       loadInstallments();
     } catch (err) {
-      const msg = err.response?.data?.error || 'เกิดข้อผิดพลาด';
-      alert(msg);
+      const data = err.response?.data;
+      const msg = data?.error || 'เกิดข้อผิดพลาด';
+      // ถ้ามี transaction เชื่อมอยู่ ถามว่าต้องการลบทั้งหมดไหม
+      if (data?.transaction_id) {
+        const txInfo = data.transaction_info;
+        const txDesc = txInfo ? `(${txInfo.type === 'income' ? 'รายรับ' : 'รายจ่าย'} ${Number(txInfo.amount).toLocaleString()} บาท)` : '';
+        const force = window.confirm(`${msg}\n\n${txDesc}\n\nต้องการลบทั้งงวดชำระและรายการบัญชีนี้เลยไหม?`);
+        if (force) {
+          try {
+            await accountingAPI.deleteInstallment(id, true);
+            loadInstallments();
+          } catch (err2) {
+            alert(err2.response?.data?.error || 'เกิดข้อผิดพลาด');
+          }
+        }
+      } else {
+        alert(msg);
+      }
     }
   }, [loadInstallments]);
 

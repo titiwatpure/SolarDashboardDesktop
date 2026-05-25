@@ -36,7 +36,16 @@ const pool = {
           const elapsed = Date.now() - start;
           if (elapsed >= SLOW_QUERY_MS) console.warn(`[SLOW QUERY ${elapsed}ms]`, sql.substring(0, 120));
           if (err) { console.error('Query Error:', err); reject(err); return; }
-          resolve({ rows: rows || [], rowCount: rows?.length || 0 });
+          const normalized = (rows || []).map(row => {
+            const fixed = { ...row };
+            for (const key of Object.keys(fixed)) {
+              if (typeof fixed[key] === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(fixed[key])) {
+                fixed[key] = fixed[key] + 'Z';
+              }
+            }
+            return fixed;
+          });
+          resolve({ rows: normalized, rowCount: normalized.length });
         });
         return;
       }

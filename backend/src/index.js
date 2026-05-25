@@ -80,6 +80,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// Static files - serve uploads (logos, etc.)
+const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, '..', 'uploads');
+app.use('/uploads', express.static(uploadsDir));
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/projects', require('./routes/projects'));

@@ -2,6 +2,7 @@
 // จัดการ Routing สุดทั้งหมดผ่านที่นี่
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { AppSettingsProvider } from './context/AppSettingsContext';
 import { ToastProvider } from './components/Toast';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -25,6 +26,7 @@ const Contracts = lazy(() => import('./pages/Contracts'));
 const CustomerPortal = lazy(() => import('./pages/CustomerPortal'));
 const Accounting = lazy(() => import('./pages/Accounting'));
 const Quotations = lazy(() => import('./pages/Quotations'));
+const Help = lazy(() => import('./pages/Help'));
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -130,6 +132,7 @@ function AppContent() {
             <Route path="/quotations" element={<Quotations />} />
             <Route path="/portal" element={<CustomerPortal />} />
             <Route path="/accounting" element={<Accounting />} />
+            <Route path="/help" element={<Help />} />
           </Routes>
           </Suspense>
         </main>
@@ -143,9 +146,11 @@ function App() {
     <ErrorBoundary>
       <Router>
         <AuthProvider>
-          <ToastProvider>
-            <AppContent />
-          </ToastProvider>
+          <AppSettingsProvider>
+            <ToastProvider>
+              <AppContent />
+            </ToastProvider>
+          </AppSettingsProvider>
         </AuthProvider>
       </Router>
     </ErrorBoundary>

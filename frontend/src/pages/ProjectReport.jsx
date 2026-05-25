@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { projectsAPI, tasksAPI, documentsAPI } from '../utils/api';
+import { projectsAPI, tasksAPI, documentsAPI, settingsAPI } from '../utils/api';
 import {
   STATUS_LABELS, STEP_LABELS, RISK_LEVELS, ROLES,
   PRIORITY_LABELS, CHECKPOINT_STATUSES, APPROVAL_STATUSES, PERMIT_TYPES
@@ -33,9 +33,21 @@ export default function ProjectReport() {
   const [documents, setDocuments] = useState([]);
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [logoBase64, setLogoBase64] = useState(null);
+  const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
     loadAll();
+    settingsAPI.getCompany().then((data) => {
+      setCompanyName(data.company_name || '');
+      if (data.logo_url) {
+        fetch(data.logo_url).then(r => r.blob()).then(blob => {
+          const reader = new FileReader();
+          reader.onload = () => setLogoBase64(reader.result);
+          reader.readAsDataURL(blob);
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   }, [id]);
 
   const loadAll = async () => {
@@ -80,11 +92,22 @@ export default function ProjectReport() {
     const w = doc.internal.pageSize.getWidth();
     let y = 15;
 
+    if (logoBase64) {
+      try { doc.addImage(logoBase64, 'PNG', 14, 8, 14, 14); } catch {}
+    }
+
     doc.setFontSize(16);
-    doc.text(`รายงานโครงการ: ${project.project_name}`, w / 2, y, { align: 'center' });
-    y += 7;
+    const titleX = logoBase64 ? 30 : w / 2;
+    const titleAlign = logoBase64 ? 'left' : 'center';
+    if (companyName) {
+      doc.setFontSize(9);
+      doc.text(companyName, titleX, y - 2, { align: titleAlign });
+    }
+    doc.setFontSize(16);
+    doc.text(`รายงานโครงการ: ${project.project_name}`, titleX, y + 4, { align: titleAlign });
+    y += 10;
     doc.setFontSize(10);
-    doc.text(`${project.project_code} | ${project.size_kw} kW | ${project.province}`, w / 2, y, { align: 'center' });
+    doc.text(`${project.project_code} | ${project.size_kw} kW | ${project.province}`, titleX, y, { align: titleAlign });
     y += 10;
 
     doc.setFontSize(11);

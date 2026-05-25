@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { reportsAPI } from '../utils/api';
+import { reportsAPI, settingsAPI } from '../utils/api';
 import { PRIORITY_LABELS, RISK_LEVELS, ROLES, STATUS_LABELS, STEP_LABELS } from '../utils/constants';
 import { SARABUN_BASE64 } from '../utils/thaiFont';
 
@@ -42,6 +42,8 @@ export default function Reports() {
   const [leadTimeData, setLeadTimeData] = useState([]);
   const [performanceData, setPerformanceData] = useState([]);
   const [tasksData, setTasksData] = useState([]);
+  const [tasksByAssignee, setTasksByAssignee] = useState([]);
+  const [tasksDetails, setTasksDetails] = useState([]);
   const [timelineData, setTimelineData] = useState([]);
   const [timelineSearch, setTimelineSearch] = useState('');
   const [timelinePage, setTimelinePage] = useState(1);
@@ -49,14 +51,26 @@ export default function Reports() {
   const [selectedSections, setSelectedSections] = useState(
     () => new Set(SECTIONS.map((s) => s.id))
   );
+  const [logoBase64, setLogoBase64] = useState(null);
+  const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
     loadReports();
+    settingsAPI.getCompany().then((data) => {
+      setCompanyName(data.company_name || '');
+      if (data.logo_url) {
+        fetch(data.logo_url).then(r => r.blob()).then(blob => {
+          const reader = new FileReader();
+          reader.onload = () => setLogoBase64(reader.result);
+          reader.readAsDataURL(blob);
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   const loadReports = async () => {
     try {
-      const [status, size, province, step, risk, leadTime, performance, tasks, timeline] =
+      const [status, size, province, step, risk, leadTime, performance, tasks, timeline, byAssignee, details] =
         await Promise.all([
           reportsAPI.getSummaryByStatus(),
           reportsAPI.getSummaryBySize(),
@@ -67,6 +81,8 @@ export default function Reports() {
           reportsAPI.getSummaryByPerformance().catch(() => []),
           reportsAPI.getSummaryByTasks().catch(() => []),
           reportsAPI.getSummaryByTimeline().catch(() => []),
+          reportsAPI.getTasksByAssignee().catch(() => []),
+          reportsAPI.getTasksDetails().catch(() => []),
         ]);
 
       setStatusData(Array.isArray(status) ? status : (status.data || []));
@@ -78,6 +94,8 @@ export default function Reports() {
       setPerformanceData(Array.isArray(performance) ? performance : (performance.data || []));
       setTasksData(Array.isArray(tasks) ? tasks : (tasks.data || []));
       setTimelineData(Array.isArray(timeline) ? timeline : (timeline.data || []));
+      setTasksByAssignee(Array.isArray(byAssignee) ? byAssignee : (byAssignee.data || []));
+      setTasksDetails(Array.isArray(details) ? details : (details.data || []));
     } catch (error) {
       console.error('Failed to load reports:', error);
     }
@@ -203,9 +221,10 @@ export default function Reports() {
     }
 
     if (sel.has('tasks')) {
-      const sheet = XLSX.utils.json_to_sheet(
-        tasksData.map((r) => ({
-          'ความสำคัญ': PRIORITY_LABELS[r.priority] || r.priority,
+      const sheet1 = XLSX.utils.json_to_sheet(
+        tasksByAssignee.map((r) => ({
+          'ผู้รับผิดชอบ': r.assignee_name,
+          'บทบาท': ROLES[r.assignee_role] || r.assignee_role || '-',
           'ทั้งหมด': r.total,
           'รอดำเนินการ': r.pending,
           'กำลังทำ': r.in_progress,
@@ -214,7 +233,21 @@ export default function Reports() {
           'เกินกำหนด': r.overdue,
         }))
       );
-      XLSX.utils.book_append_sheet(wb, sheet, 'สรุปงานที่มอบหมาย');
+      XLSX.utils.book_append_sheet(wb, sheet1, 'สรุปตามผู้รับผิดชอบ');
+
+      const sheet2 = XLSX.utils.json_to_sheet(
+        tasksDetails.map((r) => ({
+          'ความสำคัญ': PRIORITY_LABELS[r.priority] || r.priority,
+          'ชื่องาน': r.title,
+          'โครงการ': r.project_name || '-',
+          'รหัสโครงการ': r.project_code || '-',
+          'ผู้รับผิดชอบ': r.assigned_to_name || '-',
+          'ครบกำหนด': r.due_date ? new Date(r.due_date).toLocaleDateString('th-TH') : '-',
+          'สถานะ': STATUS_LABELS[r.status] || r.status,
+          'เสร็จเมื่อ': r.completed_at ? new Date(r.completed_at).toLocaleDateString('th-TH') : '-',
+        }))
+      );
+      XLSX.utils.book_append_sheet(wb, sheet2, 'รายละเอียดงาน');
     }
 
     if (sel.has('timeline')) {
@@ -235,7 +268,7 @@ export default function Reports() {
 
     const date = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `รายงาน Solar Dashboard ${date}.xlsx`);
-  }, [selectedSections, statusData, sizeData, stepData, provinceData, riskData, leadTimeData, performanceData, tasksData, filteredTimeline]);
+  }, [selectedSections, statusData, sizeData, stepData, provinceData, riskData, leadTimeData, performanceData, tasksByAssignee, tasksDetails, filteredTimeline]);
 
   // ---- PDF Export ----
   const handleExportPdf = useCallback(() => {
@@ -252,16 +285,28 @@ export default function Reports() {
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 15;
 
+    if (logoBase64) {
+      try { doc.addImage(logoBase64, 'PNG', 14, 8, 14, 14); } catch {}
+    }
+
     doc.setFontSize(16);
-    doc.text('รายงาน Solar Dashboard', pageWidth / 2, y, { align: 'center' });
-    y += 7;
+    const titleX = logoBase64 ? 30 : pageWidth / 2;
+    const titleAlign = logoBase64 ? 'left' : 'center';
+    if (companyName) {
+      doc.setFontSize(9);
+      doc.setTextColor(0);
+      doc.text(companyName, titleX, y - 2, { align: titleAlign });
+    }
+    doc.setFontSize(16);
+    doc.text('รายงาน Solar Dashboard', titleX, y + 4, { align: titleAlign });
+    y += 10;
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(
       new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }),
-      pageWidth / 2,
+      titleX,
       y,
-      { align: 'center' }
+      { align: titleAlign }
     );
     doc.setTextColor(0);
     y += 8;
@@ -365,15 +410,28 @@ export default function Reports() {
 
     if (sel.has('tasks')) {
       addSection(
-        'สรุปงานที่มอบหมาย',
-        ['ความสำคัญ', 'ทั้งหมด', 'รอดำเนินการ', 'กำลังทำ', 'เสร็จแล้ว', 'เกินกำหนด'],
-        tasksData.map((r) => [
-          PRIORITY_LABELS[r.priority] || r.priority,
+        'สรุปงานตามผู้รับผิดชอบ',
+        ['ผู้รับผิดชอบ', 'บทบาท', 'ทั้งหมด', 'รอดำเนินการ', 'กำลังทำ', 'เสร็จแล้ว', 'เกินกำหนด'],
+        tasksByAssignee.map((r) => [
+          r.assignee_name,
+          ROLES[r.assignee_role] || r.assignee_role || '-',
           String(r.total),
           String(r.pending),
           String(r.in_progress),
           String(r.completed),
           String(r.overdue),
+        ])
+      );
+      addSection(
+        'รายละเอียดงานทั้งหมด',
+        ['ความสำคัญ', 'ชื่องาน', 'โครงการ', 'ผู้รับผิดชอบ', 'ครบกำหนด', 'สถานะ'],
+        tasksDetails.map((r) => [
+          PRIORITY_LABELS[r.priority] || r.priority,
+          r.title,
+          r.project_name || '-',
+          r.assigned_to_name || '-',
+          r.due_date ? new Date(r.due_date).toLocaleDateString('th-TH') : '-',
+          STATUS_LABELS[r.status] || r.status,
         ])
       );
     }
@@ -394,7 +452,7 @@ export default function Reports() {
     }
 
     doc.save(`รายงาน Solar Dashboard ${new Date().toISOString().slice(0, 10)}.pdf`);
-  }, [selectedSections, statusData, sizeData, stepData, provinceData, riskData, leadTimeData, performanceData, tasksData, filteredTimeline]);
+  }, [selectedSections, statusData, sizeData, stepData, provinceData, riskData, leadTimeData, performanceData, tasksByAssignee, tasksDetails, filteredTimeline, logoBase64, companyName]);
 
   // ---- Chart data ----
   const pieData = useMemo(
@@ -765,53 +823,116 @@ export default function Reports() {
         )}
 
         {sel.has('tasks') && (
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-slate-900">สรุปงานที่มอบหมาย</h2>
-              <p className="mt-1 text-sm text-slate-500">จำนวนงานแยกตามความสำคัญและสถานะ</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-slate-50 text-sm text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold">ความสำคัญ</th>
-                    <th className="px-4 py-3 text-center font-semibold">ทั้งหมด</th>
-                    <th className="px-4 py-3 text-center font-semibold">รอดำเนินการ</th>
-                    <th className="px-4 py-3 text-center font-semibold">กำลังทำ</th>
-                    <th className="px-4 py-3 text-center font-semibold">เสร็จแล้ว</th>
-                    <th className="px-4 py-3 text-center font-semibold">เกินกำหนด</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {tasksData.map((row) => (
-                    <tr key={row.priority} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-3 font-medium text-slate-900">
-                        {PRIORITY_LABELS[row.priority] || row.priority}
-                      </td>
-                      <td className="px-4 py-3 text-center text-slate-700">{row.total}</td>
-                      <td className="px-4 py-3 text-center text-slate-700">{row.pending}</td>
-                      <td className="px-4 py-3 text-center text-slate-700">{row.in_progress}</td>
-                      <td className="px-4 py-3 text-center text-slate-700">{row.completed}</td>
-                      <td className="px-4 py-3 text-center">
-                        {row.overdue > 0 ? (
-                          <span className="inline-block rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800">
-                            {row.overdue}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">0</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {tasksData.length === 0 && (
+          <>
+            {/* Summary by assignee */}
+            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-5">
+                <h2 className="text-xl font-bold text-slate-900">สรุปงานตามผู้รับผิดชอบ</h2>
+                <p className="mt-1 text-sm text-slate-500">จำนวนงานแยกตามผู้รับผิดชอบและสถานะ</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-slate-50 text-sm text-slate-500">
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-slate-400">ไม่มีข้อมูล</td>
+                      <th className="px-4 py-3 text-left font-semibold">ผู้รับผิดชอบ</th>
+                      <th className="px-4 py-3 text-center font-semibold">ทั้งหมด</th>
+                      <th className="px-4 py-3 text-center font-semibold">รอดำเนินการ</th>
+                      <th className="px-4 py-3 text-center font-semibold">กำลังทำ</th>
+                      <th className="px-4 py-3 text-center font-semibold">เสร็จแล้ว</th>
+                      <th className="px-4 py-3 text-center font-semibold">เกินกำหนด</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {tasksByAssignee.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/70">
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          {row.assignee_name}
+                          {row.assignee_role && (
+                            <span className="ml-2 text-xs text-slate-400">({ROLES[row.assignee_role] || row.assignee_role})</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center text-slate-700">{row.total}</td>
+                        <td className="px-4 py-3 text-center text-slate-700">{row.pending}</td>
+                        <td className="px-4 py-3 text-center text-slate-700">{row.in_progress}</td>
+                        <td className="px-4 py-3 text-center text-slate-700">{row.completed}</td>
+                        <td className="px-4 py-3 text-center">
+                          {row.overdue > 0 ? (
+                            <span className="inline-block rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800">
+                              {row.overdue}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">0</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {tasksByAssignee.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400">ไม่มีข้อมูล</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+
+            {/* Detailed task list */}
+            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-5">
+                <h2 className="text-xl font-bold text-slate-900">รายละเอียดงานทั้งหมด</h2>
+                <p className="mt-1 text-sm text-slate-500">รายการงานทั้งหมด {tasksDetails.length} งาน</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-slate-50 text-sm text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold">ความสำคัญ</th>
+                      <th className="px-4 py-3 text-left font-semibold">ชื่องาน</th>
+                      <th className="px-4 py-3 text-left font-semibold">โครงการ</th>
+                      <th className="px-4 py-3 text-left font-semibold">ผู้รับผิดชอบ</th>
+                      <th className="px-4 py-3 text-left font-semibold">ครบกำหนด</th>
+                      <th className="px-4 py-3 text-left font-semibold">สถานะ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {tasksDetails.map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-50/70">
+                        <td className="px-4 py-3">
+                          <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            row.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                            row.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                            row.priority === 'medium' ? 'bg-blue-100 text-blue-800' :
+                            'bg-slate-100 text-slate-700'
+                          }`}>
+                            {PRIORITY_LABELS[row.priority] || row.priority}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate" title={row.title}>{row.title}</td>
+                        <td className="px-4 py-3 text-slate-700">{row.project_code || '-'}</td>
+                        <td className="px-4 py-3 text-slate-700">{row.assigned_to_name || '-'}</td>
+                        <td className="px-4 py-3 text-slate-600">{row.due_date ? new Date(row.due_date).toLocaleDateString('th-TH') : '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            row.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            row.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            row.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-slate-100 text-slate-700'
+                          }`}>
+                            {STATUS_LABELS[row.status] || row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {tasksDetails.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400">ไม่มีข้อมูล</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         )}
       </section>
 

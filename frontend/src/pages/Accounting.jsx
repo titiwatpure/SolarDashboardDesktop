@@ -1385,23 +1385,25 @@ function ProjectTab({
                 {/* Type filter */}
                 <select
                   value={txFilter}
-                  onChange={(e) => onTxFilterChange(e.target.value)}
+                  onChange={(e) => { onTxFilterChange(e.target.value); onTxCategoryFilterChange(''); }}
                   className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400"
                 >
                   <option value="all">ทั้งหมด</option>
                   <option value="income">รายรับ</option>
                   <option value="expense">รายจ่าย</option>
                 </select>
-                {/* Category filter */}
+                {/* Category filter — filtered by type */}
                 <select
                   value={txCategoryFilter}
                   onChange={(e) => onTxCategoryFilterChange(e.target.value)}
                   className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400"
                 >
                   <option value="">ทุกหมวดหมู่</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
+                  {categories
+                    .filter((cat) => txFilter === 'all' || cat.type === txFilter)
+                    .map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
                 </select>
                 {/* Date from */}
                 <input

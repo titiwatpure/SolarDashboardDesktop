@@ -238,8 +238,9 @@ router.get('/summary/performance', authenticateToken, async (_req, res) => {
         ROUND(100.0 * COUNT(CASE WHEN p.status = 'completed' THEN 1 END) / NULLIF(COUNT(p.id), 0), 1) as completion_rate
       FROM users u
       LEFT JOIN projects p ON p.responsible_user = u.id
-      WHERE u.role IN ('engineer', 'staff')
+      WHERE u.status = 'active'
       GROUP BY u.id, u.full_name, u.role
+      HAVING total_projects > 0
       ORDER BY total_projects DESC
     `);
     res.json(result.rows);
@@ -270,6 +271,65 @@ router.get('/summary/tasks', authenticateToken, async (_req, res) => {
           WHEN 'medium' THEN 3
           WHEN 'low' THEN 4
         END
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// GET /api/reports/tasks/by-assignee — สรุปงานตามผู้รับผิดชอบ
+router.get('/tasks/by-assignee', authenticateToken, async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COALESCE(u.full_name, u.username, '(ไม่มอบหมาย)') as assignee_name,
+        u.role as assignee_role,
+        COUNT(*) as total,
+        COUNT(CASE WHEN t.status = 'pending' THEN 1 END) as pending,
+        COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress,
+        COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed,
+        COUNT(CASE WHEN t.status = 'cancelled' THEN 1 END) as cancelled,
+        COUNT(CASE WHEN t.due_date < date('now') AND t.status NOT IN ('completed', 'cancelled') THEN 1 END) as overdue
+      FROM tasks t
+      LEFT JOIN users u ON u.id = t.assigned_to
+      GROUP BY COALESCE(u.id, '__unassigned__')
+      ORDER BY total DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// GET /api/reports/tasks/details — รายละเอียดงานทั้งหมด
+router.get('/tasks/details', authenticateToken, async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        t.id,
+        t.title,
+        t.priority,
+        t.status,
+        t.due_date,
+        t.completed_at,
+        t.created_at,
+        p.project_name,
+        p.project_code,
+        COALESCE(u.full_name, u.username, '-') as assigned_to_name
+      FROM tasks t
+      LEFT JOIN projects p ON p.id = t.project_id
+      LEFT JOIN users u ON u.id = t.assigned_to
+      ORDER BY
+        CASE t.priority
+          WHEN 'urgent' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+        END,
+        t.due_date ASC
     `);
     res.json(result.rows);
   } catch (error) {

@@ -5,6 +5,7 @@ import Pipeline from '../components/Pipeline';
 import ProjectsTable from '../components/ProjectsTable';
 import ProjectModal from '../components/ProjectModal';
 import { PROVINCES, STATUS_LABELS, STEP_LABELS } from '../utils/constants';
+import { useAppSettings } from '../context/AppSettingsContext';
 
 const todayLabel = new Date().toLocaleString('th-TH', {
   dateStyle: 'long',
@@ -12,6 +13,7 @@ const todayLabel = new Date().toLocaleString('th-TH', {
 });
 
 export default function Dashboard() {
+  const { logoUrl, companyName } = useAppSettings();
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -66,13 +68,17 @@ export default function Dashboard() {
       <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-start gap-4">
-            <div className="mt-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-              <Menu size={22} />
-            </div>
+            {logoUrl ? (
+              <img src={logoUrl} alt={companyName} className="mt-1 h-12 w-12 rounded-2xl object-contain" />
+            ) : (
+              <div className="mt-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                <Menu size={22} />
+              </div>
+            )}
             <div>
               <h1 className="text-4xl font-bold tracking-tight text-slate-900">ภาพรวมโครงการ</h1>
               <p className="mt-2 text-base text-slate-500">
-                แดชบอร์ดสถานะโครงการผลิตไฟฟ้าจากพลังงานแสงอาทิตย์ของนายไตรทศเกิด
+                {companyName ? `แดชบอร์ดสถานะโครงการ ${companyName}` : 'แดชบอร์ดสถานะโครงการผลิตไฟฟ้าจากพลังงานแสงอาทิตย์'}
               </p>
             </div>
           </div>

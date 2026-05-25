@@ -291,6 +291,8 @@ export const reportsAPI = {
   getSummaryByLeadTime: () => apiCall('GET', '/reports/summary/lead-time'),
   getSummaryByPerformance: () => apiCall('GET', '/reports/summary/performance'),
   getSummaryByTasks: () => apiCall('GET', '/reports/summary/tasks'),
+  getTasksByAssignee: () => apiCall('GET', '/reports/tasks/by-assignee'),
+  getTasksDetails: () => apiCall('GET', '/reports/tasks/details'),
 };
 
 export const notificationsAPI = {
@@ -334,6 +336,15 @@ export const backupAPI = {
 export const settingsAPI = {
   getCompany: () => apiCall('GET', '/settings/company'),
   updateCompany: (data) => apiCall('PUT', '/settings/company', data),
+  uploadLogo: (file) => {
+    const formData = new FormData();
+    formData.append('logo', file);
+    const token = localStorage.getItem('token');
+    return axios.post(`${API_BASE_URL}/settings/logo`, formData, {
+      headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+    }).then(res => res.data);
+  },
+  getChangelog: () => apiCall('GET', '/settings/changelog'),
 };
 
 export const quotationsAPI = {
@@ -375,7 +386,7 @@ export const accountingAPI = {
   bulkInstallments: (data) => apiCall('POST', '/accounting/installments/bulk', data),
   updateInstallment: (id, data) => apiCall('PUT', `/accounting/installments/${id}`, data),
   payInstallment: (id, data) => apiCall('POST', `/accounting/installments/${id}/pay`, data),
-  deleteInstallment: (id) => apiCall('DELETE', `/accounting/installments/${id}`),
+  deleteInstallment: (id, force) => apiCall('DELETE', `/accounting/installments/${id}${force ? '?force=true' : ''}`),
   getProjectSummary: (projectId) => apiCall('GET', `/accounting/project/${projectId}/summary`),
   getCompanySummary: () => apiCall('GET', '/accounting/company/summary'),
   export: (params) => apiCall('GET', `/accounting/export?${new URLSearchParams(params || {})}`),

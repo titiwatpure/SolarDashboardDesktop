@@ -192,6 +192,8 @@ async function initializeDatabase() {
 // 5. Start Express server and create window
 // ──────────────────────────────────────────────
 async function createApp() {
+  console.log(`Solar Dashboard v${app.getVersion()} starting...`);
+
   // Wait for sql.js to initialize
   const sqlite3Compat = require('./sqlite3-compat.cjs');
   if (sqlite3Compat._ready) await sqlite3Compat._ready;
