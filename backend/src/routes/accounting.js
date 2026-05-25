@@ -776,12 +776,18 @@ router.get('/export', authenticateToken, async (req, res) => {
 // GET /company/summary — สรุปการเงินทั้งบริษัท
 router.get('/company/summary', authenticateToken, async (req, res) => {
   try {
-    // สรุปรายรับ-รายจ่ายรวม
+    // สรุปรายรับ-รายจ่ายรวม (เฉพาะที่ยังมี project อยู่)
     const incomeResult = await pool.query(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = 'income'`
+      `SELECT COALESCE(SUM(t.amount), 0) as total
+       FROM transactions t
+       INNER JOIN projects p ON t.project_id = p.id
+       WHERE t.type = 'income'`
     );
     const expenseResult = await pool.query(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = 'expense'`
+      `SELECT COALESCE(SUM(t.amount), 0) as total
+       FROM transactions t
+       INNER JOIN projects p ON t.project_id = p.id
+       WHERE t.type = 'expense'`
     );
 
     const totalIncome = Number(incomeResult.rows[0]?.total || 0);
@@ -791,13 +797,14 @@ router.get('/company/summary', authenticateToken, async (req, res) => {
     // แนวโน้มรายเดือน (12 เดือนล่าสุด)
     const monthlyResult = await pool.query(
       `SELECT
-         strftime('%Y-%m', transaction_date) AS month,
-         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) AS income,
-         COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expense
-       FROM transactions
-       WHERE transaction_date IS NOT NULL
-         AND transaction_date >= date('now', '-12 months')
-       GROUP BY strftime('%Y-%m', transaction_date)
+         strftime('%Y-%m', t.transaction_date) AS month,
+         COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0) AS income,
+         COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense
+       FROM transactions t
+       INNER JOIN projects p ON t.project_id = p.id
+       WHERE t.transaction_date IS NOT NULL
+         AND t.transaction_date >= date('now', '-12 months')
+       GROUP BY strftime('%Y-%m', t.transaction_date)
        ORDER BY month ASC`
     );
 
@@ -811,8 +818,7 @@ router.get('/company/summary', authenticateToken, async (req, res) => {
          COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0)
            - COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS profit
        FROM transactions t
-       LEFT JOIN projects p ON t.project_id = p.id
-       WHERE t.project_id IS NOT NULL
+       INNER JOIN projects p ON t.project_id = p.id
        GROUP BY t.project_id
        ORDER BY profit DESC
        LIMIT 5`
@@ -820,16 +826,17 @@ router.get('/company/summary', authenticateToken, async (req, res) => {
 
     // ลูกหนี้คงค้าง (งวดที่ยังไม่ชำระ + ชำระบางส่วน)
     const receivableResult = await pool.query(
-      `SELECT COALESCE(SUM(amount - paid_amount), 0) as total
-       FROM payment_installments
-       WHERE status IN ('pending', 'overdue', 'partial')`
+      `SELECT COALESCE(SUM(pi.amount - pi.paid_amount), 0) as total
+       FROM payment_installments pi
+       INNER JOIN projects p ON pi.project_id = p.id
+       WHERE pi.status IN ('pending', 'overdue', 'partial')`
     );
 
     // รายการลูกหนี้ (join ชื่อโครงการ)
     const receivablesResult = await pool.query(
       `SELECT pi.*, p.project_name
        FROM payment_installments pi
-       LEFT JOIN projects p ON pi.project_id = p.id
+       INNER JOIN projects p ON pi.project_id = p.id
        WHERE pi.status IN ('pending', 'overdue', 'partial')
        ORDER BY pi.due_date ASC, pi.installment_number ASC`
     );
@@ -841,6 +848,7 @@ router.get('/company/summary', authenticateToken, async (req, res) => {
          ac.name AS category_name,
          COALESCE(SUM(t.amount), 0) AS total
        FROM transactions t
+       INNER JOIN projects p ON t.project_id = p.id
        LEFT JOIN accounting_categories ac ON t.category_id = ac.id
        GROUP BY t.category_id, t.type
        ORDER BY t.type, total DESC`
