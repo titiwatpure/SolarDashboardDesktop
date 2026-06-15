@@ -92,10 +92,6 @@ export default function NetworkMap() {
       .sort((a, b) => b[1].total - a[1].total);
   }, [provinceGroups]);
 
-  const maxCount = useMemo(() => {
-    return Math.max(1, ...Object.values(provinceGroups).map((p) => p.length));
-  }, [provinceGroups]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -118,45 +114,50 @@ export default function NetworkMap() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {Object.entries(provinceGroups).map(([province, projs]) => {
-            const coords = PROVINCE_COORDS[province];
-            if (!coords) return null;
-            const radius = 6 + (projs.length / maxCount) * 20;
+          {projects.map((p) => {
+            const lat = p.site_lat ? Number(p.site_lat) : null;
+            const lng = p.site_lng ? Number(p.site_lng) : null;
+            const hasCoords = lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+            const provinceCoords = PROVINCE_COORDS[p.province];
+            const center = hasCoords
+              ? [lat, lng]
+              : provinceCoords
+                ? [provinceCoords.lat, provinceCoords.lng]
+                : null;
+            if (!center) return null;
+            const color = STATUS_COLORS[p.status] || '#94a3b8';
             return (
               <CircleMarker
-                key={province}
-                center={[coords.lat, coords.lng]}
-                radius={radius}
+                key={p.id}
+                center={center}
+                radius={hasCoords ? 8 : 10}
                 pathOptions={{
-                  color: getDominantColor(projs),
-                  fillColor: getDominantColor(projs),
-                  fillOpacity: 0.6,
-                  weight: 2,
+                  color,
+                  fillColor: color,
+                  fillOpacity: hasCoords ? 0.85 : 0.5,
+                  weight: hasCoords ? 2.5 : 1.5,
                 }}
               >
                 <Popup>
                   <div className="min-w-[220px]">
-                    <h3 className="font-bold text-sm mb-2 text-slate-800">
+                    <h3 className="font-bold text-sm mb-1 text-slate-800 cursor-pointer hover:text-blue-600"
+                        onClick={() => navigate(`/projects/${p.id}`)}>
                       <MapPin className="inline w-4 h-4 mr-1" />
-                      {province} ({projs.length} โครงการ)
+                      {p.project_name}
                     </h3>
-                    <ul className="space-y-1 max-h-48 overflow-y-auto">
-                      {projs.map((p) => (
-                        <li
-                          key={p.id}
-                          className="text-xs cursor-pointer hover:bg-slate-100 p-1 rounded flex justify-between items-center"
-                          onClick={() => navigate(`/projects/${p.id}`)}
-                        >
-                          <span className="truncate mr-2">{p.project_name}</span>
-                          <span
-                            className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full text-white"
-                            style={{ backgroundColor: STATUS_COLORS[p.status] || '#94a3b8' }}
-                          >
-                            {STATUS_LABELS[p.status] || p.status}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="text-xs text-slate-500 mb-2">{p.province}</p>
+                    {hasCoords && (
+                      <p className="text-[10px] text-slate-400 mb-2">พิกัด: {lat}, {lng}</p>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-600">{p.size_kw} kW</span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-full text-white"
+                        style={{ backgroundColor: color }}
+                      >
+                        {STATUS_LABELS[p.status] || p.status}
+                      </span>
+                    </div>
                   </div>
                 </Popup>
               </CircleMarker>

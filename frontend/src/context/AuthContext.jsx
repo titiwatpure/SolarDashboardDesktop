@@ -3,15 +3,29 @@ import { setAuthToken, setRefreshToken, authAPI, usersAPI, decodeJWT, refreshAcc
 
 const AuthContext = createContext(null);
 
-// ตั้ง refresh ก่อน token หมดอายุ (วินาที)
 const REFRESH_BEFORE_EXPIRY_SEC = 60;
 
+function getUserFromStorage() {
+  try {
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    if (token && storedUser) {
+      const user = JSON.parse(storedUser);
+      setAuthToken(token);
+      return user;
+    }
+  } catch {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+  }
+  return null;
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => getUserFromStorage());
   const [loading, setLoading] = useState(true);
   const refreshTimerRef = useRef(null);
 
-  // ตั้ง timer ให้ refresh อัตโนมัติก่อน token หมดอายุ
   const startRefreshTimer = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
 
@@ -27,36 +41,24 @@ export function AuthProvider({ children }) {
     refreshTimerRef.current = setTimeout(async () => {
       try {
         await refreshAccessToken();
-        startRefreshTimer(); // ตั้ง timer ใหม่หลัง refresh สำเร็จ
+        startRefreshTimer();
       } catch {
-        // refresh ไม่สำเร็จ → ให้ interceptor จัดการ logout เมื่อมี request ถัดไป
+        // refresh failed — interceptor handles logout on next request
       }
     }, delayMs);
   }, []);
 
-  // ตรวจสอบ token จาก localStorage ตอนโหลด
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-
-    if (token && storedUser) {
-      setAuthToken(token);
-      try {
-        setUser(JSON.parse(storedUser));
-        startRefreshTimer();
-      } catch {
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-      }
+    if (user) {
+      startRefreshTimer();
     }
     setLoading(false);
 
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     };
-  }, [startRefreshTimer]);
+  }, [user, startRefreshTimer]);
 
-  // Login
   const login = useCallback(async (username, password) => {
     const res = await authAPI.login(username, password);
     const { token, accessToken, refreshToken: refresh, user: userData } = res;
@@ -69,10 +71,9 @@ export function AuthProvider({ children }) {
     return userData;
   }, [startRefreshTimer]);
 
-  // Logout
   const logout = useCallback(async () => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    try { await authAPI.logout(); } catch { /* ล้าง local เสมอ */ }
+    try { await authAPI.logout(); } catch { /* clear local anyway */ }
     setAuthToken(null);
     setRefreshToken(null);
     setUser(null);
@@ -81,7 +82,6 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('refreshToken');
   }, []);
 
-  // Refresh user profile
   const refreshUser = useCallback(async () => {
     try {
       const res = await usersAPI.getProfile();
@@ -94,7 +94,6 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Change password
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     const res = await usersAPI.changePassword(currentPassword, newPassword);
     return res;

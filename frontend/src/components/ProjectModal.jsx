@@ -59,7 +59,25 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, projec
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    const newValue = type === 'checkbox' ? checked : value;
+
+    if (name === 'site_lat' && value !== '') {
+      const num = Number(value);
+      if (num < -90 || num > 90) {
+        setError('ละติจูดต้องอยู่ระหว่าง -90 ถึง 90');
+        return;
+      }
+    }
+    if (name === 'site_lng' && value !== '') {
+      const num = Number(value);
+      if (num < -180 || num > 180) {
+        setError('ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180');
+        return;
+      }
+    }
+
+    setError('');
+    setFormData((prev) => ({ ...prev, [name]: newValue }));
   };
 
   const handleCreateCustomer = async () => {
@@ -277,16 +295,19 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, projec
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">ละติจูด</label>
+                  <label className="block text-xs text-gray-500 mb-1">ละติจูด (-90 ถึง 90)</label>
                   <input type="number" step="any" name="site_lat" value={formData.site_lat || ''} onChange={handleChange}
+                    placeholder="เช่น 13.756331"
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">ลองจิจูด</label>
+                  <label className="block text-xs text-gray-500 mb-1">ลองจิจูด (-180 ถึง 180)</label>
                   <input type="number" step="any" name="site_lng" value={formData.site_lng || ''} onChange={handleChange}
+                    placeholder="เช่น 100.501762"
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                 </div>
               </div>
+              <p className="text-[11px] text-gray-400">ถ้าไม่กรอก ระบบจะปักหมุดที่ตำแหน่งกลางจังหวัดอัตโนมัติ</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">สถานีไฟฟ้า</label>

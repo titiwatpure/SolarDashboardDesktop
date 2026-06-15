@@ -372,10 +372,24 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
       project_name, project_code, size_kw, size_kva, province,
       responsible_user, description, has_power_selling, start_date,
       scope_start, scope_end, expected_cod_date, actual_cod_date,
+      site_lat, site_lng,
     } = req.body;
 
     if (!project_name || !size_kw || !province) {
       return res.status(400).json({ error: 'ข้อมูลโครงการไม่ครบถ้วน' });
+    }
+
+    if (site_lat !== undefined && site_lat !== null && site_lat !== '') {
+      const latNum = Number(site_lat);
+      if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+        return res.status(400).json({ error: 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90' });
+      }
+    }
+    if (site_lng !== undefined && site_lng !== null && site_lng !== '') {
+      const lngNum = Number(site_lng);
+      if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+        return res.status(400).json({ error: 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180' });
+      }
     }
 
     const sizeKwNum = Number(size_kw);
@@ -425,8 +439,8 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
         responsible_user, description, has_power_selling, requires_permit,
         permit_type, start_date, expected_cod_date, actual_cod_date,
         status, current_step, scope_start, scope_end,
-        risk_level, risk_factors
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        risk_level, risk_factors, site_lat, site_lng
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, project_name, finalCode, Number(size_kw),
         size_kva ? Number(size_kva) : null, province,
@@ -437,6 +451,8 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
         'not_started', 'survey',
         scopeStartVal, scopeEndVal,
         'low', '{}',
+        site_lat ? Number(site_lat) : null,
+        site_lng ? Number(site_lng) : null,
       ]
     );
 
@@ -644,6 +660,18 @@ router.put('/:id', authenticateToken, async (req, res) => {
       if ((key === 'size_kw' || key === 'size_kva') && rawValue !== '' && rawValue != null) {
         value = Number(rawValue);
         if (isNaN(value)) return res.status(400).json({ error: `${key} ต้องเป็นตัวเลข` });
+      }
+      if (key === 'site_lat' && rawValue !== '' && rawValue != null) {
+        value = Number(rawValue);
+        if (isNaN(value) || value < -90 || value > 90) {
+          return res.status(400).json({ error: 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90' });
+        }
+      }
+      if (key === 'site_lng' && rawValue !== '' && rawValue != null) {
+        value = Number(rawValue);
+        if (isNaN(value) || value < -180 || value > 180) {
+          return res.status(400).json({ error: 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180' });
+        }
       }
       setClauses.push(`${key} = ?`);
       values.push(value === '' ? null : value);

@@ -18,6 +18,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Steps = lazy(() => import('./pages/Steps'));
 const Documents = lazy(() => import('./pages/Documents'));
 const Tasks = lazy(() => import('./pages/Tasks'));
+const TaskCalendar = lazy(() => import('./pages/TaskCalendar'));
 const NetworkMap = lazy(() => import('./pages/NetworkMap'));
 const Customers = lazy(() => import('./pages/Customers'));
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail'));
@@ -123,6 +124,7 @@ function AppContent() {
             <Route path="/users" element={<Users />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/tasks" element={<Tasks />} />
+            <Route path="/calendar" element={<TaskCalendar />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/steps" element={<Steps />} />
             <Route path="/network-map" element={<NetworkMap />} />

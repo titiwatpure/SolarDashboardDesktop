@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Building2,
+  CalendarDays,
   CheckSquare,
   ChevronDown,
   ChevronLeft,
@@ -14,10 +15,8 @@ import {
   Users,
   UserCircle,
   Zap,
-  ShieldCheck,
   LayoutGrid,
   Wallet,
-  Receipt,
   BookOpen
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -29,13 +28,12 @@ const allMenuItems = [
   { id: 'portal', label: 'แดชบอร์ดลูกค้า', icon: LayoutGrid, path: '/portal', roles: ['client'] },
   { id: 'projects', label: 'โครงการทั้งหมด', icon: Zap, path: '/projects', roles: ['admin', 'engineer', 'staff'] },
   { id: 'steps', label: 'ปฏิบัติงาน', icon: CheckSquare, path: '/steps', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'customers', label: 'ลูกค้า', icon: UserCircle, path: '/customers', roles: ['admin', 'engineer', 'staff'] },
-{ id: 'contracts', label: 'สัญญา', icon: ShieldCheck, path: '/contracts', roles: ['admin', 'engineer'] },
-  { id: 'quotations', label: 'ใบเสนอราคา', icon: Receipt, path: '/quotations', roles: ['admin', 'engineer'] },
+  { id: 'tasks', label: 'งานที่มอบหมาย', icon: ClipboardList, path: '/tasks', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'calendar', label: 'ปฏิทินงาน', icon: CalendarDays, path: '/calendar', roles: ['admin', 'engineer', 'staff'] },
   { id: 'accounting', label: 'บัญชี', icon: Wallet, path: '/accounting', roles: ['admin', 'engineer'] },
   { id: 'organizations', label: 'หน่วยงาน', icon: Building2, path: '/organizations', roles: ['admin', 'engineer', 'staff'] },
   { id: 'documents', label: 'เอกสาร', icon: FileText, path: '/documents', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'tasks', label: 'งานที่มอบหมาย', icon: ClipboardList, path: '/tasks', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'customers', label: 'ลูกค้า', icon: UserCircle, path: '/customers', roles: ['admin', 'engineer', 'staff'] },
   { id: 'reports', label: 'รายงาน', icon: BarChart3, path: '/reports', roles: ['admin', 'engineer', 'staff'] },
   { id: 'network-map', label: 'แผนที่โครง', icon: Map, path: '/network-map', roles: ['admin', 'engineer', 'staff'] },
   { id: 'users', label: 'ผู้ใช้งาน', icon: Users, path: '/users', roles: ['admin'] },

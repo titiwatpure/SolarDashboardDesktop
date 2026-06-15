@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const isSubmitting = useRef(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -17,16 +18,19 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
     setError('');
     setLoading(true);
 
     try {
       await login(credentials.username, credentials.password);
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (err) {
       setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-    } finally {
       setLoading(false);
+    } finally {
+      isSubmitting.current = false;
     }
   };
 
