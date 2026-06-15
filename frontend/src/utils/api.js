@@ -278,6 +278,11 @@ export const organizationsAPI = {
   create: (data) => apiCall('POST', '/organizations', data),
   update: (id, data) => apiCall('PUT', `/organizations/${id}`, data),
   delete: (id) => apiCall('DELETE', `/organizations/${id}`),
+  getContacts: (id) => apiCall('GET', `/organizations/${id}/contacts`),
+  createContact: (orgId, data) => apiCall('POST', `/organizations/${orgId}/contacts`, data),
+  updateContact: (orgId, contactId, data) => apiCall('PUT', `/organizations/${orgId}/contacts/${contactId}`, data),
+  deleteContact: (orgId, contactId) => apiCall('DELETE', `/organizations/${orgId}/contacts/${contactId}`),
+  getAllContacts: (params) => apiCall('GET', `/organizations/contacts/all?${new URLSearchParams(params || {})}`),
 };
 
 export const reportsAPI = {

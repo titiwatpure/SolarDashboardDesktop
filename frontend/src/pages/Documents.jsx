@@ -53,7 +53,8 @@ export default function Documents() {
       if (filterProject) params.project_id = filterProject;
       const [documentResult, projectResponse] = await Promise.all([
         documentsAPI.getAll(params),
-        projectsAPI.getAll({ page: 1, limit: 5000 })
+        // TODO: async search ควรทำถ้ามี project เยอะกว่า 200
+        projectsAPI.getAll({ page: 1, limit: 200 })
       ]);
 
       const docList = Array.isArray(documentResult) ? documentResult : (documentResult.data || []);

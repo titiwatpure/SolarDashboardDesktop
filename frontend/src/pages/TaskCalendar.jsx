@@ -112,8 +112,9 @@ export default function TaskCalendar() {
   const loadAll = async () => {
     setLoading(true);
     try {
+      // TODO: เพิ่ม start_date/end_date filter ใน backend Phase 2 เพื่อโหลดเฉพาะเดือนที่เลือก
       const [tasksRes, projectsRes, usersRes] = await Promise.all([
-        tasksAPI.getAll({ limit: 500 }),
+        tasksAPI.getAll({ limit: 100 }),
         projectsAPI.getAll({ limit: 100 }),
         usersAPI.getAll({ limit: 100 }),
       ]);

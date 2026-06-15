@@ -59,9 +59,10 @@ export default function Tasks() {
 
   const loadDropdowns = async () => {
     try {
+      // TODO: Phase 2 — cache dropdown data ด้วย React Query หรือ context
       const [projRes, userRes] = await Promise.all([
-        projectsAPI.getAll({ limit: 1000 }),
-        usersAPI.getAll(),
+        projectsAPI.getAll({ limit: 200 }),
+        usersAPI.getAll({ limit: 200 }),
       ]);
       setProjects(Array.isArray(projRes) ? projRes : (projRes.data || []));
       setUsers(Array.isArray(userRes) ? userRes : (userRes.data || []));

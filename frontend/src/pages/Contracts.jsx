@@ -53,8 +53,8 @@ export default function Contracts() {
   const loadDropdowns = useCallback(async () => {
     try {
       const [custRes, projRes] = await Promise.all([
-        customersAPI.getAll({ limit: 1000 }),
-        projectsAPI.getAll({ limit: 1000 }),
+        customersAPI.getAll({ limit: 200 }),
+        projectsAPI.getAll({ limit: 200 }),
       ]);
       setCustomers(Array.isArray(custRes) ? custRes : (custRes.data || []));
       setProjects(Array.isArray(projRes) ? projRes : (projRes.data || []));

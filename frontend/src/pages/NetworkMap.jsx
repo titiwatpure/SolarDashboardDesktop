@@ -54,7 +54,8 @@ export default function NetworkMap() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const data = await projectsAPI.getAll({ limit: 1000 });
+        // TODO: Phase 2 — เพิ่ม filter has_coords ใน backend เพื่อโหลดเฉพาะ projects ที่มีพิกัด
+        const data = await projectsAPI.getAll({ limit: 200 });
         setProjects(data.data || []);
       } catch (err) {
         console.error('Failed to load projects:', err);

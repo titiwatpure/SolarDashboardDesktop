@@ -215,7 +215,7 @@ export default function Accounting() {
 
   const loadProjects = useCallback(async () => {
     try {
-      const data = await projectsAPI.getAll({ limit: 1000 });
+      const data = await projectsAPI.getAll({ limit: 200 });
       setProjects(Array.isArray(data) ? data : data.data || []);
     } catch (err) {
       console.error('Failed to load projects:', err);

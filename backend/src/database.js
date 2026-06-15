@@ -5,7 +5,11 @@ require('dotenv').config();
 const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'solar_dashboard.db');
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
-const HEALTH_CHECK_INTERVAL_MS = 30000;
+const HEALTH_CHECK_INTERVAL_MS = 10000;
+const SLOW_QUERY_LOG_MS = 5000;
+const QUERY_RETRY_COUNT = 3;
+const QUERY_RETRY_DELAYS = [100, 300, 700];
+const isDev = process.env.NODE_ENV !== 'production';
 
 let db = null;
 let isClosing = false;
@@ -33,7 +37,7 @@ async function openDatabase(retries = MAX_RETRIES) {
         });
       });
       await applyPragmas(db);
-      console.log('Connected to SQLite:', dbPath);
+      if (isDev) console.log('Connected to SQLite:', dbPath);
       return;
     } catch (err) {
       console.error(`DB connection attempt ${attempt}/${retries} failed:`, err.message);
@@ -46,6 +50,47 @@ async function openDatabase(retries = MAX_RETRIES) {
   }
 }
 
+// Reconnect helper — ใช้เฉพาะ connection errors
+async function reconnectOnce() {
+  if (isClosing) return;
+  if (isDev) console.log('[DB] Attempting reconnect...');
+  try {
+    await openDatabase(1);
+    if (isDev) console.log('[DB] Reconnect succeeded');
+  } catch (err) {
+    console.error('[DB] Reconnect failed:', err.message);
+  }
+}
+
+// Check if error is connection-related (值得 reconnect)
+function isConnectionError(err) {
+  if (!err) return false;
+  const msg = (err.message || '').toLowerCase();
+  return msg.includes('database is closed') ||
+         msg.includes('connection') ||
+         msg.includes('econnrefused') ||
+         msg.includes('econnreset') ||
+         msg.includes('sqlite_busy') ||
+         msg.includes('sqlite_locked') ||
+         err.code === 'SQLITE_BUSY' ||
+         err.code === 'SQLITE_LOCKED' ||
+         err.code === 'SQLITE_CORRUPT';
+}
+
+// Check if error is retryable (SQLITE_BUSY / SQLITE_LOCKED only)
+function isRetryableError(err) {
+  if (!err) return false;
+  return err.code === 'SQLITE_BUSY' || err.code === 'SQLITE_LOCKED';
+}
+
+// Sleep helper
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Sanitize SQL for logging — ตัด parameter values ออก
+function sanitizeSql(sql) {
+  return (sql || '').substring(0, 150).replace(/\?\s*,?/g, '?');
+}
+
 // Periodic health check — reconnect if DB becomes unresponsive
 let healthCheckTimer = null;
 
@@ -55,8 +100,8 @@ function startHealthCheck() {
     if (!db || isClosing) return;
     db.get('SELECT 1', (err) => {
       if (err) {
-        console.error('DB health check failed, reconnecting:', err.message);
-        openDatabase().catch((e) => console.error('DB reconnect failed:', e.message));
+        console.error('[DB] Health check failed:', err.message);
+        reconnectOnce();
       }
     });
   }, HEALTH_CHECK_INTERVAL_MS);
@@ -80,11 +125,29 @@ process.on('SIGINT', () => {
 });
 
 const isReadQuery = (sql) => /^\s*(SELECT|WITH|PRAGMA)\b/i.test(sql);
-const SLOW_QUERY_MS = 100;
 
 function ensureDb() {
   if (!db) throw new Error('Database not initialized');
   return db;
+}
+
+// Execute query with retry for SQLITE_BUSY/SQLITE_LOCKED
+function execWithRetry(conn, method, sql, params) {
+  return new Promise((resolve, reject) => {
+    const attempt = (retryCount) => {
+      conn[method](sql, params, function onResult(err, result) {
+        if (err && isRetryableError(err) && retryCount < QUERY_RETRY_COUNT) {
+          const delay = QUERY_RETRY_DELAYS[retryCount] || 700;
+          if (isDev) console.warn(`[DB] Retry ${retryCount + 1}/${QUERY_RETRY_COUNT} after ${delay}ms (${err.code})`);
+          setTimeout(() => attempt(retryCount + 1), delay);
+          return;
+        }
+        if (err) return reject(err);
+        resolve(result);
+      });
+    };
+    attempt(0);
+  });
 }
 
 const pool = {
@@ -92,46 +155,69 @@ const pool = {
 
   query: async (sql, params = []) => {
     await dbReady;
-    const conn = ensureDb();
-    return new Promise((resolve, reject) => {
-      const start = Date.now();
+    let conn = ensureDb();
+    const start = Date.now();
+
+    try {
+      let result;
       if (isReadQuery(sql)) {
-        conn.all(sql, params, (err, rows) => {
-          const elapsed = Date.now() - start;
-          if (elapsed >= SLOW_QUERY_MS) console.warn(`[SLOW QUERY ${elapsed}ms]`, sql.substring(0, 120));
-          if (err) { console.error('Query Error:', err); reject(err); return; }
-          const normalized = (rows || []).map(row => {
-            const fixed = { ...row };
-            for (const key of Object.keys(fixed)) {
-              if (typeof fixed[key] === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(fixed[key])) {
-                fixed[key] = fixed[key] + 'Z';
-              }
-            }
-            return fixed;
-          });
-          resolve({ rows: normalized, rowCount: normalized.length });
-        });
-        return;
+        result = await execWithRetry(conn, 'all', sql, params);
+      } else {
+        result = await execWithRetry(conn, 'run', sql, params);
       }
 
-      conn.run(sql, params, function onRun(err) {
-        const elapsed = Date.now() - start;
-        if (elapsed >= SLOW_QUERY_MS) console.warn(`[SLOW QUERY ${elapsed}ms]`, sql.substring(0, 120));
-        if (err) { console.error('Query Error:', err); reject(err); return; }
-        resolve({ rows: [], rowCount: this.changes || 0, changes: this.changes || 0, lastID: this.lastID });
-      });
-    });
+      const elapsed = Date.now() - start;
+
+      // Log slow queries (>5s)
+      if (elapsed >= SLOW_QUERY_LOG_MS) {
+        console.warn(`[SLOW QUERY ${elapsed}ms]`, sanitizeSql(sql));
+      }
+
+      if (isReadQuery(sql)) {
+        const rows = (result || []).map(row => {
+          const fixed = { ...row };
+          for (const key of Object.keys(fixed)) {
+            if (typeof fixed[key] === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(fixed[key])) {
+              fixed[key] = fixed[key] + 'Z';
+            }
+          }
+          return fixed;
+        });
+        return { rows, rowCount: rows.length };
+      }
+
+      return { rows: [], rowCount: result?.changes || 0, changes: result?.changes || 0, lastID: result?.lastID };
+    } catch (err) {
+      // Auto reconnect สำหรับ connection errors เท่านั้น
+      if (isConnectionError(err) && !isRetryableError(err)) {
+        console.error('[DB] Connection error, reconnecting:', err.message);
+        await reconnectOnce();
+        // ลอง query อีกครั้งหลัง reconnect
+        conn = ensureDb();
+        try {
+          if (isReadQuery(sql)) {
+            const rows = await new Promise((res, rej) => {
+              conn.all(sql, params, (e, r) => e ? rej(e) : res(r));
+            });
+            return { rows: rows || [], rowCount: (rows || []).length };
+          } else {
+            const result = await new Promise((res, rej) => {
+              conn.run(sql, params, function (e) { e ? rej(e) : res({ changes: this.changes, lastID: this.lastID }); });
+            });
+            return { rows: [], rowCount: result.changes || 0, changes: result.changes || 0, lastID: result.lastID };
+          }
+        } catch (retryErr) {
+          console.error('[DB] Query failed after reconnect:', sanitizeSql(sql), retryErr.message);
+          throw retryErr;
+        }
+      }
+      console.error('[DB] Query error:', sanitizeSql(sql), err.message);
+      throw err;
+    }
   },
 
   run: async (sql, params = []) => {
-    await dbReady;
-    const conn = ensureDb();
-    return new Promise((resolve, reject) => {
-      conn.run(sql, params, function onRun(err) {
-        if (err) { reject(err); return; }
-        resolve({ changes: this.changes || 0, lastID: this.lastID });
-      });
-    });
+    return pool.query(sql, params);
   },
 
   exec: async (sql) => {

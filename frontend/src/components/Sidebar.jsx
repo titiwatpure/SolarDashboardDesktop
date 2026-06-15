@@ -32,6 +32,7 @@ const allMenuItems = [
   { id: 'calendar', label: 'ปฏิทินงาน', icon: CalendarDays, path: '/calendar', roles: ['admin', 'engineer', 'staff'] },
   { id: 'accounting', label: 'บัญชี', icon: Wallet, path: '/accounting', roles: ['admin', 'engineer'] },
   { id: 'organizations', label: 'หน่วยงาน', icon: Building2, path: '/organizations', roles: ['admin', 'engineer', 'staff'] },
+  { id: 'organization-contacts', label: 'เจ้าหน้าที่หน่วยงาน', icon: Users, path: '/organization-contacts', roles: ['admin', 'engineer', 'staff'] },
   { id: 'documents', label: 'เอกสาร', icon: FileText, path: '/documents', roles: ['admin', 'engineer', 'staff'] },
   { id: 'customers', label: 'ลูกค้า', icon: UserCircle, path: '/customers', roles: ['admin', 'engineer', 'staff'] },
   { id: 'reports', label: 'รายงาน', icon: BarChart3, path: '/reports', roles: ['admin', 'engineer', 'staff'] },
