@@ -10,8 +10,8 @@ const router = express.Router();
 // CATEGORIES
 // ============================================================
 
-// GET /categories — รายการหมวดหมู่ (filter: type)
-router.get('/categories', authenticateToken, async (req, res) => {
+// GET /categories — รายการหมวดหมู่ (filter: type) — admin/engineer เท่านั้น
+router.get('/categories', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     const { type } = req.query;
     let sql = 'SELECT * FROM accounting_categories WHERE 1=1';
@@ -76,8 +76,8 @@ const getTransactionById = async (id) => {
   return result.rows[0] || null;
 };
 
-// GET /transactions — รายการธุรกรรม (filter + pagination)
-router.get('/transactions', authenticateToken, async (req, res) => {
+// GET /transactions — รายการธุรกรรม (filter + pagination) — admin/engineer เท่านั้น
+router.get('/transactions', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     const { project_id, type, category_id, date_from, date_to } = req.query;
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -141,8 +141,8 @@ router.get('/transactions', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /transactions/:id — ดึงธุรกรรมเดี่ยว
-router.get('/transactions/:id', authenticateToken, async (req, res) => {
+// GET /transactions/:id — ดึงธุรกรรมเดี่ยว — admin/engineer เท่านั้น
+router.get('/transactions/:id', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     const transaction = await getTransactionById(req.params.id);
     if (!transaction) return res.status(404).json({ error: 'ไม่พบธุรกรรม' });
@@ -281,8 +281,8 @@ const getInstallmentById = async (id) => {
   return result.rows[0] || null;
 };
 
-// GET /installments — รายการงวดชำระ (filter: project_id, contract_id, status)
-router.get('/installments', authenticateToken, async (req, res) => {
+// GET /installments — รายการงวดชำระ (filter: project_id, contract_id, status) — admin/engineer เท่านั้น
+router.get('/installments', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     const { project_id, contract_id, status } = req.query;
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -640,8 +640,8 @@ router.delete('/installments/:id', authenticateToken, authorizeRole(['admin', 'e
 // PROJECT FINANCIAL SUMMARY
 // ============================================================
 
-// GET /project/:projectId/summary — สรุปการเงินของโครงการ
-router.get('/project/:projectId/summary', authenticateToken, async (req, res) => {
+// GET /project/:projectId/summary — สรุปการเงินของโครงการ — admin/engineer เท่านั้น
+router.get('/project/:projectId/summary', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     const { projectId } = req.params;
 
@@ -744,8 +744,8 @@ router.get('/project/:projectId/summary', authenticateToken, async (req, res) =>
 // EXPORT
 // ============================================================
 
-// GET /export — ส่งออกข้อมูลบัญชี (JSON)
-router.get('/export', authenticateToken, async (req, res) => {
+// GET /export — ส่งออกข้อมูลบัญชี (JSON) — admin/engineer เท่านั้น
+router.get('/export', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     const { project_id, type, date_from, date_to } = req.query;
     let clause = '';
@@ -788,8 +788,8 @@ router.get('/export', authenticateToken, async (req, res) => {
 // COMPANY-WIDE SUMMARY
 // ============================================================
 
-// GET /company/summary — สรุปการเงินทั้งบริษัท
-router.get('/company/summary', authenticateToken, async (req, res) => {
+// GET /company/summary — สรุปการเงินทั้งบริษัท — admin/engineer เท่านั้น
+router.get('/company/summary', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     // ใช้ Promise.all() สำหรับ independent queries
     const [summaryResult, monthlyResult, topProjectsResult, receivableResult, categoryResult] = await Promise.all([

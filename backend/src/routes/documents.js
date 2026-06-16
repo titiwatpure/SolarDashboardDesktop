@@ -270,8 +270,8 @@ router.get('/download/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/documents — เพิ่มเอกสารใหม่ (รองรับ file upload)
-router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
+// POST /api/documents — เพิ่มเอกสารใหม่ (admin/engineer/staff)
+router.post('/', authenticateToken, authorizeRole(['admin', 'engineer', 'staff']), upload.single('file'), async (req, res) => {
   try {
     const { project_id, document_type, description } = req.body;
     const document_name = req.body.document_name?.trim();
@@ -359,12 +359,19 @@ router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, r
 });
 
 // POST /api/documents/download-to — ดาวน์โหลดไฟล์ไปยัง path ที่ระบุ (สำหรับ Electron)
-router.post('/download-to', authenticateToken, async (req, res) => {
+router.post('/download-to', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     const { document_id, save_path } = req.body;
     if (!document_id || !save_path) {
       return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
     }
+
+    // ป้องกัน path traversal — ห้าม absolute path, UNC path, ../
+    const normalized = save_path.replace(/\\/g, '/');
+    if (path.isAbsolute(normalized) || normalized.startsWith('//') || normalized.includes('../')) {
+      return res.status(403).json({ error: 'ไม่อนุญาตใช้ path นี้' });
+    }
+
     const document = await getDocumentById(document_id);
     if (!document || !document.file_path) {
       return res.status(404).json({ error: 'ไม่พบไฟล์' });
@@ -374,22 +381,16 @@ router.post('/download-to', authenticateToken, async (req, res) => {
     if (!filePath.startsWith(path.resolve(uploadsDir)) || !fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'ไฟล์ไม่อยู่ในระบบ' });
     }
-    // Validate save_path is not targeting system directories
-    const resolvedSavePath = path.resolve(save_path);
-    const dangerousPaths = ['C:\\Windows', 'C:\\Program Files', '/etc', '/usr', '/bin', '/sbin'];
-    if (dangerousPaths.some(p => resolvedSavePath.toLowerCase().startsWith(p.toLowerCase()))) {
-      return res.status(403).json({ error: 'ไม่อนุญาตเขียนไฟล์ไปยังตำแหน่งนี้' });
-    }
-    // Ensure parent directory exists
-    const saveDir = path.dirname(resolvedSavePath);
-    if (!fs.existsSync(saveDir)) {
-      return res.status(400).json({ error: 'ไม่พบโฟลเดอร์ปลายทาง' });
-    }
-    await fs.promises.copyFile(filePath, resolvedSavePath);
+    // บันทึกไปยังโฟลเดอร์ downloads ของระบบเท่านั้น
+    const downloadsDir = path.join(path.resolve(uploadsDir), '..', 'downloads');
+    if (!fs.existsSync(downloadsDir)) fs.mkdirSync(downloadsDir, { recursive: true });
+    const safeFileName = path.basename(normalized).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const finalPath = path.join(downloadsDir, safeFileName);
+    await fs.promises.copyFile(filePath, finalPath);
     await logActivity(req.user.id, 'download', 'document', document_id, {
       document_name: document.document_name, project_id: document.project_id,
     }, req.ip || req.socket?.remoteAddress);
-    res.json({ success: true, path: save_path });
+    res.json({ success: true, path: finalPath });
   } catch (error) {
     console.error('[DOC_DOWNLOAD_TO]', error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการดาวน์โหลดไฟล์' });
