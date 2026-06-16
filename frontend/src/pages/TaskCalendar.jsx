@@ -31,6 +31,14 @@ function toKey(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${Strin
 function getWeekStart(date) { const d = new Date(date); d.setDate(d.getDate() - d.getDay()); return d; }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 
+// date-only helper — ไม่ใช้ toISOString() เพื่อหลีก timezone issue
+function formatLocalDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function getEventStyle(t, isOverdueFn) {
   if (t.status === 'completed' || t.status === 'cancelled') return EVENT_BG.completed;
   if (isOverdueFn(t.due_date, t.status)) return EVENT_BG.overdue;
@@ -107,43 +115,63 @@ export default function TaskCalendar() {
   const month = currentDate.getMonth();
   const today = new Date();
 
-  useEffect(() => { loadAll(); }, [currentDate, viewMode]);
-
+  // === Helper functions (defined before useEffects) ===
   const getDateRange = () => {
     if (viewMode === 'day') {
-      const d = currentDate.toISOString().split('T')[0];
-      return { start_date: d, end_date: d };
+      return { start_date: formatLocalDate(currentDate), end_date: formatLocalDate(currentDate) };
     }
     if (viewMode === 'week') {
       const ws = getWeekStart(currentDate);
       const we = addDays(ws, 6);
-      return { start_date: ws.toISOString().split('T')[0], end_date: we.toISOString().split('T')[0] };
+      return { start_date: formatLocalDate(ws), end_date: formatLocalDate(we) };
     }
-    // month / year — โหลดทั้งเดือน/ปี
+    if (viewMode === 'year') {
+      const first = new Date(year, 0, 1);
+      const last = new Date(year, 11, 31);
+      return { start_date: formatLocalDate(first), end_date: formatLocalDate(last) };
+    }
+    // month
     const first = new Date(year, month, 1);
     const last = new Date(year, month + 1, 0);
-    return { start_date: first.toISOString().split('T')[0], end_date: last.toISOString().split('T')[0] };
+    return { start_date: formatLocalDate(first), end_date: formatLocalDate(last) };
   };
 
-  const loadAll = async () => {
-    setLoading(true);
+  const loadDropdowns = async () => {
     try {
-      const { start_date, end_date } = getDateRange();
-      const [tasksRes, projectsRes, usersRes] = await Promise.all([
-        tasksAPI.getAll({ limit: 100, start_date, end_date }),
+      const [projectsRes, usersRes] = await Promise.all([
         projectsAPI.getAll({ limit: 100 }),
         usersAPI.getAll({ limit: 100 }),
       ]);
-      setTasks(tasksRes.data || []);
       setProjects(Array.isArray(projectsRes) ? projectsRes : projectsRes?.data || []);
       setUsers(Array.isArray(usersRes) ? usersRes : usersRes?.data || []);
-    } catch (err) { console.error('Failed to load calendar data:', err); }
+    } catch (err) { console.error('Failed to load dropdowns:', err); }
+  };
+
+  const loadTasks = async () => {
+    setLoading(true);
+    try {
+      const { start_date, end_date } = getDateRange();
+      // TODO: Phase 2 — สร้าง year summary API สำหรับ year view
+      const taskLimit = viewMode === 'year' ? 1000 : 100;
+      const tasksRes = await tasksAPI.getAll({ limit: taskLimit, start_date, end_date });
+      setTasks(tasksRes.data || []);
+    } catch (err) { console.error('Failed to load tasks:', err); }
     finally { setLoading(false); }
   };
 
+  // === Effects ===
+  useEffect(() => { loadDropdowns(); }, []);
+  useEffect(() => { loadTasks(); }, [currentDate, viewMode]);
+
   const isOverdue = (dueDate, status) => {
     if (status === 'completed' || status === 'cancelled') return false;
-    return new Date(dueDate) < today && !isSameDay(new Date(dueDate), today);
+    if (!dueDate) return false;
+    // date-only comparison — ไม่ใช้ timezone
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    return due < todayDate;
   };
   const isMyTask = (t) => t.assigned_to === user?.id;
 
@@ -167,7 +195,13 @@ export default function TaskCalendar() {
 
   const tasksByDate = useMemo(() => {
     const map = {};
-    tasksWithDueDate.forEach(t => { const d = t.due_date.split('T')[0]; if (!map[d]) map[d] = []; map[d].push(t); });
+    tasksWithDueDate.forEach(t => {
+      // due_date จาก API มาในรูปแบบ "YYYY-MM-DD" หรือ "YYYY-MM-DDTHH:MM:SS"
+      // ตัดเวลาออกเพื่อ grouping ที่ถูกต้อง
+      const d = t.due_date.split('T')[0];
+      if (!map[d]) map[d] = [];
+      map[d].push(t);
+    });
     return map;
   }, [tasksWithDueDate]);
 
