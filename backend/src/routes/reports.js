@@ -7,11 +7,12 @@ const { authenticateToken } = require('../middleware/auth');
 router.get('/summary/status', authenticateToken, async (_req, res) => {
   try {
     const result = await pool.query(`
+      WITH total AS (SELECT COUNT(*) as cnt FROM projects)
       SELECT
         status,
         COUNT(*) as count,
-        CASE WHEN (SELECT COUNT(*) FROM projects) > 0
-          THEN ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM projects), 1)
+        CASE WHEN (SELECT cnt FROM total) > 0
+          THEN ROUND(COUNT(*) * 100.0 / (SELECT cnt FROM total), 1)
           ELSE 0
         END as percentage
       FROM projects
@@ -128,9 +129,13 @@ router.get('/summary/step-status', authenticateToken, async (_req, res) => {
   }
 });
 
-// GET /api/reports/summary/timeline — รายงาน Timeline ทั้งหมด
-router.get('/summary/timeline', authenticateToken, async (_req, res) => {
+// GET /api/reports/summary/timeline — รายงาน Timeline ทั้งหมด (paginated)
+router.get('/summary/timeline', authenticateToken, async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const offset = (page - 1) * limit;
+
     const result = await pool.query(`
       SELECT
         p.project_name,
@@ -139,16 +144,18 @@ router.get('/summary/timeline', authenticateToken, async (_req, res) => {
         t.status,
         t.note,
         t.created_at,
-        u.full_name as changed_by_name,
-        (SELECT GROUP_CONCAT(tc.comment, ' | ')
-         FROM timeline_comments tc
-         WHERE tc.timeline_id = t.id) as comments
+        u.full_name as changed_by_name
       FROM project_timeline t
       JOIN projects p ON p.id = t.project_id
       LEFT JOIN users u ON u.id = t.changed_by
       ORDER BY t.created_at DESC
-    `);
-    res.json(result.rows);
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const countResult = await pool.query('SELECT COUNT(*) as count FROM project_timeline');
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    res.json({ data: result.rows, pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
@@ -304,9 +311,13 @@ router.get('/tasks/by-assignee', authenticateToken, async (_req, res) => {
   }
 });
 
-// GET /api/reports/tasks/details — รายละเอียดงานทั้งหมด
-router.get('/tasks/details', authenticateToken, async (_req, res) => {
+// GET /api/reports/tasks/details — รายละเอียดงานทั้งหมด (paginated)
+router.get('/tasks/details', authenticateToken, async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const offset = (page - 1) * limit;
+
     const result = await pool.query(`
       SELECT
         t.id,
@@ -330,8 +341,13 @@ router.get('/tasks/details', authenticateToken, async (_req, res) => {
           WHEN 'low' THEN 4
         END,
         t.due_date ASC
-    `);
-    res.json(result.rows);
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const countResult = await pool.query('SELECT COUNT(*) as count FROM tasks');
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    res.json({ data: result.rows, pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

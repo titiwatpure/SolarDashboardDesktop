@@ -642,18 +642,17 @@ router.get('/project/:projectId/summary', authenticateToken, async (req, res) =>
     const projectResult = await pool.query('SELECT budget FROM projects WHERE id = ?', [projectId]);
     const budget = projectResult.rows[0]?.budget || 0;
 
-    // สรุปรายรับ-รายจ่ายจาก transactions
-    const incomeResult = await pool.query(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE project_id = ? AND type = 'income'`,
-      [projectId]
-    );
-    const expenseResult = await pool.query(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE project_id = ? AND type = 'expense'`,
+    // สรุปรายรับ-รายจ่าย (รวมเป็น query เดียว)
+    const summaryResult = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income,
+         COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expense
+       FROM transactions WHERE project_id = ?`,
       [projectId]
     );
 
-    const totalIncome = Number(incomeResult.rows[0]?.total || 0);
-    const totalExpense = Number(expenseResult.rows[0]?.total || 0);
+    const totalIncome = Number(summaryResult.rows[0]?.total_income || 0);
+    const totalExpense = Number(summaryResult.rows[0]?.total_expense || 0);
     const profit = totalIncome - totalExpense;
     const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
 
@@ -689,16 +688,24 @@ router.get('/project/:projectId/summary', authenticateToken, async (req, res) =>
       [projectId]
     );
 
-    // รายการ transactions ทั้งหมดของโครงการ
+    // รายการ transactions (limited)
+    const txPage = Math.max(parseInt(req.query.tx_page, 10) || 1, 1);
+    const txLimit = Math.min(Math.max(parseInt(req.query.tx_limit, 10) || 20, 1), 100);
+    const txOffset = (txPage - 1) * txLimit;
+
     const transactionsResult = await pool.query(
       `SELECT t.*, ac.name AS category_name, p.project_name
        FROM transactions t
        LEFT JOIN accounting_categories ac ON t.category_id = ac.id
        LEFT JOIN projects p ON t.project_id = p.id
        WHERE t.project_id = ?
-       ORDER BY t.transaction_date DESC, t.created_at DESC`,
-      [projectId]
+       ORDER BY t.transaction_date DESC, t.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [projectId, txLimit, txOffset]
     );
+
+    const txCountResult = await pool.query('SELECT COUNT(*) as count FROM transactions WHERE project_id = ?', [projectId]);
+    const txTotal = parseInt(txCountResult.rows[0]?.count || '0', 10);
 
     res.json({
       total_income: totalIncome,
@@ -718,6 +725,7 @@ router.get('/project/:projectId/summary', authenticateToken, async (req, res) =>
       installments_total_paid: Number(inst.total_paid_all),
       category_breakdown: categoryResult.rows,
       transactions: transactionsResult.rows,
+      transactions_pagination: { page: txPage, limit: txLimit, total: txTotal, pages: Math.max(Math.ceil(txTotal / txLimit), 1) },
     });
   } catch (error) {
     console.error(error);
@@ -776,82 +784,77 @@ router.get('/export', authenticateToken, async (req, res) => {
 // GET /company/summary — สรุปการเงินทั้งบริษัท
 router.get('/company/summary', authenticateToken, async (req, res) => {
   try {
-    // สรุปรายรับ-รายจ่ายรวม (เฉพาะที่ยังมี project อยู่)
-    const incomeResult = await pool.query(
-      `SELECT COALESCE(SUM(t.amount), 0) as total
-       FROM transactions t
-       INNER JOIN projects p ON t.project_id = p.id
-       WHERE t.type = 'income'`
-    );
-    const expenseResult = await pool.query(
-      `SELECT COALESCE(SUM(t.amount), 0) as total
-       FROM transactions t
-       INNER JOIN projects p ON t.project_id = p.id
-       WHERE t.type = 'expense'`
-    );
+    // ใช้ Promise.all() สำหรับ independent queries
+    const [summaryResult, monthlyResult, topProjectsResult, receivableResult, categoryResult] = await Promise.all([
+      // สรุปรายรับ-รายจ่ายรวม (query เดียว)
+      pool.query(
+        `SELECT
+           COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0) as total_income,
+           COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) as total_expense
+         FROM transactions t
+         INNER JOIN projects p ON t.project_id = p.id`
+      ),
+      // แนวโน้มรายเดือน (12 เดือนล่าสุด)
+      pool.query(
+        `SELECT
+           strftime('%Y-%m', t.transaction_date) AS month,
+           COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0) AS income,
+           COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense
+         FROM transactions t
+         INNER JOIN projects p ON t.project_id = p.id
+         WHERE t.transaction_date IS NOT NULL
+           AND t.transaction_date >= date('now', '-12 months')
+         GROUP BY strftime('%Y-%m', t.transaction_date)
+         ORDER BY month ASC`
+      ),
+      // โครงการที่ทำกำไรมากที่สุด 5 อันดับ
+      pool.query(
+        `SELECT
+           t.project_id,
+           p.project_name,
+           COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0) AS income,
+           COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense,
+           COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS profit
+         FROM transactions t
+         INNER JOIN projects p ON t.project_id = p.id
+         GROUP BY t.project_id
+         ORDER BY profit DESC
+         LIMIT 5`
+      ),
+      // ลูกหนี้คงค้าง (limit 100)
+      pool.query(
+        `SELECT pi.*, p.project_name
+         FROM payment_installments pi
+         INNER JOIN projects p ON pi.project_id = p.id
+         WHERE pi.status IN ('pending', 'overdue', 'partial')
+         ORDER BY pi.due_date ASC, pi.installment_number ASC
+         LIMIT 100`
+      ),
+      // สรุปตามหมวดหมู่
+      pool.query(
+        `SELECT
+           t.type,
+           ac.name AS category_name,
+           COALESCE(SUM(t.amount), 0) AS total
+         FROM transactions t
+         INNER JOIN projects p ON t.project_id = p.id
+         LEFT JOIN accounting_categories ac ON t.category_id = ac.id
+         GROUP BY t.category_id, t.type
+         ORDER BY t.type, total DESC`
+      ),
+    ]);
 
-    const totalIncome = Number(incomeResult.rows[0]?.total || 0);
-    const totalExpense = Number(expenseResult.rows[0]?.total || 0);
+    const totalIncome = Number(summaryResult.rows[0]?.total_income || 0);
+    const totalExpense = Number(summaryResult.rows[0]?.total_expense || 0);
     const totalProfit = totalIncome - totalExpense;
 
-    // แนวโน้มรายเดือน (12 เดือนล่าสุด)
-    const monthlyResult = await pool.query(
-      `SELECT
-         strftime('%Y-%m', t.transaction_date) AS month,
-         COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0) AS income,
-         COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense
-       FROM transactions t
-       INNER JOIN projects p ON t.project_id = p.id
-       WHERE t.transaction_date IS NOT NULL
-         AND t.transaction_date >= date('now', '-12 months')
-       GROUP BY strftime('%Y-%m', t.transaction_date)
-       ORDER BY month ASC`
-    );
-
-    // โครงการที่ทำกำไรมากที่สุด 5 อันดับ
-    const topProjectsResult = await pool.query(
-      `SELECT
-         t.project_id,
-         p.project_name,
-         COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0) AS income,
-         COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS expense,
-         COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END), 0)
-           - COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS profit
-       FROM transactions t
-       INNER JOIN projects p ON t.project_id = p.id
-       GROUP BY t.project_id
-       ORDER BY profit DESC
-       LIMIT 5`
-    );
-
-    // ลูกหนี้คงค้าง (งวดที่ยังไม่ชำระ + ชำระบางส่วน)
-    const receivableResult = await pool.query(
+    // ลูกหนี้คงค้าง (sum)
+    const receivableSumResult = await pool.query(
       `SELECT COALESCE(SUM(pi.amount - pi.paid_amount), 0) as total
        FROM payment_installments pi
        INNER JOIN projects p ON pi.project_id = p.id
        WHERE pi.status IN ('pending', 'overdue', 'partial')`
-    );
-
-    // รายการลูกหนี้ (join ชื่อโครงการ)
-    const receivablesResult = await pool.query(
-      `SELECT pi.*, p.project_name
-       FROM payment_installments pi
-       INNER JOIN projects p ON pi.project_id = p.id
-       WHERE pi.status IN ('pending', 'overdue', 'partial')
-       ORDER BY pi.due_date ASC, pi.installment_number ASC`
-    );
-
-    // สรุปตามหมวดหมู่ (ทั้งบริษัท)
-    const categoryResult = await pool.query(
-      `SELECT
-         t.type,
-         ac.name AS category_name,
-         COALESCE(SUM(t.amount), 0) AS total
-       FROM transactions t
-       INNER JOIN projects p ON t.project_id = p.id
-       LEFT JOIN accounting_categories ac ON t.category_id = ac.id
-       GROUP BY t.category_id, t.type
-       ORDER BY t.type, total DESC`
     );
 
     res.json({
@@ -870,8 +873,8 @@ router.get('/company/summary', authenticateToken, async (req, res) => {
         expense: Number(r.expense),
         profit: Number(r.profit),
       })),
-      total_receivable: Number(receivableResult.rows[0]?.total || 0),
-      receivables: receivablesResult.rows,
+      total_receivable: Number(receivableSumResult.rows[0]?.total || 0),
+      receivables: receivableResult.rows,
       category_breakdown: categoryResult.rows,
     });
   } catch (error) {
