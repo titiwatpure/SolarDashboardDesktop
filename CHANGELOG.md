@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.0.23 (2026-06-16)
+- Performance Phase 1-3: ปรับปรุง API response time, เพิ่ม pagination, แก้ correlated subquery
+- Security P1: เพิ่ม backend permission checks (tasks, documents, projects, accounting)
+- Security P2-A: เพิ่ม frontend route guard สำหรับ /users, /accounting
+- Security P2-C: AuthContext ใช้ role จาก decoded JWT, ลบ permission leak
+- Database: เพิ่ม auto-reconnect, SQLITE_BUSY retry, slow query log
+- Tasks: เพิ่ม start_date column + API + UI
+- Calendar Phase 1: Year view โหลดทั้งปี, แก้ timezone/date-only
+- ลบ dist2/ ออกจาก git history (1.8 GB)
+- ลบ build output (node_modules, dist, dist2) จากเครื่อง
+
+## v1.0.18 (2026-06-15)
+- Performance Phase 1: ลด dropdown limit (5000→200) ใน 6 ไฟล์ frontend
+- Performance Phase 2: เพิ่ม start_date/end_date filter ใน tasks API
+- Performance Phase 3: แก้ reports correlated subquery + pagination
+- Organization contacts: เพิ่ม table + API + page ใหม่
+- Calendar: เพิ่ม Day/Week/Month/Year view modes
+- Sidebar: เพิ่มเมนู "เจ้าหน้าที่หน่วยงาน", "ปฏิทินงาน"
+- Sidebar: ซ่อนเมนู "สัญญา" และ "ใบเสนอราคา"
+- Sidebar: สลับตำแหน่งเมนู "งานที่มอบหมาย" และ "ลูกค้า"
+- Login fix: แก้ token expiry check เพื่อป้องกัน login flicker
+- Database: เพิ่ม auto-reconnect + SQLITE_BUSY retry + slow query log
+- NetworkMap: รองรับพิกัดจริง site_lat/site_lng
+
 ## v1.0.17 (2026-05-25)
 - แก้ไข timezone bug: timestamps จาก SQLite แสดงเวลาผิด 7 ชั่วโมง
 - เพิ่มตั้งค่าทั่วไป: ภาษา, ธีม, รูปแบบวันที่, เขตเวลา (มีผลทั้งระบบ)
