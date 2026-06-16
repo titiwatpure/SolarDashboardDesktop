@@ -42,7 +42,7 @@ export default function Tasks() {
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [form, setForm] = useState({
-    project_id: '', title: '', description: '', priority: 'medium', assigned_to: '', due_date: '',
+    project_id: '', title: '', description: '', priority: 'medium', assigned_to: '', due_date: '', start_date: '',
   });
 
   useEffect(() => {
@@ -148,6 +148,23 @@ export default function Tasks() {
 
   const isOverdue = (task) => task.due_date && new Date(task.due_date) < new Date() && !['completed', 'cancelled'].includes(task.status);
 
+  // คำนวณจำนวนวันที่เหลือ (date-only, ไม่ใช้ timezone)
+  const getRemainingDays = (task) => {
+    if (!task.due_date) return { text: 'ไม่กำหนด', color: 'bg-slate-100 text-slate-500' };
+    if (['completed', 'cancelled'].includes(task.status)) return { text: 'เสร็จแล้ว', color: 'bg-emerald-100 text-emerald-700' };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(task.due_date);
+    due.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+
+    if (diff === 0) return { text: 'ครบวันนี้', color: 'bg-orange-100 text-orange-700' };
+    if (diff < 0) return { text: `เกิน ${Math.abs(diff)} วัน`, color: 'bg-red-100 text-red-700' };
+    if (diff <= 7) return { text: `เหลือ ${diff} วัน`, color: 'bg-yellow-100 text-yellow-700' };
+    return { text: `เหลือ ${diff} วัน`, color: 'bg-slate-100 text-slate-600' };
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -234,14 +251,16 @@ export default function Tasks() {
                 <th className="px-4 py-3 text-left font-semibold">ความสำคัญ</th>
                 <th className="px-4 py-3 text-left font-semibold">สถานะ</th>
                 <th className="px-4 py-3 text-left font-semibold">ผู้รับผิดชอบ</th>
+                <th className="px-4 py-3 text-left font-semibold">วันที่เริ่ม</th>
                 <th className="px-4 py-3 text-left font-semibold">ครบกำหนด</th>
+                <th className="px-4 py-3 text-left font-semibold">เหลือเวลา</th>
                 <th className="px-4 py-3 text-center font-semibold">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
               {!loading && tasks.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-400">ไม่มีงานที่มอบหมาย</td>
+                  <td colSpan={9} className="px-4 py-10 text-center text-slate-400">ไม่มีงานที่มอบหมาย</td>
                 </tr>
               )}
               {tasks.map((task) => (
@@ -268,11 +287,14 @@ export default function Tasks() {
                     </select>
                   </td>
                   <td className="px-4 py-3 text-slate-700">{task.assigned_to_name || '-'}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">{formatDate(task.start_date || task.created_at)}</td>
                   <td className="px-4 py-3">
                     <span className={isOverdue(task) ? 'text-red-600 font-semibold' : 'text-slate-700'}>
                       {formatDate(task.due_date)}
-                      {isOverdue(task) && ' ⚠'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {(() => { const r = getRemainingDays(task); return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${r.color}`}>{r.text}</span>; })()}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
@@ -365,6 +387,15 @@ export default function Tasks() {
                       <option key={k} value={k}>{v}</option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">วันที่เริ่ม</label>
+                  <input
+                    type="date"
+                    value={form.start_date}
+                    onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">ครบกำหนด</label>

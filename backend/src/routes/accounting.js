@@ -400,46 +400,51 @@ router.post('/installments/bulk', authenticateToken, authorizeRole(['admin', 'en
       return res.status(400).json({ error: 'กรุณาระบุโครงการและรายการงวดชำระ' });
     }
 
-    // หา installment_number เริ่มต้น
-    const maxResult = await pool.query(
-      'SELECT COALESCE(MAX(installment_number), 0) AS max FROM payment_installments WHERE project_id = ?',
-      [project_id]
-    );
-    let nextNum = Number(maxResult.rows[0]?.max || 0) + 1;
-
-    const now = new Date().toISOString();
-    const created = [];
-
-    for (const inst of installments) {
-      if (inst.amount == null || inst.amount <= 0) continue;
-      const id = uuidv4();
-      await pool.query(
-        `INSERT INTO payment_installments
-           (id, contract_id, project_id, installment_number, description,
-            amount, due_date, status, paid_amount, notes, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)`,
-        [
-          id,
-          contract_id || null,
-          project_id,
-          nextNum,
-          inst.description || null,
-          Number(inst.amount),
-          inst.due_date || null,
-          inst.notes || null,
-          now,
-          now,
-        ]
+    const result = await pool.transaction(async (tx) => {
+      // หา installment_number เริ่มต้น
+      const maxResult = await tx.query(
+        'SELECT COALESCE(MAX(installment_number), 0) AS max FROM payment_installments WHERE project_id = ?',
+        [project_id]
       );
-      created.push(await getInstallmentById(id));
-      nextNum++;
-    }
+      let nextNum = Number(maxResult.rows[0]?.max || 0) + 1;
+
+      const now = new Date().toISOString();
+      const created = [];
+
+      for (const inst of installments) {
+        if (inst.amount == null || inst.amount <= 0) continue;
+        const id = uuidv4();
+        await tx.query(
+          `INSERT INTO payment_installments
+             (id, contract_id, project_id, installment_number, description,
+              amount, due_date, status, paid_amount, notes, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)`,
+          [
+            id,
+            contract_id || null,
+            project_id,
+            nextNum,
+            inst.description || null,
+            Number(inst.amount),
+            inst.due_date || null,
+            inst.notes || null,
+            now,
+            now,
+          ]
+        );
+        // ดึงข้อมูลที่สร้างเสร็จ
+        const row = await tx.query('SELECT * FROM payment_installments WHERE id = ?', [id]);
+        created.push(row.rows[0]);
+        nextNum++;
+      }
+      return created;
+    });
 
     logActivity(req.user.id, 'bulk_create', 'payment_installment', null, {
       project_id,
-      count: created.length,
+      count: result.length,
     });
-    res.status(201).json({ data: created, count: created.length });
+    res.status(201).json({ data: result, count: result.length });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
@@ -506,77 +511,79 @@ router.post('/installments/:id/pay', authenticateToken, authorizeRole(['admin', 
     const now = new Date().toISOString();
     const transactionId = uuidv4();
 
-    // หาหมวดหมู่รายรับเริ่มต้น (ใช้ "รายรับจากงวดชำระ" หรือหมวดแรก)
-    let incomeCategoryId = null;
-    const catResult = await pool.query(
-      "SELECT id FROM accounting_categories WHERE type = 'income' ORDER BY sort_order ASC, name ASC LIMIT 1"
-    );
-    incomeCategoryId = catResult.rows[0]?.id || null;
-
-    // สร้างธุรกรรม income จากการชำระ
-    await pool.query(
-      `INSERT INTO transactions
-         (id, project_id, category_id, type, amount, description,
-          transaction_date, reference_type, reference_id,
-          payment_method, receipt_number, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, 'income', ?, ?, ?, 'installment', ?, ?, NULL, ?, ?, ?)`,
-      [
-        transactionId,
-        existing.project_id,
-        incomeCategoryId,
-        Number(paid_amount),
-        `ชำระงวดที่ ${existing.installment_number} - ${existing.description || ''}`.trim(),
-        paid_date || new Date().toISOString().slice(0, 10),
-        id,
-        payment_method || null,
-        req.user.id,
-        now,
-        now,
-      ]
-    );
-
-    // ตรวจสอบสถานะ: paid หรือ partial
-    const totalPaid = Number(existing.paid_amount || 0) + Number(paid_amount);
-    const newStatus = totalPaid >= Number(existing.amount) ? 'paid' : 'partial';
-
-    // อัปเดต installment
-    await pool.query(
-      `UPDATE payment_installments
-       SET paid_amount = ?, paid_date = ?, status = ?,
-           transaction_id = ?, updated_at = ?
-       WHERE id = ?`,
-      [
-        totalPaid,
-        paid_date || new Date().toISOString().slice(0, 10),
-        newStatus,
-        transactionId,
-        now,
-        id,
-      ]
-    );
-
-    // ตรวจสอบว่าทุกงวดของสัญญาจ่ายครบหรือยัง → อัปเดตสถานะสัญญา
-    if (existing.contract_id) {
-    const unpaidResult = await pool.query(
-      `SELECT COUNT(*) as count FROM payment_installments
-       WHERE contract_id = ? AND status NOT IN ('paid')`,
-      [existing.contract_id]
-    );
-    const unpaidCount = parseInt(unpaidResult.rows[0]?.count || '0', 10);
-
-    if (unpaidCount === 0) {
-      await pool.query(
-        `UPDATE contracts SET status = 'completed', updated_at = ? WHERE id = ?`,
-        [now, existing.contract_id]
+    // ใช้ transaction เพื่อให้ทุก query atomic
+    const installment = await pool.transaction(async (tx) => {
+      // หาหมวดหมู่รายรับเริ่มต้น
+      let incomeCategoryId = null;
+      const catResult = await tx.query(
+        "SELECT id FROM accounting_categories WHERE type = 'income' ORDER BY sort_order ASC, name ASC LIMIT 1"
       );
-      logActivity(req.user.id, 'update', 'contract', existing.contract_id, {
-        status: 'completed',
-        reason: 'installments_all_paid',
-      });
-    }
-    } // end if existing.contract_id
+      incomeCategoryId = catResult.rows[0]?.id || null;
 
-    const installment = await getInstallmentById(id);
+      // สร้างธุรกรรม income จากการชำระ
+      await tx.query(
+        `INSERT INTO transactions
+           (id, project_id, category_id, type, amount, description,
+            transaction_date, reference_type, reference_id,
+            payment_method, receipt_number, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, 'income', ?, ?, ?, 'installment', ?, ?, NULL, ?, ?, ?)`,
+        [
+          transactionId,
+          existing.project_id,
+          incomeCategoryId,
+          Number(paid_amount),
+          `ชำระงวดที่ ${existing.installment_number} - ${existing.description || ''}`.trim(),
+          paid_date || new Date().toISOString().slice(0, 10),
+          id,
+          payment_method || null,
+          req.user.id,
+          now,
+          now,
+        ]
+      );
+
+      // ตรวจสอบสถานะ: paid หรือ partial
+      const totalPaid = Number(existing.paid_amount || 0) + Number(paid_amount);
+      const newStatus = totalPaid >= Number(existing.amount) ? 'paid' : 'partial';
+
+      // อัปเดต installment
+      await tx.query(
+        `UPDATE payment_installments
+         SET paid_amount = ?, paid_date = ?, status = ?,
+             transaction_id = ?, updated_at = ?
+         WHERE id = ?`,
+        [
+          totalPaid,
+          paid_date || new Date().toISOString().slice(0, 10),
+          newStatus,
+          transactionId,
+          now,
+          id,
+        ]
+      );
+
+      // ตรวจสอบว่าทุกงวดของสัญญาจ่ายครบหรือยัง
+      if (existing.contract_id) {
+        const unpaidResult = await tx.query(
+          `SELECT COUNT(*) as count FROM payment_installments
+           WHERE contract_id = ? AND status NOT IN ('paid')`,
+          [existing.contract_id]
+        );
+        const unpaidCount = parseInt(unpaidResult.rows[0]?.count || '0', 10);
+
+        if (unpaidCount === 0) {
+          await tx.query(
+            `UPDATE contracts SET status = 'completed', updated_at = ? WHERE id = ?`,
+            [now, existing.contract_id]
+          );
+        }
+      }
+
+      // ดึงข้อมูล installment ล่าสุด
+      const updated = await tx.query('SELECT * FROM payment_installments WHERE id = ?', [id]);
+      return updated.rows[0];
+    });
+
     logActivity(req.user.id, 'pay', 'payment_installment', id, {
       paid_amount: Number(paid_amount),
       transaction_id: transactionId,

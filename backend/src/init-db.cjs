@@ -165,6 +165,7 @@ const initDB = async () => {
       priority TEXT DEFAULT 'medium',
       assigned_to TEXT REFERENCES users(id) ON DELETE SET NULL,
       due_date DATETIME,
+      start_date DATE,
       completed_at DATETIME,
       created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

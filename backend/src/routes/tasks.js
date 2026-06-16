@@ -113,7 +113,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // POST /api/tasks — สร้าง task ใหม่
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { project_id, title, description, priority, assigned_to, due_date } = req.body;
+    const { project_id, title, description, priority, assigned_to, due_date, start_date } = req.body;
 
     if (!project_id || !title) {
       return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
@@ -132,9 +132,9 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const id = uuidv4();
     await pool.query(
-      `INSERT INTO tasks (id, project_id, title, description, priority, assigned_to, due_date, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, project_id, title, description || null, priority || 'medium', assigned_to || null, due_date || null, req.user.id]
+      `INSERT INTO tasks (id, project_id, title, description, priority, assigned_to, due_date, start_date, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, project_id, title, description || null, priority || 'medium', assigned_to || null, due_date || null, start_date || null, req.user.id]
     );
 
     const task = await getTaskById(id);
@@ -150,7 +150,7 @@ router.post('/', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, status, priority, assigned_to, due_date } = req.body;
+    const { title, description, status, priority, assigned_to, due_date, start_date } = req.body;
 
     const existing = await getTaskById(id);
     if (!existing) {
@@ -181,7 +181,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     await pool.query(
       `UPDATE tasks SET
         title = ?, description = ?, status = ?, priority = ?,
-        assigned_to = ?, due_date = ?, completed_at = ?, updated_at = ?
+        assigned_to = ?, due_date = ?, start_date = ?, completed_at = ?, updated_at = ?
        WHERE id = ?`,
       [
         title ?? existing.title,
@@ -190,6 +190,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         priority ?? existing.priority,
         assigned_to !== undefined ? assigned_to : existing.assigned_to,
         due_date ?? existing.due_date,
+        start_date !== undefined ? start_date : existing.start_date,
         completedAt,
         new Date().toISOString(),
         id

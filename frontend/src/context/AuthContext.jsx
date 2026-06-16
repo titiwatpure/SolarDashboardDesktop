@@ -10,6 +10,18 @@ function getUserFromStorage() {
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token && storedUser) {
+      // ตรวจสอบ token หมดอายุหรือยัง
+      const payload = decodeJWT(token);
+      if (payload?.exp) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (payload.exp < nowSec) {
+          // Token หมดอายุ → ล้างข้อมูล
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          return null;
+        }
+      }
       const user = JSON.parse(storedUser);
       setAuthToken(token);
       return user;
