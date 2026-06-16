@@ -23,6 +23,10 @@ function getUserFromStorage() {
         }
       }
       const user = JSON.parse(storedUser);
+      // ใช้ role จาก decoded JWT เป็น source of truth (ป้องกัน localStorage spoofing)
+      if (payload?.role) {
+        user.role = payload.role;
+      }
       setAuthToken(token);
       return user;
     }

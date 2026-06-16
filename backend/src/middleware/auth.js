@@ -70,7 +70,7 @@ const authorizePermission = (...requiredPermissions) => {
 
     const hasPermission = requiredPermissions.every(p => userPermissions.includes(p));
     if (!hasPermission) {
-      return res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึง', required: requiredPermissions });
+      return res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึง' });
     }
     next();
   };

@@ -7,6 +7,7 @@ import { ToastProvider } from './components/Toast';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Login from './pages/Login';
+import ProtectedRoute from './components/ProtectedRoute';
 import { Component, Suspense, lazy, useState } from 'react';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -123,7 +124,7 @@ function AppContent() {
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/organization-contacts" element={<OrganizationContacts />} />
             <Route path="/reports" element={<Reports />} />
-            <Route path="/users" element={<Users />} />
+            <Route path="/users" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/calendar" element={<TaskCalendar />} />
@@ -135,7 +136,7 @@ function AppContent() {
             <Route path="/contracts" element={<Contracts />} />
             <Route path="/quotations" element={<Quotations />} />
             <Route path="/portal" element={<CustomerPortal />} />
-            <Route path="/accounting" element={<Accounting />} />
+            <Route path="/accounting" element={<ProtectedRoute roles={['admin', 'engineer']}><Accounting /></ProtectedRoute>} />
             <Route path="/help" element={<Help />} />
           </Routes>
           </Suspense>
