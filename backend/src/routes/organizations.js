@@ -18,9 +18,13 @@ const getOrganizationById = async (id) => {
 // Static routes (BEFORE /:id)
 // ========================
 
-// GET /api/organizations/contacts/all — all contacts
+// GET /api/organizations/contacts/all — all contacts (paginated)
 router.get('/contacts/all', authenticateToken, async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const offset = (page - 1) * limit;
+
     const { search, organization_id, org_type, status, is_primary } = req.query;
     let whereClause = 'WHERE 1=1';
     const params = [];
@@ -33,14 +37,23 @@ router.get('/contacts/all', authenticateToken, async (req, res) => {
     if (org_type) { whereClause += ' AND o.org_type = ?'; params.push(org_type); }
     if (status) { whereClause += ' AND c.status = ?'; params.push(status); }
     if (is_primary === '1') { whereClause += ' AND c.is_primary = 1'; }
+
     const result = await pool.query(`
       SELECT c.*, o.org_name, o.org_type
       FROM organization_contacts c
       JOIN organizations o ON c.organization_id = o.id
       ${whereClause}
       ORDER BY o.org_name, c.is_primary DESC, c.full_name
-    `, params);
-    res.json(result.rows);
+      LIMIT ? OFFSET ?
+    `, [...params, limit, offset]);
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as count FROM organization_contacts c JOIN organizations o ON c.organization_id = o.id ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    res.json({ data: result.rows, pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

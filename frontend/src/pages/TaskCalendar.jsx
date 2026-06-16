@@ -107,14 +107,30 @@ export default function TaskCalendar() {
   const month = currentDate.getMonth();
   const today = new Date();
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(); }, [currentDate, viewMode]);
+
+  const getDateRange = () => {
+    if (viewMode === 'day') {
+      const d = currentDate.toISOString().split('T')[0];
+      return { start_date: d, end_date: d };
+    }
+    if (viewMode === 'week') {
+      const ws = getWeekStart(currentDate);
+      const we = addDays(ws, 6);
+      return { start_date: ws.toISOString().split('T')[0], end_date: we.toISOString().split('T')[0] };
+    }
+    // month / year — โหลดทั้งเดือน/ปี
+    const first = new Date(year, month, 1);
+    const last = new Date(year, month + 1, 0);
+    return { start_date: first.toISOString().split('T')[0], end_date: last.toISOString().split('T')[0] };
+  };
 
   const loadAll = async () => {
     setLoading(true);
     try {
-      // TODO: เพิ่ม start_date/end_date filter ใน backend Phase 2 เพื่อโหลดเฉพาะเดือนที่เลือก
+      const { start_date, end_date } = getDateRange();
       const [tasksRes, projectsRes, usersRes] = await Promise.all([
-        tasksAPI.getAll({ limit: 100 }),
+        tasksAPI.getAll({ limit: 100, start_date, end_date }),
         projectsAPI.getAll({ limit: 100 }),
         usersAPI.getAll({ limit: 100 }),
       ]);

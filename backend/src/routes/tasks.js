@@ -26,7 +26,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
     const offset = (page - 1) * limit;
-    const { project_id, status, priority, assigned_to } = req.query;
+    const { project_id, status, priority, assigned_to, start_date, end_date } = req.query;
 
     let whereClause = 'WHERE 1=1';
     const params = [];
@@ -46,6 +46,14 @@ router.get('/', authenticateToken, async (req, res) => {
     if (assigned_to) {
       whereClause += ' AND t.assigned_to = ?';
       params.push(assigned_to);
+    }
+    if (start_date) {
+      whereClause += ' AND t.due_date >= ?';
+      params.push(start_date);
+    }
+    if (end_date) {
+      whereClause += ' AND t.due_date <= ?';
+      params.push(end_date);
     }
 
     const result = await pool.query(

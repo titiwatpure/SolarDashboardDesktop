@@ -35,14 +35,14 @@ export default function OrganizationContacts() {
   const loadContacts = async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { limit: 200 };
       if (search) params.search = search;
       if (filterOrg) params.organization_id = filterOrg;
       if (filterOrgType) params.org_type = filterOrgType;
       if (filterPrimary) params.is_primary = '1';
       if (filterStatus) params.status = filterStatus;
       const result = await organizationsAPI.getAllContacts(params);
-      setContacts(Array.isArray(result) ? result : []);
+      setContacts(Array.isArray(result) ? result : (result.data || []));
     } catch (e) { console.error(e); setContacts([]); }
     finally { setLoading(false); }
   };
