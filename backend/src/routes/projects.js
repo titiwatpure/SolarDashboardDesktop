@@ -807,8 +807,8 @@ router.get('/:id/specs', authenticateToken, async (req, res) => {
   }
 });
 
-// PUT /api/projects/:id/specs — สร้างหรืออัปเดตสเปค (upsert)
-router.put('/:id/specs', authenticateToken, async (req, res) => {
+// PUT /api/projects/:id/specs — สร้างหรืออัปเดตสเปค (admin/engineer เท่านั้น)
+router.put('/:id/specs', authenticateToken, authorizeRole(['admin', 'engineer']), async (req, res) => {
   try {
     const { id } = req.params;
     const projectCheck = await pool.query('SELECT id FROM projects WHERE id = ?', [id]);

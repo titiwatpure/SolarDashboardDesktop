@@ -110,8 +110,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/tasks — สร้าง task ใหม่
-router.post('/', authenticateToken, async (req, res) => {
+// POST /api/tasks — สร้าง task ใหม่ (admin/engineer/staff)
+router.post('/', authenticateToken, authorizeRole(['admin', 'engineer', 'staff']), async (req, res) => {
   try {
     const { project_id, title, description, priority, assigned_to, due_date, start_date } = req.body;
 
