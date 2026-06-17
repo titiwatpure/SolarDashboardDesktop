@@ -1,9 +1,13 @@
-import { ChevronLeft, ChevronRight, Clock, AlertTriangle, Edit2, ExternalLink, X, Star, Search, ChevronDown, Filter, CalendarDays } from 'lucide-react';
-import { useEffect, useState, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, Clock, AlertTriangle, Edit2, ExternalLink, X, Star, Search, ChevronDown, Filter, CalendarDays, Target, CheckCircle2, TrendingUp } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tasksAPI, projectsAPI, usersAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { PRIORITY_LABELS } from '../utils/constants';
+
+// TODO: Phase 2.2 — Multi-day task bar จาก start_date → due_date
+// TODO: Phase 2.3 — Holiday calendar + working day calculation
+// TODO: Phase 2.4 — Drag/drop หรือ resize bar
 
 const PRIORITY_COLORS = { urgent: 'bg-red-500', high: 'bg-orange-500', medium: 'bg-yellow-400', low: 'bg-slate-300' };
 const TASK_STATUS_LABELS = { pending: 'รอดำเนินการ', in_progress: 'กำลังดำเนินการ', completed: 'เสร็จแล้ว', cancelled: 'ยกเลิก' };
@@ -16,13 +20,13 @@ const EVENT_BG = {
 };
 const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 const MONTHS_TH = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-const VIEW_MODES = [
-  { key: 'day', label: 'วัน' },
-  { key: 'week', label: 'สัปดาห์' },
-  { key: 'month', label: 'เดือน' },
-  { key: 'year', label: 'ปี' },
+const VIEW_MODES = [{ key: 'day', label: 'วัน' }, { key: 'week', label: 'สัปดาห์' }, { key: 'month', label: 'เดือน' }, { key: 'year', label: 'ปี' }];
+const QUICK_FILTERS = [
+  { key: '', label: 'ทั้งหมด' }, { key: 'today', label: 'วันนี้' }, { key: 'overdue', label: 'เกินกำหนด' },
+  { key: 'thisWeek', label: 'สัปดาห์นี้' }, { key: 'urgent', label: 'เร่งด่วน' }, { key: 'myTasks', label: 'งานของฉัน' },
 ];
 
+// ===== Helpers =====
 function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDayOfMonth(y, m) { return new Date(y, m, 1).getDay(); }
 function isSameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
@@ -30,13 +34,21 @@ function isToday(d) { return isSameDay(d, new Date()); }
 function toKey(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
 function getWeekStart(date) { const d = new Date(date); d.setDate(d.getDate() - d.getDay()); return d; }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+function formatLocalDate(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 
-// date-only helper — ไม่ใช้ toISOString() เพื่อหลีก timezone issue
-function formatLocalDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+// ===== Dynamic User Helpers (ไม่ hardcode) =====
+function getUserColor(userId) {
+  let hash = 0;
+  for (let i = 0; i < String(userId || '').length; i++) hash = String(userId).charCodeAt(i) + ((hash << 5) - hash);
+  return `hsl(${Math.abs(hash) % 360}, 65%, 55%)`;
+}
+function getUserInitials(name) {
+  if (!name) return '?';
+  const p = name.trim().split(/\s+/);
+  return p.length >= 2 ? (p[0][0] + p[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+}
+function UserAvatar({ name, userId, size = 'w-6 h-6 text-[10px]' }) {
+  return <span className={`inline-flex items-center justify-center rounded-full font-bold text-white shrink-0 ${size}`} style={{ backgroundColor: getUserColor(userId) }} title={name || 'ไม่ระบุ'}>{getUserInitials(name)}</span>;
 }
 
 function getEventStyle(t, isOverdueFn) {
@@ -46,47 +58,39 @@ function getEventStyle(t, isOverdueFn) {
   return EVENT_BG.pending;
 }
 
-function TaskChip({ task, onClick, isOverdueFn, isMyTaskFn }) {
-  const bg = getEventStyle(task, isOverdueFn);
-  const myTask = isMyTaskFn(task);
+function TaskChip({ task, onClick, isOverdueFn, isMyTaskFn, users }) {
+  const a = users.find(u => u.id === task.assigned_to);
   return (
-    <button onClick={onClick} className={`w-full text-left rounded border px-2.5 py-2 text-xs leading-tight transition-all hover:shadow-sm ${bg}`}>
-      <div className="flex items-center gap-1.5">
-        <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_COLORS[task.priority] || 'bg-slate-300'}`} />
+    <button onClick={onClick} title={a ? `${task.title} — ${a.full_name}` : task.title}
+      className={`w-full text-left rounded border px-2 py-1.5 text-[11px] leading-tight transition-all hover:shadow-sm ${getEventStyle(task, isOverdueFn)}`}>
+      <div className="flex items-center gap-1">
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_COLORS[task.priority] || 'bg-slate-300'}`} />
         <span className="truncate font-medium">{task.title}</span>
-        {myTask && <Star size={10} className="shrink-0 text-amber-500 fill-amber-500" />}
+        {a && <UserAvatar name={a.full_name} userId={a.id} size="w-4 h-4 text-[7px]" />}
       </div>
-      {task.project_name && <p className="mt-0.5 pl-3.5 text-[10px] opacity-60 truncate">{task.project_name}</p>}
     </button>
   );
 }
 
-function TaskListCard({ task, onClick, isOverdueFn, isMyTaskFn }) {
-  const bg = getEventStyle(task, isOverdueFn);
-  const myTask = isMyTaskFn(task);
+function TaskListCard({ task, onClick, isOverdueFn, isMyTaskFn, users }) {
+  const a = users.find(u => u.id === task.assigned_to);
   const overdue = task.due_date && isOverdueFn(task.due_date, task.status);
   return (
-    <button onClick={onClick} className={`w-full text-left rounded-xl border px-4 py-3 transition-all hover:shadow-sm ${bg}`}>
+    <button onClick={onClick} className={`w-full text-left rounded-xl border px-4 py-3 transition-all hover:shadow-sm ${getEventStyle(task, isOverdueFn)}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${PRIORITY_COLORS[task.priority] || 'bg-slate-300'}`} />
+            <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_COLORS[task.priority] || 'bg-slate-300'}`} />
             <span className="font-medium text-sm truncate">{task.title}</span>
-            {myTask && <Star size={11} className="shrink-0 text-amber-500 fill-amber-500" />}
+            {isMyTaskFn(task) && <Star size={10} className="shrink-0 text-amber-500 fill-amber-500" />}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] opacity-70">
-            {task.project_name && <span>{task.project_name}</span>}
-            {task.assigned_to_name && <span>· {task.assigned_to_name}</span>}
-            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${TASK_STATUS_COLORS[task.status] || ''}`}>
-              {TASK_STATUS_LABELS[task.status] || task.status}
-            </span>
+            {a && <div className="flex items-center gap-1"><UserAvatar name={a.full_name} userId={a.id} size="w-4 h-4 text-[8px]" /><span>{a.full_name}</span></div>}
+            {!a && <span className="italic">ยังไม่มอบหมาย</span>}
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${TASK_STATUS_COLORS[task.status] || ''}`}>{TASK_STATUS_LABELS[task.status] || task.status}</span>
           </div>
         </div>
-        {overdue && (
-          <span className="shrink-0 inline-flex items-center gap-0.5 rounded-lg bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
-            <AlertTriangle size={10} />เกินกำหนด
-          </span>
-        )}
+        {overdue && <span className="shrink-0 inline-flex items-center gap-0.5 rounded-lg bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700"><AlertTriangle size={10} />เกินกำหนด</span>}
       </div>
     </button>
   );
@@ -99,10 +103,12 @@ export default function TaskCalendar() {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
   const [showCompleted, setShowCompleted] = useState(true);
   const [showUnscheduled, setShowUnscheduled] = useState(true);
   const [expandedDays, setExpandedDays] = useState({});
   const [viewMode, setViewMode] = useState('month');
+  const [quickFilter, setQuickFilter] = useState('');
   const [filterProject, setFilterProject] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -110,71 +116,44 @@ export default function TaskCalendar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
-
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const today = new Date();
 
-  // === Helper functions (defined before useEffects) ===
-  const getDateRange = () => {
-    if (viewMode === 'day') {
-      return { start_date: formatLocalDate(currentDate), end_date: formatLocalDate(currentDate) };
-    }
-    if (viewMode === 'week') {
-      const ws = getWeekStart(currentDate);
-      const we = addDays(ws, 6);
-      return { start_date: formatLocalDate(ws), end_date: formatLocalDate(we) };
-    }
-    if (viewMode === 'year') {
-      const first = new Date(year, 0, 1);
-      const last = new Date(year, 11, 31);
-      return { start_date: formatLocalDate(first), end_date: formatLocalDate(last) };
-    }
-    // month
-    const first = new Date(year, month, 1);
-    const last = new Date(year, month + 1, 0);
-    return { start_date: formatLocalDate(first), end_date: formatLocalDate(last) };
-  };
-
-  const loadDropdowns = async () => {
-    try {
-      const [projectsRes, usersRes] = await Promise.all([
-        projectsAPI.getAll({ limit: 100 }),
-        usersAPI.getAll({ limit: 100 }),
-      ]);
-      setProjects(Array.isArray(projectsRes) ? projectsRes : projectsRes?.data || []);
-      setUsers(Array.isArray(usersRes) ? usersRes : usersRes?.data || []);
-    } catch (err) { console.error('Failed to load dropdowns:', err); }
-  };
+  // ===== Data Loading (ไม่ refetch ซ้ำ) =====
+  useEffect(() => {
+    Promise.all([projectsAPI.getAll({ limit: 100 }), usersAPI.getAll({ limit: 100 })])
+      .then(([p, u]) => { setProjects(Array.isArray(p) ? p : p?.data || []); setUsers(Array.isArray(u) ? u : u?.data || []); })
+      .catch(() => {});
+  }, []);
+  useEffect(() => { loadTasks(); }, [currentDate, viewMode]);
 
   const loadTasks = async () => {
     setLoading(true);
     try {
       const { start_date, end_date } = getDateRange();
-      // TODO: Phase 2 — สร้าง year summary API สำหรับ year view
-      const taskLimit = viewMode === 'year' ? 1000 : 100;
-      const tasksRes = await tasksAPI.getAll({ limit: taskLimit, start_date, end_date });
-      setTasks(tasksRes.data || []);
-    } catch (err) { console.error('Failed to load tasks:', err); }
+      const res = await tasksAPI.getAll({ limit: viewMode === 'year' ? 1000 : 100, start_date, end_date });
+      setTasks(res.data || []);
+    } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
-  // === Effects ===
-  useEffect(() => { loadDropdowns(); }, []);
-  useEffect(() => { loadTasks(); }, [currentDate, viewMode]);
+  const getDateRange = useCallback(() => {
+    if (viewMode === 'day') return { start_date: formatLocalDate(currentDate), end_date: formatLocalDate(currentDate) };
+    if (viewMode === 'week') { const ws = getWeekStart(currentDate); return { start_date: formatLocalDate(ws), end_date: formatLocalDate(addDays(ws, 6)) }; }
+    if (viewMode === 'year') return { start_date: formatLocalDate(new Date(year, 0, 1)), end_date: formatLocalDate(new Date(year, 11, 31)) };
+    return { start_date: formatLocalDate(new Date(year, month, 1)), end_date: formatLocalDate(new Date(year, month + 1, 0)) };
+  }, [viewMode, currentDate, year, month]);
 
-  const isOverdue = (dueDate, status) => {
-    if (status === 'completed' || status === 'cancelled') return false;
-    if (!dueDate) return false;
-    // date-only comparison — ไม่ใช้ timezone
-    const todayDate = new Date();
-    todayDate.setHours(0, 0, 0, 0);
-    const due = new Date(dueDate);
-    due.setHours(0, 0, 0, 0);
-    return due < todayDate;
-  };
-  const isMyTask = (t) => t.assigned_to === user?.id;
+  const isOverdue = useCallback((dueDate, status) => {
+    if (status === 'completed' || status === 'cancelled' || !dueDate) return false;
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const d = new Date(dueDate); d.setHours(0, 0, 0, 0);
+    return d < t;
+  }, []);
+  const isMyTask = useCallback((t) => t.assigned_to === user?.id, [user]);
 
+  // ===== Filters =====
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
       if (!showCompleted && t.status === 'completed') return false;
@@ -182,375 +161,312 @@ export default function TaskCalendar() {
       if (filterAssignee && t.assigned_to !== filterAssignee) return false;
       if (filterStatus && t.status !== filterStatus) return false;
       if (filterPriority && t.priority !== filterPriority) return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        if (!(t.title || '').toLowerCase().includes(q) && !(t.project_name || '').toLowerCase().includes(q) && !(t.assigned_to_name || '').toLowerCase().includes(q)) return false;
-      }
+      if (searchQuery) { const q = searchQuery.toLowerCase(); if (!(t.title||'').toLowerCase().includes(q) && !(t.project_name||'').toLowerCase().includes(q) && !(t.assigned_to_name||'').toLowerCase().includes(q)) return false; }
+      if (quickFilter === 'today') { const dk = formatLocalDate(today); if (!t.due_date || t.due_date.split('T')[0] !== dk) return false; }
+      if (quickFilter === 'overdue' && !isOverdue(t.due_date, t.status)) return false;
+      if (quickFilter === 'thisWeek') { const ws = getWeekStart(today); const we = addDays(ws, 6); if (!t.due_date) return false; const dk = t.due_date.split('T')[0]; if (dk < formatLocalDate(ws) || dk > formatLocalDate(we)) return false; }
+      if (quickFilter === 'urgent' && t.priority !== 'urgent' && t.priority !== 'high') return false;
+      if (quickFilter === 'myTasks' && t.assigned_to !== user?.id) return false;
       return true;
     });
-  }, [tasks, showCompleted, filterProject, filterAssignee, filterStatus, filterPriority, searchQuery]);
+  }, [tasks, showCompleted, filterProject, filterAssignee, filterStatus, filterPriority, searchQuery, quickFilter, user, isOverdue]);
 
+  // ===== Derived Data =====
   const tasksWithDueDate = useMemo(() => filteredTasks.filter(t => t.due_date), [filteredTasks]);
   const tasksWithoutDueDate = useMemo(() => filteredTasks.filter(t => !t.due_date), [filteredTasks]);
+  const tasksByDate = useMemo(() => { const m = {}; tasksWithDueDate.forEach(t => { const d = t.due_date.split('T')[0]; if (!m[d]) m[d] = []; m[d].push(t); }); return m; }, [tasksWithDueDate]);
+  const todayKey = formatLocalDate(today);
+  const todayTasks = useMemo(() => filteredTasks.filter(t => t.due_date && t.due_date.split('T')[0] === todayKey), [filteredTasks, todayKey]);
+  const overdueTasks = useMemo(() => filteredTasks.filter(t => isOverdue(t.due_date, t.status)), [filteredTasks, isOverdue]);
+  const myTasks = useMemo(() => filteredTasks.filter(t => t.assigned_to === user?.id), [filteredTasks, user]);
+  const urgentTasks = useMemo(() => filteredTasks.filter(t => (t.priority === 'urgent' || t.priority === 'high') && t.status !== 'completed'), [filteredTasks]);
+  const completedTasks = useMemo(() => filteredTasks.filter(t => t.status === 'completed'), [filteredTasks]);
+  const nearDueTasks = useMemo(() => {
+    const we = addDays(getWeekStart(today), 6);
+    return filteredTasks.filter(t => { if (!t.due_date || t.status === 'completed') return false; const dk = t.due_date.split('T')[0]; return dk >= todayKey && dk <= formatLocalDate(we); }).sort((a, b) => (a.due_date||'').localeCompare(b.due_date||''));
+  }, [filteredTasks, todayKey]);
 
-  const tasksByDate = useMemo(() => {
-    const map = {};
-    tasksWithDueDate.forEach(t => {
-      // due_date จาก API มาในรูปแบบ "YYYY-MM-DD" หรือ "YYYY-MM-DDTHH:MM:SS"
-      // ตัดเวลาออกเพื่อ grouping ที่ถูกต้อง
-      const d = t.due_date.split('T')[0];
-      if (!map[d]) map[d] = [];
-      map[d].push(t);
-    });
-    return map;
-  }, [tasksWithDueDate]);
+  const workload = useMemo(() => {
+    const m = {};
+    users.filter(u => u.role !== 'client').forEach(u => { m[u.id] = { user: u, total: 0, active: 0, overdue: 0 }; });
+    filteredTasks.forEach(t => { if (t.assigned_to && m[t.assigned_to]) { m[t.assigned_to].total++; if (t.status !== 'completed' && t.status !== 'cancelled') m[t.assigned_to].active++; if (isOverdue(t.due_date, t.status)) m[t.assigned_to].overdue++; } });
+    return Object.values(m).filter(w => w.total > 0).sort((a, b) => b.active - a.active);
+  }, [filteredTasks, users, isOverdue]);
 
-  const clearFilters = () => { setFilterProject(''); setFilterAssignee(''); setFilterStatus(''); setFilterPriority(''); setSearchQuery(''); };
-  const hasActiveFilter = filterProject || filterAssignee || filterStatus || filterPriority || searchQuery;
-  const openTask = (task) => setSelectedTask(task);
-  const closeModal = () => setSelectedTask(null);
+  const selectedDayTasks = useMemo(() => {
+    if (!selectedDate) return [];
+    const dk = formatLocalDate(selectedDate);
+    return filteredTasks.filter(t => t.due_date && t.due_date.split('T')[0] === dk);
+  }, [filteredTasks, selectedDate]);
 
-  const navPrev = () => {
-    if (viewMode === 'day') setCurrentDate(d => addDays(d, -1));
-    else if (viewMode === 'week') setCurrentDate(d => addDays(d, -7));
-    else if (viewMode === 'month') setCurrentDate(new Date(year, month - 1, 1));
-    else setCurrentDate(new Date(year - 1, month, 1));
-  };
-  const navNext = () => {
-    if (viewMode === 'day') setCurrentDate(d => addDays(d, 1));
-    else if (viewMode === 'week') setCurrentDate(d => addDays(d, 7));
-    else if (viewMode === 'month') setCurrentDate(new Date(year, month + 1, 1));
-    else setCurrentDate(new Date(year + 1, month, 1));
-  };
-  const goToToday = () => setCurrentDate(new Date());
+  const clearFilters = () => { setFilterProject(''); setFilterAssignee(''); setFilterStatus(''); setFilterPriority(''); setSearchQuery(''); setQuickFilter(''); };
+  const hasActiveFilter = filterProject || filterAssignee || filterStatus || filterPriority || searchQuery || quickFilter;
 
+  // ===== Navigation =====
+  const navPrev = () => { if (viewMode === 'day') setCurrentDate(d => addDays(d, -1)); else if (viewMode === 'week') setCurrentDate(d => addDays(d, -7)); else if (viewMode === 'month') setCurrentDate(new Date(year, month - 1, 1)); else setCurrentDate(new Date(year - 1, month, 1)); };
+  const navNext = () => { if (viewMode === 'day') setCurrentDate(d => addDays(d, 1)); else if (viewMode === 'week') setCurrentDate(d => addDays(d, 7)); else if (viewMode === 'month') setCurrentDate(new Date(year, month + 1, 1)); else setCurrentDate(new Date(year + 1, month, 1)); };
+  const goToToday = () => { setCurrentDate(new Date()); setSelectedDate(new Date()); };
   const getNavLabel = () => {
     if (viewMode === 'day') return `${currentDate.getDate()} ${MONTHS_TH[currentDate.getMonth()]} ${currentDate.getFullYear() + 543}`;
-    if (viewMode === 'week') {
-      const ws = getWeekStart(currentDate);
-      const we = addDays(ws, 6);
-      return `${ws.getDate()} ${MONTHS_TH[ws.getMonth()].slice(0, 3)} - ${we.getDate()} ${MONTHS_TH[we.getMonth()].slice(0, 3)} ${we.getFullYear() + 543}`;
-    }
+    if (viewMode === 'week') { const ws = getWeekStart(currentDate); const we = addDays(ws, 6); return `${ws.getDate()} ${MONTHS_TH[ws.getMonth()].slice(0,3)} - ${we.getDate()} ${MONTHS_TH[we.getMonth()].slice(0,3)} ${we.getFullYear()+543}`; }
     if (viewMode === 'month') return `${MONTHS_TH[month]} ${year + 543}`;
     return `ปี ${year + 543}`;
   };
-
-  const getTasksForDay = (date) => {
-    const dk = toKey(date.getFullYear(), date.getMonth(), date.getDate());
-    return tasksByDate[dk] || [];
-  };
-
+  const getTasksForDay = (date) => tasksByDate[formatLocalDate(date)] || [];
   const toggleExpandDay = (key) => setExpandedDays(p => ({ ...p, [key]: !p[key] }));
   const MAX_VISIBLE = 3;
 
-  // ===== DAY VIEW =====
+  // ===== Views =====
   const renderDayView = () => {
-    const dayTasks = getTasksForDay(currentDate);
-    const todayFlag = isToday(currentDate);
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className={`px-5 py-4 border-b border-slate-100 ${todayFlag ? 'bg-blue-50' : ''}`}>
-          <div className="flex items-center gap-3">
-            <span className={`inline-flex items-center justify-center w-12 h-12 text-lg font-bold rounded-2xl ${todayFlag ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
-              {currentDate.getDate()}
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-slate-800">{DAYS_TH[currentDate.getDay()]}</p>
-              <p className="text-xs text-slate-500">{MONTHS_TH[currentDate.getMonth()]} {currentDate.getFullYear() + 543}</p>
-            </div>
-            {dayTasks.length > 0 && (
-              <span className="ml-auto text-sm font-bold text-slate-700">{dayTasks.length} งาน</span>
-            )}
-          </div>
-        </div>
-        <div className="p-4 space-y-2">
-          {dayTasks.length === 0 ? (
-            <p className="text-center text-sm text-slate-400 py-8">ไม่มีงานในวันนี้</p>
-          ) : dayTasks.map(t => <TaskListCard key={t.id} task={t} onClick={() => openTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} />)}
+    const dt = getTasksForDay(currentDate); const tf = isToday(currentDate);
+    return (<div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className={`px-5 py-4 border-b border-slate-100 ${tf?'bg-blue-50':''}`}>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex items-center justify-center w-12 h-12 text-lg font-bold rounded-2xl ${tf?'bg-blue-600 text-white':'bg-slate-100 text-slate-700'}`}>{currentDate.getDate()}</span>
+          <div><p className="text-sm font-semibold text-slate-800">{DAYS_TH[currentDate.getDay()]}</p><p className="text-xs text-slate-500">{MONTHS_TH[currentDate.getMonth()]} {currentDate.getFullYear()+543}</p></div>
+          {dt.length > 0 && <span className="ml-auto text-sm font-bold text-slate-700">{dt.length} งาน</span>}
         </div>
       </div>
-    );
+      <div className="p-4 space-y-2">
+        {dt.length === 0 ? <p className="text-center text-sm text-slate-400 py-8">ไม่มีงานในวันนี้</p> : dt.map(t => <TaskListCard key={t.id} task={t} onClick={() => setSelectedTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
+      </div>
+    </div>);
   };
 
-  // ===== WEEK VIEW =====
   const renderWeekView = () => {
-    const ws = getWeekStart(currentDate);
-    const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-slate-200">
-          {days.map((d, i) => {
-            const tf = isToday(d);
-            return (
-              <div key={i} className={`py-2.5 text-center border-r border-slate-100 last:border-r-0 ${tf ? 'bg-blue-50' : 'bg-slate-50'}`}>
-                <p className={`text-[10px] font-medium ${tf ? 'text-blue-600' : 'text-slate-400'}`}>{DAYS_TH[d.getDay()]}</p>
-                <p className={`inline-flex items-center justify-center w-7 h-7 mt-0.5 text-sm font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-700'}`}>{d.getDate()}</p>
-              </div>
-            );
-          })}
-        </div>
-        <div className="grid grid-cols-7 min-h-[200px]">
-          {days.map((d, i) => {
-            const dayTasks = getTasksForDay(d);
-            return (
-              <div key={i} className="border-r border-slate-100 last:border-r-0 p-1.5 space-y-1">
-                {dayTasks.slice(0, 4).map(t => {
-                  const bg = getEventStyle(t, isOverdue);
-                  return (
-                    <button key={t.id} onClick={() => openTask(t)} className={`w-full text-left rounded px-1.5 py-1 text-[10px] leading-tight truncate border transition-all hover:shadow-sm ${bg}`}>
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 shrink-0 ${PRIORITY_COLORS[t.priority] || 'bg-slate-300'}`} />
-                      {t.title}
-                      {isMyTask(t) && <Star size={8} className="inline ml-0.5 text-amber-500 fill-amber-500" />}
-                    </button>
-                  );
-                })}
-                {dayTasks.length > 4 && <p className="text-[9px] text-slate-400 text-center">+{dayTasks.length - 4}</p>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+    const ws = getWeekStart(currentDate); const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+    return (<div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-slate-200">{days.map((d, i) => { const tf = isToday(d); return (
+        <div key={i} className={`py-2.5 text-center border-r border-slate-100 last:border-r-0 ${tf?'bg-blue-50':'bg-slate-50'}`}>
+          <p className={`text-[10px] font-medium ${tf?'text-blue-600':'text-slate-400'}`}>{DAYS_TH[d.getDay()]}</p>
+          <p className={`inline-flex items-center justify-center w-7 h-7 mt-0.5 text-sm font-bold rounded-full ${tf?'bg-blue-600 text-white':'text-slate-700'}`}>{d.getDate()}</p>
+        </div>);})}</div>
+      <div className="grid grid-cols-7 min-h-[200px]">{days.map((d, i) => { const dt = getTasksForDay(d); return (
+        <div key={i} className="border-r border-slate-100 last:border-r-0 p-1 space-y-1">
+          {dt.slice(0, 4).map(t => <TaskChip key={t.id} task={t} onClick={() => setSelectedTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
+          {dt.length > 4 && <p className="text-[9px] text-slate-400 text-center">+{dt.length - 4}</p>}
+        </div>);})}</div>
+    </div>);
   };
 
-  // ===== MONTH VIEW (existing) =====
   const renderMonthView = () => {
-    const daysInMo = getDaysInMonth(year, month);
-    const firstDay = getFirstDayOfMonth(year, month);
-    const cells = [];
+    const daysInMo = getDaysInMonth(year, month); const firstDay = getFirstDayOfMonth(year, month); const cells = [];
     for (let i = 0; i < firstDay; i++) cells.push(<div key={`e-${i}`} className="min-h-[110px] bg-slate-50/40" />);
     for (let day = 1; day <= daysInMo; day++) {
-      const date = new Date(year, month, day);
-      const dk = toKey(year, month, day);
-      const dayTasks = tasksByDate[dk] || [];
-      const tf = isToday(date);
-      const expanded = expandedDays[dk];
-      const visible = expanded ? dayTasks : dayTasks.slice(0, MAX_VISIBLE);
-      const hidden = dayTasks.length - MAX_VISIBLE;
+      const date = new Date(year, month, day); const dk = toKey(year, month, day); const dt = tasksByDate[dk] || []; const tf = isToday(date);
+      const expanded = expandedDays[dk]; const visible = expanded ? dt : dt.slice(0, MAX_VISIBLE); const hidden = dt.length - MAX_VISIBLE;
+      const isSelected = selectedDate && isSameDay(date, selectedDate);
       cells.push(
-        <div key={day} className={`min-h-[110px] border border-slate-100 p-1.5 transition-colors ${tf ? 'bg-blue-50/80 ring-2 ring-inset ring-blue-300' : 'bg-white hover:bg-slate-50/60'}`}>
+        <div key={day} onClick={() => setSelectedDate(date)} className={`min-h-[110px] border border-slate-100 p-1.5 transition-colors cursor-pointer ${tf ? 'bg-blue-50/80 ring-2 ring-inset ring-blue-300' : isSelected ? 'bg-indigo-50/50 ring-1 ring-inset ring-indigo-200' : 'bg-white hover:bg-slate-50/60'}`}>
           <div className="flex items-center justify-between mb-1">
             <span className={`inline-flex items-center justify-center w-6 h-6 text-xs font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>{day}</span>
-            {dayTasks.length > 0 && <span className="text-[10px] bg-slate-200 text-slate-600 rounded-full px-1.5 py-0.5 font-medium">{dayTasks.length}</span>}
+            {dt.length > 0 && <span className="text-[10px] bg-slate-200 text-slate-600 rounded-full px-1.5 py-0.5 font-medium">{dt.length}</span>}
           </div>
           <div className="space-y-0.5">
-            {visible.map(t => <TaskChip key={t.id} task={t} onClick={() => openTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} />)}
-            {hidden > 0 && <button onClick={() => toggleExpandDay(dk)} className="w-full text-[10px] text-blue-600 hover:text-blue-800 text-center py-0.5 font-medium">ดูเพิ่ม {hidden} งาน</button>}
-            {expanded && dayTasks.length > MAX_VISIBLE && <button onClick={() => toggleExpandDay(dk)} className="w-full text-[10px] text-slate-400 hover:text-slate-600 text-center py-0.5">ย่อ</button>}
+            {visible.map(t => <TaskChip key={t.id} task={t} onClick={(e) => { e.stopPropagation(); setSelectedTask(t); }} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
+            {hidden > 0 && <button onClick={(e) => { e.stopPropagation(); toggleExpandDay(dk); }} className="w-full text-[10px] text-blue-600 hover:text-blue-800 text-center py-0.5 font-medium">ดูเพิ่ม {hidden}</button>}
           </div>
         </div>
       );
     }
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-slate-200">
-          {DAYS_TH.map(d => <div key={d} className="py-2.5 text-center text-xs font-semibold text-slate-500 bg-slate-50">{d}</div>)}
-        </div>
-        <div className="grid grid-cols-7">{cells}</div>
-      </div>
-    );
+    return (<div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-slate-200">{DAYS_TH.map(d => <div key={d} className="py-2.5 text-center text-xs font-semibold text-slate-500 bg-slate-50">{d}</div>)}</div>
+      <div className="grid grid-cols-7">{cells}</div>
+    </div>);
   };
 
-  // ===== YEAR VIEW =====
   const renderYearView = () => {
-    const months = Array.from({ length: 12 }, (_, i) => {
-      const mTasks = tasksWithDueDate.filter(t => {
-        const d = new Date(t.due_date);
-        return d.getFullYear() === year && d.getMonth() === i;
-      });
-      return { month: i, tasks: mTasks };
-    });
-    return (
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-        {months.map(({ month: m, tasks: mTasks }) => {
-          const overdue = mTasks.filter(t => isOverdue(t.due_date, t.status)).length;
-          const inProgress = mTasks.filter(t => t.status === 'in_progress').length;
-          const completed = mTasks.filter(t => t.status === 'completed').length;
-          const tf = today.getFullYear() === year && today.getMonth() === m;
-          return (
-            <button key={m} onClick={() => { setCurrentDate(new Date(year, m, 1)); setViewMode('month'); }}
-              className={`rounded-2xl border p-4 text-left transition-all hover:shadow-md ${tf ? 'border-blue-300 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
-              <p className={`text-sm font-bold ${tf ? 'text-blue-700' : 'text-slate-800'}`}>{MONTHS_TH[m]}</p>
-              <p className="mt-2 text-2xl font-bold text-slate-900">{mTasks.length} <span className="text-xs font-normal text-slate-400">งาน</span></p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {overdue > 0 && <span className="inline-flex items-center rounded-md bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">เกิน {overdue}</span>}
-                {inProgress > 0 && <span className="inline-flex items-center rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">ทำ {inProgress}</span>}
-                {completed > 0 && <span className="inline-flex items-center rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">เสร็จ {completed}</span>}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    );
+    const months = Array.from({ length: 12 }, (_, i) => ({ month: i, tasks: tasksWithDueDate.filter(t => { const d = new Date(t.due_date); return d.getFullYear() === year && d.getMonth() === i; }) }));
+    return (<div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">{months.map(({ month: m, tasks: mt }) => {
+      const overdue = mt.filter(t => isOverdue(t.due_date, t.status)).length;
+      const inProg = mt.filter(t => t.status === 'in_progress').length;
+      const comp = mt.filter(t => t.status === 'completed').length;
+      const tf = today.getFullYear() === year && today.getMonth() === m;
+      return (<button key={m} onClick={() => { setCurrentDate(new Date(year, m, 1)); setSelectedDate(new Date(year, m, 1)); setViewMode('month'); }}
+        className={`rounded-2xl border p-4 text-left transition-all hover:shadow-md ${tf ? 'border-blue-300 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+        <p className={`text-sm font-bold ${tf ? 'text-blue-700' : 'text-slate-800'}`}>{MONTHS_TH[m]}</p>
+        <p className="mt-2 text-2xl font-bold text-slate-900">{mt.length} <span className="text-xs font-normal text-slate-400">งาน</span></p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {overdue > 0 && <span className="inline-flex items-center rounded-md bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">เกิน {overdue}</span>}
+          {inProg > 0 && <span className="inline-flex items-center rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">ทำ {inProg}</span>}
+          {comp > 0 && <span className="inline-flex items-center rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">เสร็จ {comp}</span>}
+        </div>
+      </button>);})}</div>);
   };
 
-  const renderView = () => {
-    if (viewMode === 'day') return renderDayView();
-    if (viewMode === 'week') return renderWeekView();
-    if (viewMode === 'year') return renderYearView();
-    return renderMonthView();
-  };
+  const renderView = () => { if (viewMode === 'day') return renderDayView(); if (viewMode === 'week') return renderWeekView(); if (viewMode === 'year') return renderYearView(); return renderMonthView(); };
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex gap-5 min-h-[calc(100vh-8rem)]">
+      {/* Main Calendar */}
+      <div className="flex-1 min-w-0 space-y-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">ปฏิทินงาน</h1>
-          <p className="mt-1 text-sm text-slate-500">{tasksWithDueDate.length} งานมีวันกำหนด, {tasksWithoutDueDate.length} งานยังไม่กำหนดวัน</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">ปฏิทินงาน</h1>
+          <p className="mt-1 text-sm text-slate-500">ติดตามงาน กำหนดส่ง และภาพรวมทีม</p>
         </div>
-        {/* View Mode Toggle */}
-        <div className="flex items-center rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
-          {VIEW_MODES.map(v => (
-            <button key={v.key} onClick={() => setViewMode(v.key)}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition-all ${viewMode === v.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>
-              {v.label}
+
+        {/* Quick Filters */}
+        <div className="flex flex-wrap gap-2">
+          {QUICK_FILTERS.map(f => (
+            <button key={f.key} onClick={() => setQuickFilter(quickFilter === f.key ? '' : f.key)}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${quickFilter === f.key ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+              {f.key === 'urgent' && <span className="w-2 h-2 rounded-full bg-red-500" />}
+              {f.key === 'overdue' && <AlertTriangle size={12} />}
+              {f.key === 'myTasks' && <Star size={12} />}
+              {f.label}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-        <div className="flex items-center gap-2">
-          <Filter size={16} className="text-slate-400" />
-          <span className="text-sm font-medium text-slate-600">ตัวกรอง</span>
-          {hasActiveFilter && <button onClick={clearFilters} className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium">ล้างตัวกรอง</button>}
-        </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="ค้นหางาน..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition" />
+        {/* Filters */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter size={14} className="text-slate-400" />
+            <span className="text-xs font-medium text-slate-500">ตัวกรอง</span>
+            {hasActiveFilter && <button onClick={clearFilters} className="ml-auto text-[11px] text-blue-600 hover:text-blue-800 font-medium">ล้างตัวกรอง</button>}
           </div>
-          <select value={filterProject} onChange={(e) => setFilterProject(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 outline-none focus:border-blue-400 transition">
-            <option value="">ทุกโครงการ</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.project_name || p.project_code}</option>)}
-          </select>
-          <select value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 outline-none focus:border-blue-400 transition">
-            <option value="">ทุกคน</option>
-            {users.filter(u => u.role !== 'client').map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}
-          </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 outline-none focus:border-blue-400 transition">
-            <option value="">ทุกสถานะ</option>
-            {Object.entries(TASK_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-          <div className="flex items-center gap-3">
-            <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 outline-none focus:border-blue-400 transition">
-              <option value="">ทุก priority</option>
-              {Object.entries(PRIORITY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none whitespace-nowrap">
-              <input type="checkbox" checked={showCompleted} onChange={(e) => setShowCompleted(e.target.checked)} className="w-3.5 h-3.5 rounded border-slate-300" />
-              เสร็จแล้ว
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
-        <button onClick={navPrev} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 transition"><ChevronLeft size={20} /></button>
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-slate-800">{getNavLabel()}</h2>
-          <button onClick={goToToday} className="rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100 transition">วันนี้</button>
-        </div>
-        <button onClick={navNext} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 transition"><ChevronRight size={20} /></button>
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-        <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-400" />เกินกำหนด</span>
-        <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-400" />กำลังทำ</span>
-        <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-400" />เสร็จแล้ว</span>
-        <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-slate-300" />รอดำเนินการ</span>
-        <span className="inline-flex items-center gap-1"><Star size={10} className="text-amber-500 fill-amber-500" />งานของฉัน</span>
-      </div>
-
-      {/* Main View */}
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
-        </div>
-      ) : (
-        <>
-          {renderView()}
-          {/* Unscheduled tasks */}
-          {tasksWithoutDueDate.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <button onClick={() => setShowUnscheduled(!showUnscheduled)} className="flex items-center gap-2 mb-3 w-full text-left">
-                <Clock size={18} className="text-slate-400" />
-                <h3 className="text-sm font-semibold text-slate-700">งานยังไม่กำหนดวัน ({tasksWithoutDueDate.length})</h3>
-                <ChevronDown size={14} className={`ml-auto text-slate-400 transition-transform ${showUnscheduled ? 'rotate-180' : ''}`} />
-              </button>
-              {showUnscheduled && (
-                <div className="flex flex-wrap gap-2">
-                  {tasksWithoutDueDate.map(t => (
-                    <button key={t.id} onClick={() => openTask(t)}
-                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs transition-all hover:shadow-sm ${getEventStyle(t, isOverdue)}`}>
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_COLORS[t.priority] || 'bg-slate-300'}`} />
-                      <span className="truncate max-w-[150px]">{t.title}</span>
-                      {t.project_name && <span className="text-slate-400 hidden sm:inline">· {t.project_name}</span>}
-                      {isMyTask(t) && <Star size={10} className="text-amber-500 fill-amber-500 shrink-0" />}
-                    </button>
-                  ))}
-                </div>
-              )}
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+            <div className="relative"><Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="ค้นหางาน..." className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-xs text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition" /></div>
+            <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"><option value="">ทุกโครงการ</option>{projects.map(p => <option key={p.id} value={p.id}>{p.project_name || p.project_code}</option>)}</select>
+            <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"><option value="">ทุกคน</option>{users.filter(u => u.role !== 'client').map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}</select>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"><option value="">ทุกสถานะ</option>{Object.entries(TASK_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+            <div className="flex items-center gap-2">
+              <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"><option value="">ทุก priority</option>{Object.entries(PRIORITY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+              <label className="flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer select-none whitespace-nowrap"><input type="checkbox" checked={showCompleted} onChange={e => setShowCompleted(e.target.checked)} className="w-3 h-3 rounded border-slate-300" />เสร็จ</label>
             </div>
-          )}
-        </>
-      )}
+          </div>
+        </div>
 
-      {/* Task Detail Modal */}
+        {/* Navigation */}
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+          <button onClick={navPrev} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 transition"><ChevronLeft size={20} /></button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">{VIEW_MODES.map(v => <button key={v.key} onClick={() => setViewMode(v.key)} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${viewMode === v.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>{v.label}</button>)}</div>
+            <span className="text-sm font-bold text-slate-800">{getNavLabel()}</span>
+            <button onClick={goToToday} className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-600 hover:bg-blue-100 transition">วันนี้</button>
+          </div>
+          <button onClick={navNext} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 transition"><ChevronRight size={20} /></button>
+        </div>
+
+        {loading ? <div className="flex items-center justify-center h-64"><div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" /></div> : (
+          <>
+            {renderView()}
+            {tasksWithoutDueDate.length > 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <button onClick={() => setShowUnscheduled(!showUnscheduled)} className="flex items-center gap-2 mb-3 w-full text-left">
+                  <Clock size={16} className="text-slate-400" />
+                  <h3 className="text-sm font-semibold text-slate-700">งานยังไม่กำหนดวัน ({tasksWithoutDueDate.length})</h3>
+                  <ChevronDown size={14} className={`ml-auto text-slate-400 transition-transform ${showUnscheduled ? 'rotate-180' : ''}`} />
+                </button>
+                {showUnscheduled && <div className="flex flex-wrap gap-2">{tasksWithoutDueDate.map(t => { const a = users.find(u => u.id === t.assigned_to); return (
+                  <button key={t.id} onClick={() => setSelectedTask(t)} className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs transition-all hover:shadow-sm ${getEventStyle(t, isOverdue)}`}>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_COLORS[t.priority] || 'bg-slate-300'}`} />
+                    <span className="truncate max-w-[150px]">{t.title}</span>
+                    {a && <UserAvatar name={a.full_name} userId={a.id} size="w-4 h-4 text-[8px]" />}
+                    {isMyTask(t) && <Star size={10} className="text-amber-500 fill-amber-500 shrink-0" />}
+                  </button>);})}</div>}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Right Sidebar — Summary Panel */}
+      <div className="w-72 shrink-0 space-y-4 hidden lg:block">
+        {/* Summary Cards */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">สรุปภาพรวม</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: 'งานทั้งหมด', count: filteredTasks.length, color: 'text-slate-800', filter: '' },
+              { label: 'กำลังทำ', count: filteredTasks.filter(t => t.status === 'in_progress').length, color: 'text-blue-600', filter: '' },
+              { label: 'เกินกำหนด', count: overdueTasks.length, color: 'text-red-600', filter: 'overdue' },
+              { label: 'เสร็จสิ้น', count: completedTasks.length, color: 'text-emerald-600', filter: '' },
+              { label: 'เร่งด่วน', count: urgentTasks.length, color: 'text-orange-600', filter: 'urgent' },
+              { label: 'งานของฉัน', count: myTasks.length, color: 'text-amber-600', filter: 'myTasks' },
+            ].map(s => (
+              <button key={s.label} onClick={() => setQuickFilter(quickFilter === s.filter ? '' : s.filter)}
+                className={`rounded-xl p-2.5 text-center transition-all ${quickFilter === s.filter ? 'bg-blue-100 ring-1 ring-blue-300' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                <p className={`text-lg font-bold ${s.color}`}>{s.count}</p>
+                <p className="text-[10px] text-slate-500">{s.label}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Selected Day Tasks */}
+        {selectedDate && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-700 mb-2">งานวันที่ {selectedDate.getDate()} {MONTHS_TH[selectedDate.getMonth()]} <span className="text-xs font-normal text-slate-400">({selectedDayTasks.length})</span></h3>
+            {selectedDayTasks.length === 0 ? <p className="text-xs text-slate-400 py-2">ไม่มีงานในวันนี้</p> : (
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">{selectedDayTasks.map(t => <TaskListCard key={t.id} task={t} onClick={() => setSelectedTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}</div>
+            )}
+          </div>
+        )}
+
+        {/* My Tasks */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+            <Star size={14} className="text-amber-500 fill-amber-500" /> งานของฉัน
+            <span className="ml-auto bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 text-[10px] font-bold">{myTasks.length}</span>
+          </h3>
+          {myTasks.length === 0 ? <p className="text-[11px] text-slate-400">ไม่มีงานที่มอบหมาย</p> : (
+            <div className="space-y-1 max-h-32 overflow-y-auto">{myTasks.slice(0, 5).map(t => (
+              <button key={t.id} onClick={() => setSelectedTask(t)} className={`w-full text-left rounded-lg px-2 py-1 text-[11px] truncate transition hover:bg-slate-50 ${isOverdue(t.due_date, t.status) ? 'text-red-600 font-medium' : 'text-slate-700'}`}>{t.title}{t.due_date && <span className="ml-1 text-[10px] text-slate-400">{t.due_date.split('T')[0]}</span>}</button>
+            ))}{myTasks.length > 5 && <p className="text-[10px] text-slate-400 text-center">+{myTasks.length - 5} งาน</p>}</div>
+          )}
+        </div>
+
+        {/* Workload */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">ภาระงานรายคน</h3>
+          {workload.length === 0 ? <p className="text-[11px] text-slate-400">ไม่มีงานมอบหมาย</p> : (
+            <div className="space-y-2.5 max-h-48 overflow-y-auto">{workload.map(w => {
+              const maxW = Math.max(...workload.map(x => x.active), 1); const pct = Math.round((w.active / maxW) * 100);
+              return (<div key={w.user.id}>
+                <div className="flex items-center gap-2 mb-1">
+                  <UserAvatar name={w.user.full_name} userId={w.user.id} size="w-5 h-5 text-[9px]" />
+                  <span className="text-[11px] font-medium text-slate-700 truncate">{w.user.full_name}</span>
+                  <span className="ml-auto text-[10px] text-slate-500">{w.active} งาน</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: getUserColor(w.user.id) }} /></div>
+                {w.overdue > 0 && <p className="text-[9px] text-red-500 mt-0.5">{w.overdue} เกินกำหนด</p>}
+              </div>);})}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Task Modal */}
       {selectedTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={closeModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setSelectedTask(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between p-5 border-b border-slate-100">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-lg font-bold text-slate-900">{selectedTask.title}</h3>
-                {selectedTask.project_name && <p className="text-sm text-slate-500 mt-0.5">{selectedTask.project_name}</p>}
-              </div>
-              <button onClick={closeModal} className="ml-3 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 transition"><X size={18} /></button>
+              <div className="flex-1 min-w-0"><h3 className="text-lg font-bold text-slate-900">{selectedTask.title}</h3>{selectedTask.project_name && <p className="text-sm text-slate-500 mt-0.5">{selectedTask.project_name}</p>}</div>
+              <button onClick={() => setSelectedTask(null)} className="ml-3 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 transition"><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="flex flex-wrap gap-2">
-                <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ${TASK_STATUS_COLORS[selectedTask.status] || 'bg-slate-100 text-slate-700'}`}>
-                  {TASK_STATUS_LABELS[selectedTask.status] || selectedTask.status}
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                  <span className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[selectedTask.priority] || 'bg-slate-300'}`} />
-                  {PRIORITY_LABELS[selectedTask.priority] || selectedTask.priority}
-                </span>
-                {selectedTask.due_date && isOverdue(selectedTask.due_date, selectedTask.status) && (
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700"><AlertTriangle size={12} />เกินกำหนด</span>
-                )}
-                {isMyTask(selectedTask) && (
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200"><Star size={10} className="fill-amber-500" />งานของฉัน</span>
-                )}
+                <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ${TASK_STATUS_COLORS[selectedTask.status] || 'bg-slate-100 text-slate-700'}`}>{TASK_STATUS_LABELS[selectedTask.status] || selectedTask.status}</span>
+                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"><span className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[selectedTask.priority] || 'bg-slate-300'}`} />{PRIORITY_LABELS[selectedTask.priority] || selectedTask.priority}</span>
+                {selectedTask.due_date && isOverdue(selectedTask.due_date, selectedTask.status) && <span className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700"><AlertTriangle size={12} />เกินกำหนด</span>}
+                {isMyTask(selectedTask) && <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200"><Star size={10} className="fill-amber-500" />งานของฉัน</span>}
               </div>
               <div className="space-y-2.5 text-sm">
+                {selectedTask.start_date && <div className="flex items-center gap-2 text-slate-600"><CalendarDays size={14} className="text-slate-400" /><span>วันเริ่ม: {new Date(selectedTask.start_date).toLocaleDateString('th-TH', { dateStyle: 'long' })}</span></div>}
                 {selectedTask.due_date && <div className="flex items-center gap-2 text-slate-600"><Clock size={14} className="text-slate-400" /><span>กำหนดส่ง: {new Date(selectedTask.due_date).toLocaleDateString('th-TH', { dateStyle: 'long' })}</span></div>}
-                {selectedTask.assigned_to_name && <div className="flex items-center gap-2 text-slate-600"><span className="text-xs text-slate-400 w-3.5 text-center">👤</span><span>ผู้รับผิดชอบ: {selectedTask.assigned_to_name}</span></div>}
-                {selectedTask.description && (
-                  <div className="mt-3 rounded-xl bg-slate-50 p-3">
-                    <p className="text-xs text-slate-500 mb-1">รายละเอียดงาน</p>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedTask.description}</p>
-                  </div>
-                )}
+                {(() => { const a = users.find(u => u.id === selectedTask.assigned_to); return (
+                  <div className="flex items-center gap-2 text-slate-600">
+                    {a ? <UserAvatar name={a.full_name} userId={a.id} size="w-5 h-5 text-[9px]" /> : <span className="text-xs text-slate-400 w-5 text-center">👤</span>}
+                    <span>ผู้รับผิดชอบ: {a ? a.full_name : selectedTask.assigned_to_name || 'ยังไม่มอบหมาย'}</span>
+                  </div>);})()}
+                {selectedTask.description && <div className="mt-3 rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500 mb-1">รายละเอียดงาน</p><p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedTask.description}</p></div>}
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-slate-100 p-4">
-              <button onClick={closeModal} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">ปิด</button>
-              {selectedTask.project_id && (
-                <button onClick={() => { closeModal(); navigate(`/projects/${selectedTask.project_id}`); }}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
-                  <ExternalLink size={14} />ไปที่หน้างาน
-                </button>
-              )}
-              <button onClick={() => { closeModal(); navigate('/tasks'); }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition">
-                <Edit2 size={14} />แก้ไข
-              </button>
+              <button onClick={() => setSelectedTask(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">ปิด</button>
+              {selectedTask.project_id && <button onClick={() => { setSelectedTask(null); navigate(`/projects/${selectedTask.project_id}`); }} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"><ExternalLink size={14} />ไปที่หน้างาน</button>}
+              <button onClick={() => { setSelectedTask(null); navigate('/tasks'); }} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"><Edit2 size={14} />แก้ไข</button>
             </div>
           </div>
         </div>

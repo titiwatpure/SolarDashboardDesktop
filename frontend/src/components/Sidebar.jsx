@@ -1,54 +1,65 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  BarChart3,
-  Building2,
-  CalendarDays,
-  CheckSquare,
-  ChevronDown,
-  ChevronLeft,
-  ClipboardList,
-  FileText,
-  LayoutDashboard,
-  LogOut,
-  Map,
-  Settings,
-  Users,
-  UserCircle,
-  Zap,
-  LayoutGrid,
-  Wallet,
-  BookOpen
+  BarChart3, Building2, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ChevronRight,
+  ClipboardList, FileText, LayoutDashboard, LogOut, Map, Settings, Users, UserCircle,
+  Zap, LayoutGrid, Wallet, BookOpen
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../utils/constants';
 
-const allMenuItems = [
-  { id: 'dashboard', label: 'หน้าหลัก', icon: LayoutDashboard, path: '/', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'portal', label: 'แดชบอร์ดลูกค้า', icon: LayoutGrid, path: '/portal', roles: ['client'] },
-  { id: 'projects', label: 'โครงการทั้งหมด', icon: Zap, path: '/projects', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'steps', label: 'ปฏิบัติงาน', icon: CheckSquare, path: '/steps', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'tasks', label: 'งานที่มอบหมาย', icon: ClipboardList, path: '/tasks', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'calendar', label: 'ปฏิทินงาน', icon: CalendarDays, path: '/calendar', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'accounting', label: 'บัญชี', icon: Wallet, path: '/accounting', roles: ['admin', 'engineer'] },
-  { id: 'organizations', label: 'หน่วยงาน', icon: Building2, path: '/organizations', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'organization-contacts', label: 'เจ้าหน้าที่หน่วยงาน', icon: Users, path: '/organization-contacts', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'documents', label: 'เอกสาร', icon: FileText, path: '/documents', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'customers', label: 'ลูกค้า', icon: UserCircle, path: '/customers', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'reports', label: 'รายงาน', icon: BarChart3, path: '/reports', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'network-map', label: 'แผนที่โครง', icon: Map, path: '/network-map', roles: ['admin', 'engineer', 'staff'] },
-  { id: 'users', label: 'ผู้ใช้งาน', icon: Users, path: '/users', roles: ['admin'] },
-  { id: 'help', label: 'คู่มือ', icon: BookOpen, path: '/help', roles: ['admin', 'engineer', 'staff', 'client'] },
-  { id: 'settings', label: 'ตั้งค่า', icon: Settings, path: '/settings', roles: ['admin', 'engineer', 'staff', 'client'] }
+// ===== Menu Groups =====
+const menuGroups = [
+  {
+    id: 'home', label: 'หน้าหลัก', icon: LayoutDashboard,
+    children: [
+      { id: 'dashboard', label: 'หน้าหลัก', path: '/', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'portal', label: 'แดชบอร์ดลูกค้า', path: '/portal', roles: ['client'] },
+      { id: 'projects', label: 'โครงการทั้งหมด', path: '/projects', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'steps', label: 'ปฏิบัติงาน', path: '/steps', roles: ['admin', 'engineer', 'staff'] },
+    ],
+  },
+  {
+    id: 'tasks', label: 'งาน', icon: ClipboardList,
+    children: [
+      { id: 'tasks-list', label: 'งานที่มอบหมาย', path: '/tasks', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'calendar', label: 'ปฏิทินงาน', path: '/calendar', roles: ['admin', 'engineer', 'staff'] },
+    ],
+  },
+  {
+    id: 'org-docs', label: 'เอกสารและหน่วยงาน', icon: FileText,
+    children: [
+      { id: 'documents', label: 'เอกสาร', path: '/documents', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'organizations', label: 'หน่วยงาน', path: '/organizations', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'organization-contacts', label: 'เจ้าหน้าที่หน่วยงาน', path: '/organization-contacts', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'customers', label: 'ลูกค้า', path: '/customers', roles: ['admin', 'engineer', 'staff'] },
+    ],
+  },
+  {
+    id: 'finance', label: 'การเงินและรายงาน', icon: Wallet,
+    children: [
+      { id: 'accounting', label: 'บัญชี', path: '/accounting', roles: ['admin', 'engineer'] },
+      { id: 'reports', label: 'รายงาน', path: '/reports', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'network-map', label: 'แผนที่โครงการ', path: '/network-map', roles: ['admin', 'engineer', 'staff'] },
+    ],
+  },
+  {
+    id: 'system', label: 'ระบบ', icon: Settings,
+    children: [
+      { id: 'users', label: 'ผู้ใช้งาน', path: '/users', roles: ['admin'] },
+      { id: 'help', label: 'คู่มือ', path: '/help', roles: ['admin', 'engineer', 'staff', 'client'] },
+      { id: 'settings', label: 'ตั้งค่า', path: '/settings', roles: ['admin', 'engineer', 'staff', 'client'] },
+    ],
+  },
 ];
 
 function BrandMark() {
   return (
-    <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
-      <div className="absolute top-2 h-3.5 w-6 rounded-full bg-amber-300" />
-      <div className="absolute top-3.5 h-0.5 w-8 bg-amber-200/80" />
-      <div className="h-4 w-7 rounded-b-full border-2 border-amber-200 border-t-0" />
-      <div className="absolute bottom-2 h-0 w-0 border-l-[10px] border-r-[10px] border-t-[14px] border-l-transparent border-r-transparent border-t-sky-400/90" />
+    <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
+      <div className="absolute top-1.5 h-2.5 w-5 rounded-full bg-amber-300" />
+      <div className="absolute top-2.5 h-0.5 w-6 bg-amber-200/80" />
+      <div className="h-3 w-5 rounded-b-full border-2 border-amber-200 border-t-0" />
+      <div className="absolute bottom-1.5 h-0 w-0 border-l-[8px] border-r-[8px] border-t-[11px] border-l-transparent border-r-transparent border-t-sky-400/90" />
     </div>
   );
 }
@@ -57,133 +68,151 @@ export default function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [appVersion, setAppVersion] = useState('');
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar-collapsed') === 'true'; } catch { return false; }
+  });
+  const [openGroups, setOpenGroups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sidebar-open-groups') || '["home"]'); } catch { return ['home']; }
+  });
 
   useEffect(() => {
-    if (window.electronAPI?.getAppVersion) {
-      window.electronAPI.getAppVersion().then(setAppVersion);
-    }
-  }, []);
+    try { localStorage.setItem('sidebar-collapsed', String(collapsed)); } catch {}
+  }, [collapsed]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  useEffect(() => {
+    try { localStorage.setItem('sidebar-open-groups', JSON.stringify(openGroups)); } catch {}
+  }, [openGroups]);
+
+  // Auto-expand group based on current route
+  useEffect(() => {
+    const currentPath = location.pathname;
+    for (const group of menuGroups) {
+      if (group.children.some(c => c.path === currentPath || (c.path !== '/' && currentPath.startsWith(c.path)))) {
+        if (!openGroups.includes(group.id)) {
+          setOpenGroups(prev => [...prev, group.id]);
+        }
+      }
+    }
+  }, [location.pathname]);
+
+  const toggleGroup = (groupId) => {
+    setOpenGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
   };
+
+  const isActive = (path) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
+
+  const isGroupActive = (group) => group.children.some(c => isActive(c.path));
+
+  const handleLogout = () => { logout(); navigate('/login'); };
+
+  const collapsedWidth = collapsed ? 'w-[72px]' : 'w-[260px]';
 
   return (
     <>
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm lg:hidden"
-          onClick={onClose}
-        />
-      )}
+      {/* Mobile overlay */}
+      {isOpen && <div className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm lg:hidden" onClick={onClose} />}
 
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-slate-800 bg-slate-950 text-slate-100 transition-transform duration-300 lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="flex items-center justify-between px-6 pb-6 pt-7">
-          <Link to="/" className="flex items-center gap-3" onClick={onClose}>
-            <BrandMark />
-            <div>
-              <p className="text-xl font-bold tracking-tight text-white">Solar Project</p>
-              <p className="text-sm text-slate-400">Dashboard</p>
-            </div>
-          </Link>
-
-          <button
-            onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 transition hover:bg-white/5 hover:text-white lg:hidden"
-          >
-            <ChevronLeft size={20} />
+      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-800 bg-slate-950 text-slate-100 transition-all duration-300 ${collapsedWidth} ${
+        isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      }`}>
+        {/* Header */}
+        <div className={`flex items-center border-b border-white/10 px-4 py-4 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+          {!collapsed && (
+            <Link to="/" className="flex items-center gap-2.5" onClick={onClose}>
+              <BrandMark />
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-white truncate">Solar Project</p>
+                <p className="text-[10px] text-slate-400">Dashboard</p>
+              </div>
+            </Link>
+          )}
+          {collapsed && <Link to="/" onClick={onClose}><BrandMark /></Link>}
+          <button onClick={() => setCollapsed(!collapsed)}
+            className="hidden lg:flex rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition">
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white lg:hidden">
+            <ChevronLeft size={16} />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1.5 px-4">
-          {allMenuItems.filter(item => item.roles.includes(user?.role)).map((item) => {
-            const Icon = item.icon;
-            const isActive = item.path === '/'
-              ? location.pathname === '/'
-              : location.pathname.startsWith(item.path);
+        {/* Menu */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-0.5 scrollbar-thin scrollbar-thumb-slate-700">
+          {menuGroups.map(group => {
+            const hasAccess = group.children.some(c => c.roles.includes(user?.role));
+            if (!hasAccess) return null;
+            const isOpenGroup = openGroups.includes(group.id);
+            const active = isGroupActive(group);
 
+            if (collapsed) {
+              // Compact mode — show group icon with tooltip
+              return (
+                <div key={group.id} className="relative group">
+                  <button onClick={() => { setCollapsed(false); setOpenGroups(prev => [...prev, group.id]); }}
+                    className={`w-full flex items-center justify-center rounded-xl p-2.5 transition ${active ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}
+                    title={group.label}>
+                    <group.icon size={18} />
+                  </button>
+                  <div className="absolute left-full top-0 ml-2 hidden group-hover:block z-50">
+                    <div className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white whitespace-nowrap shadow-lg">{group.label}</div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Expanded mode — group with children
             return (
-              <Link
-                key={item.id}
-                to={item.path}
-                onClick={onClose}
-                className={`group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30'
-                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <Icon
-                  size={18}
-                  className={isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}
-                />
-                <span>{item.label}</span>
-              </Link>
+              <div key={group.id}>
+                <button onClick={() => toggleGroup(group.id)}
+                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                    active ? 'text-white bg-white/5' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  }`}>
+                  <group.icon size={17} className={active ? 'text-blue-400' : 'text-slate-500'} />
+                  <span className="flex-1 text-left">{group.label}</span>
+                  <ChevronDown size={14} className={`text-slate-500 transition-transform duration-200 ${isOpenGroup ? 'rotate-180' : ''}`} />
+                </button>
+                <div className={`overflow-hidden transition-all duration-200 ${isOpenGroup ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="ml-3 pl-3 border-l border-slate-700/50 space-y-0.5 py-1">
+                    {group.children.filter(c => c.roles.includes(user?.role)).map(child => {
+                      const childActive = isActive(child.path);
+                      return (
+                        <Link key={child.id} to={child.path} onClick={onClose}
+                          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition ${
+                            childActive ? 'bg-blue-600/90 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                          }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${childActive ? 'bg-blue-400' : 'bg-transparent'}`} />
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             );
           })}
         </nav>
 
-        <div className="border-t border-white/10 p-4">
-          <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+        {/* User Profile */}
+        <div className="border-t border-white/10 p-3">
+          <div className={`rounded-xl bg-white/5 p-3 ring-1 ring-white/10 ${collapsed ? 'flex flex-col items-center' : ''}`}>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shrink-0">
                 {(user?.full_name || user?.username || 'U').charAt(0)}
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-white">{user?.full_name || user?.username}</p>
-                <p className="text-xs text-slate-400">{ROLES[user?.role] || user?.role}</p>
-              </div>
-              <button
-                onClick={() => setUserMenuOpen((open) => !open)}
-                className="rounded-xl p-1.5 text-slate-400 transition hover:bg-white/5 hover:text-white"
-              >
-                <ChevronDown size={16} className={`transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
+              {!collapsed && (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-white">{user?.full_name || user?.username}</p>
+                  <p className="text-[10px] text-slate-400">{ROLES[user?.role] || user?.role}</p>
+                </div>
+              )}
             </div>
-
-            {userMenuOpen && (
-              <div className="mt-3 space-y-1">
-                <button
-                  onClick={() => { setUserMenuOpen(false); navigate('/settings'); onClose(); }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
-                >
-                  <Settings size={16} />
-                  ตั้งค่าบัญชี
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
-                >
-                  <LogOut size={16} />
-                  ออกจากระบบ
-                </button>
-              </div>
-            )}
-
-            {!userMenuOpen && (
-              <button
-                onClick={handleLogout}
-                className="mt-4 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
-              >
-                <LogOut size={16} />
-                ออกจากระบบ
+            {!collapsed && (
+              <button onClick={handleLogout} className="mt-3 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs text-slate-300 transition hover:bg-white/5 hover:text-white">
+                <LogOut size={14} />ออกจากระบบ
               </button>
             )}
           </div>
         </div>
-
-        {appVersion && (
-          <div className="px-6 pb-4 pt-2">
-            <p className="text-center text-[11px] text-slate-500">Solar Dashboard v{appVersion}</p>
-          </div>
-        )}
       </aside>
     </>
   );
