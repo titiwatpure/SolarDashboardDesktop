@@ -5,7 +5,6 @@ import { tasksAPI, projectsAPI, usersAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { PRIORITY_LABELS } from '../utils/constants';
 
-// TODO: Phase 2.2 — Multi-day task bar จาก start_date → due_date
 // TODO: Phase 2.3 — Holiday calendar + working day calculation
 // TODO: Phase 2.4 — Drag/drop หรือ resize bar
 
@@ -21,6 +20,7 @@ const EVENT_BG = {
 const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 const MONTHS_TH = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const VIEW_MODES = [{ key: 'day', label: 'วัน' }, { key: 'week', label: 'สัปดาห์' }, { key: 'month', label: 'เดือน' }, { key: 'year', label: 'ปี' }];
+const DISPLAY_MODES = [{ key: 'dueDate', label: 'ครบกำหนด' }, { key: 'workRange', label: 'ช่วงเวลาทำงาน' }];
 const QUICK_FILTERS = [
   { key: '', label: 'ทั้งหมด' }, { key: 'today', label: 'วันนี้' }, { key: 'overdue', label: 'เกินกำหนด' },
   { key: 'thisWeek', label: 'สัปดาห์นี้' }, { key: 'urgent', label: 'เร่งด่วน' }, { key: 'myTasks', label: 'งานของฉัน' },
@@ -35,6 +35,27 @@ function toKey(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${Strin
 function getWeekStart(date) { const d = new Date(date); d.setDate(d.getDate() - d.getDay()); return d; }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 function formatLocalDate(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+function parseLocalDate(str) { const [y, m, d] = str.split('-').map(Number); return new Date(y, m - 1, d); }
+function isDateInRange(date, startStr, endStr) {
+  if (!startStr || !endStr) return false;
+  const dk = formatLocalDate(date);
+  return dk >= startStr && dk <= endStr;
+}
+function getTaskRange(task) {
+  const dueKey = task.due_date ? task.due_date.split('T')[0] : null;
+  const startKey = task.start_date ? task.start_date.split('T')[0] : null;
+  if (!dueKey) return { start: null, end: null, hasRange: false };
+  const effectiveStart = startKey || dueKey;
+  // start_date > due_date → fallback
+  const rangeStart = effectiveStart <= dueKey ? effectiveStart : dueKey;
+  return { start: rangeStart, end: dueKey, hasRange: startKey && startKey < dueKey };
+}
+function getBarBgStyle(task, isOverdueFn) {
+  if (task.status === 'completed' || task.status === 'cancelled') return 'bg-emerald-200 border-emerald-300 text-emerald-800 opacity-60';
+  if (isOverdueFn(task.due_date, task.status)) return 'bg-red-200 border-red-300 text-red-800';
+  if (task.status === 'in_progress') return 'bg-blue-200 border-blue-300 text-blue-800';
+  return 'bg-slate-200 border-slate-300 text-slate-700';
+}
 
 // ===== Dynamic User Helpers (ไม่ hardcode) =====
 function getUserColor(userId) {
@@ -108,6 +129,8 @@ export default function TaskCalendar() {
   const [showUnscheduled, setShowUnscheduled] = useState(true);
   const [expandedDays, setExpandedDays] = useState({});
   const [viewMode, setViewMode] = useState('month');
+  const [displayMode, setDisplayMode] = useState('dueDate');
+  const [expandedWeeks, setExpandedWeeks] = useState({}); // week key → true = แสดง lanes ทั้งหมด
   const [quickFilter, setQuickFilter] = useState('');
   const [filterProject, setFilterProject] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
@@ -174,7 +197,31 @@ export default function TaskCalendar() {
   // ===== Derived Data =====
   const tasksWithDueDate = useMemo(() => filteredTasks.filter(t => t.due_date), [filteredTasks]);
   const tasksWithoutDueDate = useMemo(() => filteredTasks.filter(t => !t.due_date), [filteredTasks]);
-  const tasksByDate = useMemo(() => { const m = {}; tasksWithDueDate.forEach(t => { const d = t.due_date.split('T')[0]; if (!m[d]) m[d] = []; m[d].push(t); }); return m; }, [tasksWithDueDate]);
+
+  const tasksByDate = useMemo(() => {
+    const m = {};
+    if (displayMode === 'workRange') {
+      // โหมดช่วงเวลาทำงาน — แสดง task ในทุกวันที่ start_date → due_date
+      filteredTasks.forEach(t => {
+        const range = getTaskRange(t);
+        if (!range.end) return; // ไม่มี due_date → อยู่ใน "ยังไม่กำหนดวัน"
+        let current = parseLocalDate(range.start);
+        const end = parseLocalDate(range.end);
+        while (current <= end) {
+          const dk = formatLocalDate(current);
+          if (!m[dk]) m[dk] = [];
+          const isStart = dk === range.start;
+          const isDue = dk === range.end;
+          m[dk].push({ ...t, _barType: isStart ? 'start' : isDue ? 'due' : 'middle' });
+          current = addDays(current, 1);
+        }
+      });
+    } else {
+      // โหมดครบกำหนด — due_date เดิม
+      tasksWithDueDate.forEach(t => { const d = t.due_date.split('T')[0]; if (!m[d]) m[d] = []; m[d].push(t); });
+    }
+    return m;
+  }, [filteredTasks, displayMode, tasksWithDueDate]);
   const todayKey = formatLocalDate(today);
   const todayTasks = useMemo(() => filteredTasks.filter(t => t.due_date && t.due_date.split('T')[0] === todayKey), [filteredTasks, todayKey]);
   const overdueTasks = useMemo(() => filteredTasks.filter(t => isOverdue(t.due_date, t.status)), [filteredTasks, isOverdue]);
@@ -219,6 +266,7 @@ export default function TaskCalendar() {
   // ===== Views =====
   const renderDayView = () => {
     const dt = getTasksForDay(currentDate); const tf = isToday(currentDate);
+    // ใน workRange mode แสดง badge ว่าเป็น start/middle/due
     return (<div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       <div className={`px-5 py-4 border-b border-slate-100 ${tf?'bg-blue-50':''}`}>
         <div className="flex items-center gap-3">
@@ -228,50 +276,265 @@ export default function TaskCalendar() {
         </div>
       </div>
       <div className="p-4 space-y-2">
-        {dt.length === 0 ? <p className="text-center text-sm text-slate-400 py-8">ไม่มีงานในวันนี้</p> : dt.map(t => <TaskListCard key={t.id} task={t} onClick={() => setSelectedTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
+        {dt.length === 0 ? <p className="text-center text-sm text-slate-400 py-8">ไม่มีงานในวันนี้</p> : dt.map(t => {
+          // workRange mode: เพิ่ม badge
+          if (displayMode === 'workRange' && t._barType) {
+            const badge = t._barType === 'start' ? 'วันเริ่ม' : t._barType === 'due' ? 'ครบกำหนด' : 'กำลังดำเนินการ';
+            const badgeColor = t._barType === 'start' ? 'bg-blue-100 text-blue-700' : t._barType === 'due' ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700';
+            return (
+              <div key={t.id} className={`rounded-xl border px-4 py-3 transition-all hover:shadow-sm ${getBarBgStyle(t, isOverdue)}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_COLORS[t.priority] || 'bg-slate-300'}`} />
+                      <span className="font-medium text-sm truncate">{t.title}</span>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold ${badgeColor}`}>{badge}</span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-[11px] opacity-70">
+                      {(() => { const a = users.find(u => u.id === t.assigned_to); return a ? <div className="flex items-center gap-1"><UserAvatar name={a.full_name} userId={a.id} size="w-4 h-4 text-[8px]" /><span>{a.full_name}</span></div> : <span className="italic">ยังไม่มอบหมาย</span>; })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return <TaskListCard key={t.id} task={t} onClick={() => setSelectedTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />;
+        })}
       </div>
     </div>);
   };
 
   const renderWeekView = () => {
-    const ws = getWeekStart(currentDate); const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
-    return (<div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-slate-200">{days.map((d, i) => { const tf = isToday(d); return (
-        <div key={i} className={`py-2.5 text-center border-r border-slate-100 last:border-r-0 ${tf?'bg-blue-50':'bg-slate-50'}`}>
-          <p className={`text-[10px] font-medium ${tf?'text-blue-600':'text-slate-400'}`}>{DAYS_TH[d.getDay()]}</p>
-          <p className={`inline-flex items-center justify-center w-7 h-7 mt-0.5 text-sm font-bold rounded-full ${tf?'bg-blue-600 text-white':'text-slate-700'}`}>{d.getDate()}</p>
-        </div>);})}</div>
-      <div className="grid grid-cols-7 min-h-[200px]">{days.map((d, i) => { const dt = getTasksForDay(d); return (
-        <div key={i} className="border-r border-slate-100 last:border-r-0 p-1 space-y-1">
-          {dt.slice(0, 4).map(t => <TaskChip key={t.id} task={t} onClick={() => setSelectedTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
-          {dt.length > 4 && <p className="text-[9px] text-slate-400 text-center">+{dt.length - 4}</p>}
-        </div>);})}</div>
-    </div>);
+    const ws = getWeekStart(currentDate);
+    const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+    const we = addDays(ws, 6);
+    const { segments, laneCount } = displayMode === 'workRange' ? assignLanes(filteredTasks, ws, we) : { segments: [], laneCount: 0 };
+    const MAX_LANES = 3;
+    const weekKey = formatLocalDate(ws);
+    const weekExpanded = expandedWeeks[weekKey];
+    const displayLaneCount = weekExpanded ? Math.min(laneCount, 8) : Math.min(laneCount, MAX_LANES);
+    const displaySegments = segments.filter(s => s.lane < displayLaneCount);
+    const overflow = laneCount - displayLaneCount;
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        {/* Day headers */}
+        <div className="grid grid-cols-7 border-b border-slate-200">
+          {days.map((d, i) => { const tf = isToday(d); return (
+            <div key={i} className={`py-2.5 text-center border-r border-slate-100 last:border-r-0 ${tf ? 'bg-blue-50' : 'bg-slate-50'}`}>
+              <p className={`text-[10px] font-medium ${tf ? 'text-blue-600' : 'text-slate-400'}`}>{DAYS_TH[d.getDay()]}</p>
+              <p className={`inline-flex items-center justify-center w-7 h-7 mt-0.5 text-sm font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-700'}`}>{d.getDate()}</p>
+            </div>
+          );})}
+        </div>
+
+        {/* Chip rows — dueDate mode */}
+        {displayMode === 'dueDate' && (
+          <div className="grid grid-cols-7 min-h-[200px]">
+            {days.map((d, i) => { const dt = getTasksForDay(d); return (
+              <div key={i} className="border-r border-slate-100 last:border-r-0 p-1 space-y-1">
+                {dt.slice(0, 4).map(t => <TaskChip key={t.id} task={t} onClick={() => setSelectedTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
+                {dt.length > 4 && <p className="text-[9px] text-slate-400 text-center">+{dt.length - 4}</p>}
+              </div>
+            );})}
+          </div>
+        )}
+
+        {/* Bar rows — workRange mode */}
+        {displayMode === 'workRange' && (
+          <div className="min-h-[200px] bg-slate-50/50 p-1">
+            {Array.from({ length: displayLaneCount }, (_, lane) => {
+              const laneSegs = displaySegments.filter(s => s.lane === lane);
+              return (
+                <div key={lane} className="grid grid-cols-7 gap-0 h-[28px] mb-1">
+                  {Array.from({ length: 7 }, (_, col) => {
+                    const seg = laneSegs.find(s => col >= s.startCol && col <= s.endCol);
+                    if (!seg) return <div key={col} />;
+                    const isStart = col === seg.startCol;
+                    const isEnd = col === seg.endCol;
+                    const a = users.find(u => u.id === seg.task.assigned_to);
+                    const barBg = getBarBgStyle(seg.task, isOverdue);
+                    const roundedLeft = isStart ? 'rounded-l-md' : 'rounded-none';
+                    const roundedRight = isEnd ? 'rounded-r-md' : 'rounded-none';
+                    return (
+                      <div key={col} className="flex items-center">
+                        <button onClick={() => setSelectedTask(seg.task)}
+                          title={`${seg.task.title}${a ? ` — ${a.full_name}` : ''} (${formatLocalDate(seg.start)} → ${formatLocalDate(seg.end)})`}
+                          className={`w-full h-[24px] flex items-center gap-1 px-1.5 border ${barBg} ${roundedLeft} ${roundedRight} text-[10px] font-medium truncate transition-all hover:shadow-sm cursor-pointer`}>
+                          {isStart && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_COLORS[seg.task.priority] || 'bg-slate-300'}`} />}
+                          {(isStart || (!isStart && !isEnd)) && <span className="truncate">{seg.task.title}</span>}
+                          {a && <UserAvatar name={a.full_name} userId={a.id} size="w-3 h-3 text-[6px]" />}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            {overflow > 0 && !weekExpanded && (
+              <button onClick={() => setExpandedWeeks(p => ({ ...p, [weekKey]: true }))}
+                className="w-full text-center text-[9px] text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium mt-1 py-1">
+                +{overflow} งานอื่นๆ
+              </button>
+            )}
+            {weekExpanded && overflow > 0 && (
+              <button onClick={() => setExpandedWeeks(p => { const n = { ...p }; delete n[weekKey]; return n; })}
+                className="w-full text-center text-[9px] text-slate-500 hover:text-slate-700 hover:underline cursor-pointer font-medium mt-1 py-1">
+                ย่อกลับ
+              </button>
+            )}
+            {laneCount === 0 && <p className="text-center text-sm text-slate-400 py-8">ไม่มีงานในสัปดาห์นี้</p>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ===== Lane assignment สำหรับ multi-day bars =====
+  const assignLanes = (tasks, weekStart, weekEnd) => {
+    const segments = tasks.map(t => {
+      const range = getTaskRange(t);
+      if (!range.end) return null;
+      const s = parseLocalDate(range.start);
+      const e = parseLocalDate(range.end);
+      // Clamp to visible week
+      const segStart = s < weekStart ? weekStart : s;
+      const segEnd = e > weekEnd ? weekEnd : e;
+      if (segStart > segEnd) return null;
+      const startCol = Math.floor((segStart - weekStart) / 86400000);
+      const endCol = Math.floor((segEnd - weekStart) / 86400000);
+      return { task: t, startCol, endCol, start: segStart, end: segEnd };
+    }).filter(Boolean);
+    // Sort by startCol, then by span (longer first)
+    segments.sort((a, b) => a.startCol - b.startCol || (b.endCol - b.startCol) - (a.endCol - a.startCol));
+    // Assign lanes
+    const lanes = [];
+    segments.forEach(seg => {
+      let placed = false;
+      for (let lane = 0; lane < lanes.length; lane++) {
+        const last = lanes[lane];
+        if (seg.startCol > last.endCol) { lanes[lane] = seg; seg.lane = lane; placed = true; break; }
+      }
+      if (!placed) { seg.lane = lanes.length; lanes.push(seg); }
+    });
+    return { segments, laneCount: lanes.length };
   };
 
   const renderMonthView = () => {
-    const daysInMo = getDaysInMonth(year, month); const firstDay = getFirstDayOfMonth(year, month); const cells = [];
-    for (let i = 0; i < firstDay; i++) cells.push(<div key={`e-${i}`} className="min-h-[110px] bg-slate-50/40" />);
-    for (let day = 1; day <= daysInMo; day++) {
-      const date = new Date(year, month, day); const dk = toKey(year, month, day); const dt = tasksByDate[dk] || []; const tf = isToday(date);
-      const expanded = expandedDays[dk]; const visible = expanded ? dt : dt.slice(0, MAX_VISIBLE); const hidden = dt.length - MAX_VISIBLE;
-      const isSelected = selectedDate && isSameDay(date, selectedDate);
-      cells.push(
-        <div key={day} onClick={() => setSelectedDate(date)} className={`min-h-[110px] border border-slate-100 p-1.5 transition-colors cursor-pointer ${tf ? 'bg-blue-50/80 ring-2 ring-inset ring-blue-300' : isSelected ? 'bg-indigo-50/50 ring-1 ring-inset ring-indigo-200' : 'bg-white hover:bg-slate-50/60'}`}>
-          <div className="flex items-center justify-between mb-1">
-            <span className={`inline-flex items-center justify-center w-6 h-6 text-xs font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>{day}</span>
-            {dt.length > 0 && <span className="text-[10px] bg-slate-200 text-slate-600 rounded-full px-1.5 py-0.5 font-medium">{dt.length}</span>}
+    const daysInMo = getDaysInMonth(year, month);
+    const firstDay = getFirstDayOfMonth(year, month);
+    const MAX_LANES = 3;
+    const rows = [];
+
+    // Build week rows
+    let dayOffset = 1;
+    for (let weekIdx = 0; dayOffset <= daysInMo; weekIdx++) {
+      const weekStart = new Date(year, month, dayOffset);
+      const weekEnd = new Date(year, month, Math.min(dayOffset + 6, daysInMo));
+      const { segments, laneCount } = displayMode === 'workRange'
+        ? assignLanes(filteredTasks, weekStart, weekEnd)
+        : { segments: [], laneCount: 0 };
+
+      const weekDays = [];
+      for (let col = 0; col < 7; col++) {
+        const dayNum = dayOffset + col;
+        if (dayNum > daysInMo) { weekDays.push(<div key={`empty-${weekIdx}-${col}`} className="bg-slate-50/40 border border-slate-100" />); continue; }
+        const date = new Date(year, month, dayNum);
+        const dk = toKey(year, month, dayNum);
+        const dt = displayMode === 'dueDate' ? (tasksByDate[dk] || []) : [];
+        const tf = isToday(date);
+        const isSelected = selectedDate && isSameDay(date, selectedDate);
+        const visibleChips = dt.slice(0, 3);
+        const hiddenChips = dt.length - 3;
+
+        weekDays.push(
+          <div key={dayNum} onClick={() => setSelectedDate(date)}
+            className={`border border-slate-100 p-1.5 transition-colors cursor-pointer min-h-[90px] ${tf ? 'bg-blue-50/80 ring-2 ring-inset ring-blue-300' : isSelected ? 'bg-indigo-50/50 ring-1 ring-inset ring-indigo-200' : 'bg-white hover:bg-slate-50/60'}`}>
+            <div className="flex items-center justify-between mb-1">
+              <span className={`inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{dayNum}</span>
+              {dt.length > 0 && <span className="text-[9px] bg-slate-200 text-slate-500 rounded-full px-1 py-0.5">{dt.length}</span>}
+            </div>
+            {visibleChips.map(t => <TaskChip key={t.id} task={t} onClick={(e) => { e.stopPropagation(); setSelectedTask(t); }} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
+            {hiddenChips > 0 && <button onClick={(e) => { e.stopPropagation(); toggleExpandDay(dk); }} className="w-full text-[9px] text-blue-600 hover:text-blue-800 text-center py-0.5 font-medium">+{hiddenChips}</button>}
           </div>
-          <div className="space-y-0.5">
-            {visible.map(t => <TaskChip key={t.id} task={t} onClick={(e) => { e.stopPropagation(); setSelectedTask(t); }} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
-            {hidden > 0 && <button onClick={(e) => { e.stopPropagation(); toggleExpandDay(dk); }} className="w-full text-[10px] text-blue-600 hover:text-blue-800 text-center py-0.5 font-medium">ดูเพิ่ม {hidden}</button>}
+        );
+      }
+
+      // Bar rows — lane 0, 1, 2+
+      let finalBarRows = [];
+      if (displayMode === 'workRange' && segments.length > 0) {
+        const weekExpanded = expandedWeeks[`week-${weekIdx}`];
+        const displayLaneCount = weekExpanded ? Math.min(laneCount, 8) : Math.min(laneCount, MAX_LANES);
+        const displaySegments = segments.filter(s => s.lane < displayLaneCount);
+
+        for (let lane = 0; lane < displayLaneCount; lane++) {
+          const laneSegs = displaySegments.filter(s => s.lane === lane);
+          const cells = Array.from({ length: 7 }, (_, col) => {
+            const seg = laneSegs.find(s => col >= s.startCol && col <= s.endCol);
+            if (!seg) return <div key={col} className="bg-transparent" />;
+            const isStart = col === seg.startCol;
+            const isEnd = col === seg.endCol;
+            const a = users.find(u => u.id === seg.task.assigned_to);
+            const barBg = getBarBgStyle(seg.task, isOverdue);
+            const roundedLeft = isStart ? 'rounded-l-md' : '';
+            const roundedRight = isEnd ? 'rounded-r-md' : '';
+            return (
+              <div key={col} className="flex items-center">
+                <button onClick={(e) => { e.stopPropagation(); setSelectedTask(seg.task); }}
+                  title={`${seg.task.title}${a ? ` — ${a.full_name}` : ''} (${formatLocalDate(seg.start)} → ${formatLocalDate(seg.end)})`}
+                  className={`w-full h-[22px] flex items-center gap-1 px-1.5 border ${barBg} ${roundedLeft} ${roundedRight} text-[10px] font-medium truncate transition-all hover:shadow-sm cursor-pointer`}>
+                  {isStart && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_COLORS[seg.task.priority] || 'bg-slate-300'}`} />}
+                  {(isStart || (!isStart && !isEnd)) && <span className="truncate">{seg.task.title}</span>}
+                  {a && <UserAvatar name={a.full_name} userId={a.id} size="w-3.5 h-3.5 text-[6px]" />}
+                </button>
+              </div>
+            );
+          });
+          finalBarRows.push(<div key={lane} className="grid grid-cols-7 gap-0 h-[24px]">{cells}</div>);
+        }
+
+        // Overflow indicator
+        const overflow = laneCount - MAX_LANES;
+        if (overflow > 0 && !weekExpanded) {
+          finalBarRows.push(
+            <div key="overflow" className="h-[22px] flex items-center justify-center">
+              <button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => ({ ...p, [`week-${weekIdx}`]: true })); }}
+                className="text-[9px] text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium">
+                +{overflow} งานอื่นๆ
+              </button>
+            </div>
+          );
+        }
+        if (weekExpanded && overflow > 0) {
+          finalBarRows.push(
+            <div key="collapse" className="h-[22px] flex items-center justify-center">
+              <button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => { const n = { ...p }; delete n[`week-${weekIdx}`]; return n; }); }}
+                className="text-[9px] text-slate-500 hover:text-slate-700 hover:underline cursor-pointer font-medium">
+                ย่อกลับ
+              </button>
+            </div>
+          );
+        }
+      }
+
+      rows.push(
+        <div key={`week-${weekIdx}`} className="border-b border-slate-100 last:border-b-0">
+          <div className="grid grid-cols-7">
+            {weekDays}
           </div>
+          {finalBarRows.length > 0 && (
+            <div className="border-t border-slate-200 bg-slate-50/50 px-0.5">
+              {finalBarRows}
+            </div>
+          )}
         </div>
       );
+      dayOffset += 7;
     }
+
     return (<div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-slate-200">{DAYS_TH.map(d => <div key={d} className="py-2.5 text-center text-xs font-semibold text-slate-500 bg-slate-50">{d}</div>)}</div>
-      <div className="grid grid-cols-7">{cells}</div>
+      <div className="grid grid-cols-7 border-b border-slate-200">{DAYS_TH.map(d => <div key={d} className="py-2 text-center text-xs font-semibold text-slate-500 bg-slate-50">{d}</div>)}</div>
+      {rows}
     </div>);
   };
 
@@ -343,6 +606,8 @@ export default function TaskCalendar() {
           <button onClick={navPrev} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 transition"><ChevronLeft size={20} /></button>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">{VIEW_MODES.map(v => <button key={v.key} onClick={() => setViewMode(v.key)} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${viewMode === v.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>{v.label}</button>)}</div>
+            <div className="w-px h-5 bg-slate-200" />
+            <div className="flex items-center gap-1">{DISPLAY_MODES.map(d => <button key={d.key} onClick={() => setDisplayMode(d.key)} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${displayMode === d.key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>{d.label}</button>)}</div>
             <span className="text-sm font-bold text-slate-800">{getNavLabel()}</span>
             <button onClick={goToToday} className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-600 hover:bg-blue-100 transition">วันนี้</button>
           </div>

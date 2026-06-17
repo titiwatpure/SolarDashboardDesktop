@@ -96,7 +96,7 @@ export default function Tasks() {
 
   const openCreate = () => {
     setEditingTask(null);
-    setForm({ project_id: '', title: '', description: '', priority: 'medium', assigned_to: '', due_date: '' });
+    setForm({ project_id: '', title: '', description: '', priority: 'medium', assigned_to: '', due_date: '', start_date: '' });
     setShowModal(true);
   };
 
@@ -109,6 +109,7 @@ export default function Tasks() {
       priority: task.priority || 'medium',
       assigned_to: task.assigned_to || '',
       due_date: task.due_date ? task.due_date.slice(0, 10) : '',
+      start_date: task.start_date ? task.start_date.slice(0, 10) : '',
     });
     setShowModal(true);
   };
