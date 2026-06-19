@@ -51,10 +51,19 @@ function getTaskRange(task) {
   return { start: rangeStart, end: dueKey, hasRange: startKey && startKey < dueKey };
 }
 function getBarBgStyle(task, isOverdueFn) {
-  if (task.status === 'completed' || task.status === 'cancelled') return 'bg-emerald-200 border-emerald-300 text-emerald-800 opacity-60';
-  if (isOverdueFn(task.due_date, task.status)) return 'bg-red-200 border-red-300 text-red-800';
-  if (task.status === 'in_progress') return 'bg-blue-200 border-blue-300 text-blue-800';
-  return 'bg-slate-200 border-slate-300 text-slate-700';
+  if (task.status === 'completed' || task.status === 'cancelled') return 'bg-emerald-100 border-emerald-300 text-emerald-800';
+  if (isOverdueFn(task.due_date, task.status)) return 'bg-red-100 border-red-300 text-red-800';
+  if (task.status === 'in_progress') return 'bg-blue-100 border-blue-300 text-blue-800';
+  return 'bg-purple-50 border-purple-200 text-purple-800';
+}
+
+function getBarLabel(task, dateStr) {
+  if (task.status === 'completed') return '';
+  const start = task.start_date ? task.start_date.split('T')[0] : null;
+  const due = task.due_date ? task.due_date.split('T')[0] : null;
+  if (start && dateStr === start) return 'เริ่ม';
+  if (due && dateStr === due) return 'ครบ';
+  return 'กำลังทำ';
 }
 
 // ===== Dynamic User Helpers (ไม่ hardcode) =====
@@ -243,8 +252,15 @@ export default function TaskCalendar() {
   const selectedDayTasks = useMemo(() => {
     if (!selectedDate) return [];
     const dk = formatLocalDate(selectedDate);
+    if (displayMode === 'workRange') {
+      return filteredTasks.filter(t => {
+        const range = getTaskRange(t);
+        if (!range.end) return false;
+        return dk >= range.start && dk <= range.end;
+      });
+    }
     return filteredTasks.filter(t => t.due_date && t.due_date.split('T')[0] === dk);
-  }, [filteredTasks, selectedDate]);
+  }, [filteredTasks, selectedDate, displayMode]);
 
   const clearFilters = () => { setFilterProject(''); setFilterAssignee(''); setFilterStatus(''); setFilterPriority(''); setSearchQuery(''); setQuickFilter(''); };
   const hasActiveFilter = filterProject || filterAssignee || filterStatus || filterPriority || searchQuery || quickFilter;
@@ -449,7 +465,7 @@ export default function TaskCalendar() {
 
         weekDays.push(
           <div key={dayNum} onClick={() => setSelectedDate(date)}
-            className={`border border-slate-100 p-1.5 transition-colors cursor-pointer min-h-[90px] ${tf ? 'bg-blue-50/80 ring-2 ring-inset ring-blue-300' : isSelected ? 'bg-indigo-50/50 ring-1 ring-inset ring-indigo-200' : 'bg-white hover:bg-slate-50/60'}`}>
+            className={`border border-slate-100 p-1.5 transition-colors cursor-pointer min-h-[90px] ${tf ? 'bg-blue-50/50 ring-1 ring-inset ring-blue-200' : isSelected ? 'bg-slate-50 ring-1 ring-inset ring-slate-200' : 'bg-white hover:bg-slate-50/60'}`}>
             <div className="flex items-center justify-between mb-1">
               <span className={`inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{dayNum}</span>
               {dt.length > 0 && <span className="text-[9px] bg-slate-200 text-slate-500 rounded-full px-1 py-0.5">{dt.length}</span>}
@@ -460,8 +476,8 @@ export default function TaskCalendar() {
         );
       }
 
-      // Bar rows — lane 0, 1, 2+
-      let finalBarRows = [];
+      // Bar elements — 1 segment = 1 bar, gridColumn span
+      const barElements = [];
       if (displayMode === 'workRange' && segments.length > 0) {
         const weekExpanded = expandedWeeks[`week-${weekIdx}`];
         const displayLaneCount = weekExpanded ? Math.min(laneCount, 8) : Math.min(laneCount, MAX_LANES);
@@ -469,64 +485,42 @@ export default function TaskCalendar() {
 
         for (let lane = 0; lane < displayLaneCount; lane++) {
           const laneSegs = displaySegments.filter(s => s.lane === lane);
-          const cells = Array.from({ length: 7 }, (_, col) => {
-            const seg = laneSegs.find(s => col >= s.startCol && col <= s.endCol);
-            if (!seg) return <div key={col} className="bg-transparent" />;
-            const isStart = col === seg.startCol;
-            const isEnd = col === seg.endCol;
+          laneSegs.forEach(seg => {
+            const span = seg.endCol - seg.startCol + 1;
             const a = users.find(u => u.id === seg.task.assigned_to);
             const barBg = getBarBgStyle(seg.task, isOverdue);
-            const roundedLeft = isStart ? 'rounded-l-md' : '';
-            const roundedRight = isEnd ? 'rounded-r-md' : '';
-            return (
-              <div key={col} className="flex items-center">
+            const label = getBarLabel(seg.task, formatLocalDate(seg.start));
+            barElements.push(
+              <div key={`bar-${lane}-${seg.task.id}`} style={{ gridColumn: `${seg.startCol + 1} / span ${span}`, gridRow: lane + 2 }} className="px-[2px] pt-0 pb-[1px]">
                 <button onClick={(e) => { e.stopPropagation(); setSelectedTask(seg.task); }}
-                  title={`${seg.task.title}${a ? ` — ${a.full_name}` : ''} (${formatLocalDate(seg.start)} → ${formatLocalDate(seg.end)})`}
-                  className={`w-full h-[22px] flex items-center gap-1 px-1.5 border ${barBg} ${roundedLeft} ${roundedRight} text-[10px] font-medium truncate transition-all hover:shadow-sm cursor-pointer`}>
-                  {isStart && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_COLORS[seg.task.priority] || 'bg-slate-300'}`} />}
-                  {(isStart || (!isStart && !isEnd)) && <span className="truncate">{seg.task.title}</span>}
-                  {a && <UserAvatar name={a.full_name} userId={a.id} size="w-3.5 h-3.5 text-[6px]" />}
+                  title={`${seg.task.title}${a ? ` — ${a.full_name}` : ''} | ${formatLocalDate(seg.start)} → ${formatLocalDate(seg.end)}${label ? ` [${label}]` : ''}`}
+                  className={`w-full h-[24px] flex items-center gap-1 px-2 border ${barBg} rounded-md text-[11px] font-semibold truncate transition-all hover:shadow-md cursor-pointer`}>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_COLORS[seg.task.priority] || 'bg-slate-300'}`} />
+                  <span className="truncate">{seg.task.title}</span>
+                  {span >= 3 && <span className="shrink-0 text-[8px] text-slate-500 ml-1">{label}</span>}
+                  {a && <UserAvatar name={a.full_name} userId={a.id} size="w-4 h-4 text-[7px]" className="shrink-0 ml-auto" />}
                 </button>
               </div>
             );
           });
-          finalBarRows.push(<div key={lane} className="grid grid-cols-7 gap-0 h-[24px]">{cells}</div>);
         }
-
-        // Overflow indicator
+        // Overflow
         const overflow = laneCount - MAX_LANES;
         if (overflow > 0 && !weekExpanded) {
-          finalBarRows.push(
-            <div key="overflow" className="h-[22px] flex items-center justify-center">
-              <button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => ({ ...p, [`week-${weekIdx}`]: true })); }}
-                className="text-[9px] text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium">
-                +{overflow} งานอื่นๆ
-              </button>
-            </div>
-          );
+          barElements.push(<div key="overflow" style={{ gridColumn: '1 / -1', gridRow: displayLaneCount + 2 }} className="px-1 py-[1px]"><button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => ({ ...p, [`week-${weekIdx}`]: true })); }} className="w-full h-[22px] flex items-center justify-center rounded-md border border-dashed border-blue-200 bg-blue-50 text-[10px] text-blue-600 font-medium cursor-pointer transition-all hover:bg-blue-100 hover:border-blue-300">+{overflow} งานอื่นๆ</button></div>);
         }
         if (weekExpanded && overflow > 0) {
-          finalBarRows.push(
-            <div key="collapse" className="h-[22px] flex items-center justify-center">
-              <button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => { const n = { ...p }; delete n[`week-${weekIdx}`]; return n; }); }}
-                className="text-[9px] text-slate-500 hover:text-slate-700 hover:underline cursor-pointer font-medium">
-                ย่อกลับ
-              </button>
-            </div>
-          );
+          barElements.push(<div key="collapse" style={{ gridColumn: '1 / -1', gridRow: displayLaneCount + 2 }} className="px-1 py-[1px]"><button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => { const n = { ...p }; delete n[`week-${weekIdx}`]; return n; }); }} className="w-full h-[22px] flex items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50 text-[10px] text-slate-500 font-medium cursor-pointer transition-all hover:bg-slate-100 hover:border-slate-300">ย่อกลับ</button></div>);
         }
       }
 
+      // ONE grid: date cells at row 1, bars at row 2+
       rows.push(
         <div key={`week-${weekIdx}`} className="border-b border-slate-100 last:border-b-0">
-          <div className="grid grid-cols-7">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridAutoRows: 'auto' }}>
             {weekDays}
+            {barElements}
           </div>
-          {finalBarRows.length > 0 && (
-            <div className="border-t border-slate-200 bg-slate-50/50 px-0.5">
-              {finalBarRows}
-            </div>
-          )}
         </div>
       );
       dayOffset += 7;
