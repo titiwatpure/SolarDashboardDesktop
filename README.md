@@ -99,6 +99,26 @@
 - สถานะ: รอดำเนินการ, กำลังทำ, เสร็จแล้ว, ยกเลิก
 - มอบหมายงานให้ผู้ใช้ + แจ้งเตือนอัตโนมัติ
 - ติดตามงานเกินกำหนด (Overdue)
+- วันเริ่มงาน (start_date) + วันครบกำหนด (due_date)
+
+### ปฏิทินงาน (Task Calendar)
+- **4 มุมมอง**: วัน / สัปดาห์ / เดือน / ปี
+- **2 โหมดแสดงผล**:
+  - **ครบกำหนด** — แสดงงานตาม due_date, แต่ละวันมี Chip
+  - **ช่วงเวลาทำงาน** — แสดง Bar ข้ามวันจาก start_date → due_date
+- **Bar ข้ามวัน**: 1 งาน = 1 bar, span ข้ามวันจริงด้วย CSS grid-column
+- **Label**: "เริ่ม" / "กำลังทำ" / "ครบ" บน bar (แสดงเมื่อ bar span >= 3 วัน)
+- **สี Bar**: เขียว=เสร็จ, น้ำเงิน=กำลังทำ, ม่วง=รอดำเนินการ, แดง=เกินกำหนด
+- **Summary Panel** — การ์ดสรุป: งานทั้งหมด, กำลังทำ, ใกล้ครบ, เกินกำหนด, งานของฉัน
+- **Workload by User** — แสดงจำนวนงานต่อคน
+- **Selected Day Panel** — ตารางงานของวันที่เลือก
+- **Quick Filters** — ทั้งหมด, วันนี้, เกินกำหนด, สัปดาห์นี้, เร่งด่วน, งานของฉัน
+- **Overflow**: "+N งานอื่นๆ" ปุ่มกดขยาย/ย่อกลับ
+
+### เจ้าหน้าที่หน่วยงาน (Organization Contacts)
+- หน้าจัดการ `/organization-contacts`
+- เพิ่ม/แก้ไข/ลบ เจ้าหน้าที่ในแต่ละหน่วยงาน
+- บทบาท: reception, engineer, approver, finance, other
 
 ### ผู้ใช้งาน
 - สิทธิ์ 4 ระดับ: Admin (เต็ม), Engineer (อ่าน/สร้าง/แก้ไข), Staff (จำกัด), Client (อ่านอย่างเดียว)
@@ -274,7 +294,7 @@ Dashboard/
 │   ├── src/
 │   │   ├── context/             # AuthContext (login/logout/token)
 │   │   ├── components/
-│   │   │   ├── Sidebar.jsx      # Navigation sidebar
+│   │   │   ├── Sidebar.jsx      # Navigation sidebar (collapsible, grouped menu)
 │   │   │   ├── Header.jsx       # Top header + notifications
 │   │   │   ├── KPICards.jsx     # 6 KPI cards
 │   │   │   ├── Pipeline.jsx     # Pipeline visualization
@@ -282,6 +302,7 @@ Dashboard/
 │   │   │   ├── ProjectModal.jsx # Create/Edit project
 │   │   │   ├── StatusModal.jsx  # Status change
 │   │   │   ├── RiskBadge.jsx    # Risk level badge
+│   │   │   ├── ProtectedRoute.jsx # Route guard (roles prop)
 │   │   │   └── Toast.jsx        # Toast notifications
 │   │   ├── hooks/
 │   │   │   ├── useAccounting.js # useAccountingOverview, useProjectAccounting, useInstallments
@@ -295,8 +316,10 @@ Dashboard/
 │   │   │   ├── ProjectReport.jsx # /projects/:id/report (single project report)
 │   │   │   ├── Steps.jsx        # /steps (pipeline visualization)
 │   │   │   ├── Tasks.jsx        # /tasks (task management)
+│   │   │   ├── TaskCalendar.jsx # /calendar (4 view modes + workRange)
 │   │   │   ├── Documents.jsx    # /documents (file management)
 │   │   │   ├── Organizations.jsx # /organizations
+│   │   │   ├── OrganizationContacts.jsx # /organization-contacts
 │   │   │   ├── Customers.jsx    # /customers (customer management)
 │   │   │   ├── Reports.jsx      # /reports (10 report sections)
 │   │   │   ├── Users.jsx        # /users (admin)
@@ -339,6 +362,12 @@ Dashboard/
 - Recharts (charts)
 - Axios (API + auto token refresh interceptor)
 - XLSX + jsPDF (export with Thai font support)
+- React-Leaflet (map display)
+
+### Desktop App
+- Electron 28
+- electron-builder
+- electron-updater (auto-update via GitHub Releases)
 
 ## API Endpoints
 
@@ -413,8 +442,15 @@ Dashboard/
 - `PUT /api/organizations/:id` - อัปเดต (Admin)
 - `DELETE /api/organizations/:id` - ลบ (Admin)
 
+### Organization Contacts
+- `GET /api/organization-contacts` - รายชื่อเจ้าหน้าที่ทั้งหมด
+- `GET /api/organizations/:id/contacts` - เจ้าหน้าที่ของหน่วยงาน
+- `POST /api/organizations/:id/contacts` - เพิ่มเจ้าหน้าที่
+- `PUT /api/organization-contacts/:id` - อัปเดตเจ้าหน้าที่
+- `DELETE /api/organization-contacts/:id` - ลบเจ้าหน้าที่
+
 ### Tasks
-- `GET /api/tasks` - รายการงาน (pagination + filter)
+- `GET /api/tasks` - รายการงาน (pagination + filter: project_id, status, priority, assigned_to, start_date, end_date)
 - `GET /api/tasks/:id` - รายละเอียดงาน
 - `POST /api/tasks` - สร้างงาน
 - `PUT /api/tasks/:id` - อัปเดตงาน
