@@ -5,7 +5,10 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "set ELECTRON_DEV=1 && electron .",
+    "dev": "concurrently --names backend,frontend,electron --kill-others \"cd backend && node src/index.js\" \"cd frontend && npm run dev -- --host 127.0.0.1 --port 3000\" \"wait-on http://127.0.0.1:3000 && cross-env ELECTRON_DEV=1 electron .\"",
+    "dev:backend": "cd backend && node src/index.js",
+    "dev:frontend": "cd frontend && npm run dev -- --host 127.0.0.1 --port 3000",
+    "dev:electron": "cross-env ELECTRON_DEV=1 electron .",
     "build:frontend": "cd frontend && npm run build",
     "build:win": "npm run build:frontend && electron-builder --win --config electron-builder.yml",
     "postinstall": "electron-builder install-app-deps"
@@ -26,8 +29,11 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.4",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
     "electron": "^42.4.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "wait-on": "^9.0.10"
   },
   "author": "",
   "license": "MIT"

@@ -192,69 +192,71 @@ async function initializeDatabase() {
 // 5. Start Express server and create window
 // ──────────────────────────────────────────────
 async function createApp() {
-  console.log(`Solar Dashboard v${app.getVersion()} starting...`);
+  const isDev = process.env.ELECTRON_DEV === '1';
+  console.log(`Solar Dashboard v${app.getVersion()} starting... (dev=${isDev})`);
 
-  // Wait for sql.js to initialize
-  const sqlite3Compat = require('./sqlite3-compat.cjs');
-  if (sqlite3Compat._ready) await sqlite3Compat._ready;
-
-  // Check frontend build exists
-  if (!fs.existsSync(frontendBuild)) {
-    await dialog.showMessageBox({
-      type: 'error',
-      title: 'Solar Dashboard',
-      message: 'Frontend build not found.\n\nPlease run: cd frontend && npm run build',
-    });
-    app.quit();
-    return;
-  }
-
-  await initializeDatabase();
-
-  // require AFTER env vars are set
-  const expressApp = require('../backend/src/index');
-
-  const PORT = parseInt(process.env.PORT, 10);
-  const server = expressApp.listen(PORT, () => {
-    console.log(`Express listening on port ${PORT}`);
-
-    mainWindow = new BrowserWindow({
-      width: 1400,
-      height: 900,
-      title: 'Solar Dashboard',
-      icon: path.join(__dirname, 'icon.png'),
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        nodeIntegration: false,
-        contextIsolation: true,
-      },
-    });
-
-    mainWindow.loadURL(`http://localhost:${PORT}`);
-    mainWindow.on('closed', () => {
-      mainWindow = null;
-    });
-
-    // เช็คอัปเดตหลังเปิดหน้าต่าง
-    setTimeout(checkForUpdates, 3000);
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    title: 'Solar Dashboard',
+    icon: path.join(__dirname, 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
   });
 
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      dialog.showMessageBox({
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  if (isDev) {
+    // DEV MODE: ข้าม Express + DB init — frontend/backend ทำงานแยกอยู่แล้ว
+    console.log('Dev mode: loading http://127.0.0.1:3000');
+    mainWindow.loadURL('http://127.0.0.1:3000');
+  } else {
+    // PRODUCTION MODE: start Express + load from it
+    const sqlite3Compat = require('./sqlite3-compat.cjs');
+    if (sqlite3Compat._ready) await sqlite3Compat._ready;
+
+    if (!fs.existsSync(frontendBuild)) {
+      await dialog.showMessageBox({
         type: 'error',
         title: 'Solar Dashboard',
-        message: `Port ${PORT} is already in use.\n\nPlease close the application using port ${PORT} and try again.`,
+        message: 'Frontend build not found.\n\nPlease run: cd frontend && npm run build',
       });
-    } else {
-      dialog.showMessageBox({
-        type: 'error',
-        title: 'Solar Dashboard',
-        message: `Server error: ${err.message}`,
-      });
+      app.quit();
+      return;
     }
-    app.quit();
-  });
+
+    await initializeDatabase();
+
+    const expressApp = require('../backend/src/index');
+    const PORT = parseInt(process.env.PORT, 10);
+    const server = expressApp.listen(PORT, () => {
+      console.log(`Express listening on port ${PORT}`);
+      mainWindow.loadURL(`http://localhost:${PORT}`);
+      setTimeout(checkForUpdates, 3000);
+    });
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        dialog.showMessageBox({
+          type: 'error',
+          title: 'Solar Dashboard',
+          message: `Port ${PORT} is already in use.\n\nPlease close the application using port ${PORT} and try again.`,
+        });
+      } else {
+        dialog.showMessageBox({
+          type: 'error',
+          title: 'Solar Dashboard',
+          message: `Server error: ${err.message}`,
+        });
+      }
+      app.quit();
+    });
+  }
 }
 
 // ──────────────────────────────────────────────
