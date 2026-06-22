@@ -6,7 +6,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/solar-dashboard
+  IMAGE_PREFIX: ${{ github.repository_owner }}/solardashboarddesktop
 
 jobs:
   build-and-push:
