@@ -27,6 +27,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Initialize test database
+        run: node src/init-db.cjs
+        env:
+          JWT_SECRET: ci-test-secret-key
+          NODE_ENV: test
+          INIT_ADMIN_PASSWORD: admin
+
       - name: Run tests
         run: npm test
         env:
