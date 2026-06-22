@@ -3,6 +3,7 @@ const pool = require('../database');
 const CLEANUP_DAYS = 365;
 const VACUUM_KEY = 'last_vacuum_at';
 const CLEANUP_KEY = 'last_cleanup_at';
+const CHECKPOINT_KEY = 'last_wal_checkpoint_at';
 
 async function getLastRun(key) {
   const { rows } = await pool.query(
@@ -51,6 +52,17 @@ async function vacuumDatabase() {
   return { success: true };
 }
 
+async function checkpointWal() {
+  try {
+    await pool.query('PRAGMA wal_checkpoint(TRUNCATE)');
+    await setLastRun(CHECKPOINT_KEY);
+    return { success: true };
+  } catch (err) {
+    console.error('WAL checkpoint error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 function daysSince(isoDate) {
   if (!isoDate) return Infinity;
   return (Date.now() - new Date(isoDate).getTime()) / 86400000;
@@ -58,6 +70,12 @@ function daysSince(isoDate) {
 
 async function runMaintenance() {
   const results = {};
+
+  // WAL checkpoint — ทำทุกวันเพื่อป้องกัน WAL file ใหญ่เกินไป
+  const lastCheckpoint = await getLastRun(CHECKPOINT_KEY);
+  if (daysSince(lastCheckpoint) >= 1) {
+    results.checkpoint = await checkpointWal();
+  }
 
   const lastVacuum = await getLastRun(VACUUM_KEY);
   if (daysSince(lastVacuum) >= 30) {
@@ -73,4 +91,4 @@ async function runMaintenance() {
   return results;
 }
 
-module.exports = { runMaintenance, cleanupOldLogs, vacuumDatabase };
+module.exports = { runMaintenance, cleanupOldLogs, vacuumDatabase, checkpointWal };

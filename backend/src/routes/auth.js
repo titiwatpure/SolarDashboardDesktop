@@ -15,8 +15,17 @@ const REFRESH_TOKEN_EXPIRY_DAYS = parseInt(process.env.REFRESH_TOKEN_EXPIRY_DAYS
 const BCRYPT_COST = 10;
 
 // ---------------------------------------------------------------------------
-// Helpers — refresh token CRUD
+// Helpers — refresh token CRUD (hashed tokens for security)
 // ---------------------------------------------------------------------------
+
+/**
+ * Hash a refresh token using SHA-256 for secure storage.
+ * @param {string} token
+ * @returns {string} hex-encoded hash
+ */
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 /**
  * Generate a cryptographically secure random refresh token.
@@ -27,18 +36,19 @@ function generateRefreshToken() {
 }
 
 /**
- * Store a refresh token in the database.
+ * Store a refresh token in the database (hashed).
  * @param {string} userId
- * @param {string} token
+ * @param {string} token - raw token (will be hashed before storage)
  * @returns {{ id: string, token: string, expiresAt: string }}
  */
 async function storeRefreshToken(userId, token) {
   const id = uuidv4();
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const tokenHash = hashToken(token);
 
   await pool.query(
     'INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)',
-    [id, userId, token, expiresAt]
+    [id, userId, tokenHash, expiresAt]
   );
 
   return { id, token, expiresAt };
@@ -46,23 +56,42 @@ async function storeRefreshToken(userId, token) {
 
 /**
  * Find a valid (non-expired) refresh token in the database.
- * @param {string} token
+ * Supports both hashed tokens (new) and plain-text tokens (legacy/backward compat).
+ * @param {string} token - raw token from client
  * @returns {object|null} row or null
  */
 async function findRefreshToken(token) {
-  const result = await pool.query(
+  const tokenHash = hashToken(token);
+
+  // ลองเทียบแบบ hash ก่อน (tokens ใหม่)
+  let result = await pool.query(
+    'SELECT * FROM refresh_tokens WHERE token = ? AND expires_at > datetime("now")',
+    [tokenHash]
+  );
+
+  if (result.rows.length > 0) return result.rows[0];
+
+  // Backward compat: ถ้าไม่เจอ ลองเทียบ plain text (tokens เก่าที่ยังไม่ expire)
+  result = await pool.query(
     'SELECT * FROM refresh_tokens WHERE token = ? AND expires_at > datetime("now")',
     [token]
   );
+
   return result.rows.length > 0 ? result.rows[0] : null;
 }
 
 /**
  * Delete a specific refresh token (used during rotation / logout).
+ * Supports both hashed and plain-text tokens.
  * @param {string} token
  */
 async function deleteRefreshToken(token) {
-  await pool.query('DELETE FROM refresh_tokens WHERE token = ?', [token]);
+  const tokenHash = hashToken(token);
+  // Delete by hash (new tokens) OR plain text (legacy tokens)
+  await pool.query(
+    'DELETE FROM refresh_tokens WHERE token = ? OR token = ?',
+    [tokenHash, token]
+  );
 }
 
 /**

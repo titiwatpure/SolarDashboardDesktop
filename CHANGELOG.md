@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.24 (2026-06-23)
+- Security: Hash refresh tokens (SHA-256) ก่อนเก็บลง database
+- Security: ไม่ reset admin password ถ้า admin user มีอยู่แล้ว
+- Security: ใช้ INIT_ADMIN_PASSWORD env var สำหรับสร้าง admin ครั้งแรก
+- Security: Production mode บังคับให้ INIT_ADMIN_PASSWORD ไม่เท่ากับ 'admin'
+- Stability: เพิ่ม WAL checkpoint ใน maintenance service (ป้องกัน WAL file ใหญ่เกินไป)
+- Test: แก้ organizations.test.js ให้ตรงกับ API response format { data, pagination }
+
 ## v1.0.23 (2026-06-16)
 - Performance Phase 1-3: ปรับปรุง API response time, เพิ่ม pagination, แก้ correlated subquery
 - Security P1: เพิ่ม backend permission checks (tasks, documents, projects, accounting)

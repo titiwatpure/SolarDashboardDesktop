@@ -461,21 +461,34 @@ const initDB = async () => {
   });
 
   try {
-    const adminId = uuidv4();
-    const hashedPassword = await bcrypt.hash('admin', 10);
+    // ตรวจสอบว่า admin user มีอยู่แล้วหรือไม่
+    const existingAdmin = await new Promise((resolve, reject) => {
+      db.all("SELECT id FROM users WHERE username = 'admin'", [], (err, rows) => {
+        if (err) reject(err); else resolve(rows);
+      });
+    });
 
-    // สร้าง admin user หรือ reset password ถ้ามีอยู่แล้ว
-    await runInsert(
-      `INSERT OR IGNORE INTO users (id, username, email, password, full_name, role, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [adminId, 'admin', 'admin@solardashboard.com', hashedPassword, 'Admin User', 'admin', 'active']
-    );
-    // Reset password ทุกครั้งที่ container เริ่มต้น
-    await runInsert(
-      `UPDATE users SET password = ? WHERE username = 'admin'`,
-      [hashedPassword]
-    );
-    console.log('✅ เพิ่ม admin user สำเร็จ');
+    if (existingAdmin.length === 0) {
+      // สร้าง admin user ใหม่ — ใช้ INIT_ADMIN_PASSWORD ถ้ามี, ไม่เช่นนั้นใช้ 'admin'
+      const initPassword = process.env.INIT_ADMIN_PASSWORD || 'admin';
+      const isProduction = process.env.NODE_ENV === 'production';
+
+      if (isProduction && initPassword === 'admin') {
+        console.error('❌ Production mode: INIT_ADMIN_PASSWORD ต้องไม่เท่ากับ "admin"');
+        process.exit(1);
+      }
+
+      const adminId = uuidv4();
+      const hashedPassword = await bcrypt.hash(initPassword, 10);
+      await runInsert(
+        `INSERT INTO users (id, username, email, password, full_name, role, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [adminId, 'admin', 'admin@solardashboard.com', hashedPassword, 'Admin User', 'admin', 'active']
+      );
+      console.log('✅ สร้าง admin user สำเร็จ');
+    } else {
+      console.log('✅ admin user มีอยู่แล้ว — ข้ามการสร้าง');
+    }
 
     // เพิ่ม demo users สำหรับ role อื่นๆ
     const demoUsers = [

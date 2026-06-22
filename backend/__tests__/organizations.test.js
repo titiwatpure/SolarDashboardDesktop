@@ -18,8 +18,11 @@ describe('Organizations API', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
-      expect(res.body.length).toBeGreaterThan(0);
+      expect(res.body).toHaveProperty('data');
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body).toHaveProperty('pagination');
+      expect(res.body.pagination).toHaveProperty('total');
     });
   });
 
