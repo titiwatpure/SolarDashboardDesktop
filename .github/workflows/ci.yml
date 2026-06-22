@@ -32,6 +32,7 @@ jobs:
         env:
           JWT_SECRET: ci-test-secret-key
           NODE_ENV: test
+          DB_PATH: ./solar_dashboard_test.db
           INIT_ADMIN_PASSWORD: admin
 
       - name: Run tests

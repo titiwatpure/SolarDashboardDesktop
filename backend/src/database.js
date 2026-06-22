@@ -1,8 +1,22 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'solar_dashboard.db');
+const isTestEnv = process.env.NODE_ENV === 'test';
+
+// SAFEGUARD: ป้องกัน zero-byte DB — ถ้าไฟล์มีอยู่แล้วแต่ size = 0 ให้หยุดทันที
+if (!isTestEnv && fs.existsSync(dbPath)) {
+  const stats = fs.statSync(dbPath);
+  if (stats.size === 0) {
+    console.error(`\n❌ FATAL: Database file is empty (0 bytes): ${dbPath}`);
+    console.error('❌ This indicates a data loss incident. Server will NOT start.');
+    console.error('❌ Please restore from backup before starting.\n');
+    process.exit(1);
+  }
+}
+
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 const HEALTH_CHECK_INTERVAL_MS = 10000;
@@ -37,6 +51,44 @@ async function openDatabase(retries = MAX_RETRIES) {
         });
       });
       await applyPragmas(db);
+
+      // SAFEGUARD: integrity check หลังเปิด DB (เฉพาะ production)
+      if (!isTestEnv) {
+        const integrityResult = await new Promise((resolve, reject) => {
+          db.get('PRAGMA integrity_check', (err, row) => {
+            if (err) return reject(err);
+            resolve(row);
+          });
+        });
+        if (integrityResult?.integrity_check !== 'ok') {
+          console.error(`\n❌ FATAL: Database integrity check failed: ${integrityResult?.integrity_check}`);
+          console.error('❌ Server will NOT start. Please restore from backup.\n');
+          process.exit(1);
+        }
+
+        // SAFEGUARD: ตรวจออฟัล data หลัก — ถ้า users หาย ให้ warn
+        const counts = await new Promise((resolve, reject) => {
+          db.all(
+            `SELECT
+              (SELECT COUNT(*) FROM users) as users,
+              (SELECT COUNT(*) FROM projects) as projects,
+              (SELECT COUNT(*) FROM tasks) as tasks,
+              (SELECT COUNT(*) FROM organizations) as organizations`,
+            (err, rows) => {
+              if (err) return reject(err);
+              resolve(rows[0]);
+            }
+          );
+        });
+        if (counts.users === 0) {
+          console.error('\n⚠️  WARNING: users table is EMPTY — possible data loss!');
+          console.error('⚠️  Server will still start, but please check your database.\n');
+        }
+        if (isDev) {
+          console.log(`[DB] Integrity: ok | users: ${counts.users} | projects: ${counts.projects} | tasks: ${counts.tasks} | orgs: ${counts.organizations}`);
+        }
+      }
+
       if (isDev) console.log('Connected to SQLite:', dbPath);
       return;
     } catch (err) {
