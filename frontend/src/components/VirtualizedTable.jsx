@@ -1,10 +1,10 @@
 /**
  * VirtualizedTable - ตารางที่ใช้ react-window สำหรับข้อมูลจำนวนมาก
- * ใช้ FixedSizeList สำหรับ performance (rows สูงเท่ากัน)
+ * ใช้ List สำหรับ performance (rows สูงเท่ากัน)
  */
 
 import { useRef, useCallback } from 'react';
-import { FixedSizeList as List } from 'react-window';
+import { List } from 'react-window';
 
 export default function VirtualizedTable({ headers, rows, renderRow, rowHeight = 52, maxHeight = 600, className = '' }) {
   const listRef = useRef(null);
