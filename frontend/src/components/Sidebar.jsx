@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3, Building2, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ChevronRight,
   ClipboardList, FileText, LayoutDashboard, LogOut, Map, Settings, Users, UserCircle,
-  Zap, LayoutGrid, Wallet, BookOpen
+  Zap, LayoutGrid, Wallet, BookOpen, FileCheck
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -49,6 +49,14 @@ const menuGroups = [
       { id: 'users', label: 'ผู้ใช้งาน', path: '/users', roles: ['admin'] },
       { id: 'help', label: 'คู่มือ', path: '/help', roles: ['admin', 'engineer', 'staff', 'client'] },
       { id: 'settings', label: 'ตั้งค่า', path: '/settings', roles: ['admin', 'engineer', 'staff', 'client'] },
+    ],
+  },
+  {
+    id: 'doc-review', label: 'ตรวจเอกสาร / ยื่นหน่วยงาน', icon: FileCheck,
+    children: [
+      { id: 'doc-review-dashboard', label: 'แดชบอร์ดเอกสาร', path: '/doc-review', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'doc-review-templates', label: 'Template Checklist', path: '/doc-review/templates', roles: ['admin', 'engineer'] },
+      { id: 'doc-review-agency-tracking', label: 'ติดตามยื่นหน่วยงาน', path: '/doc-review/agency-tracking', roles: ['admin', 'engineer', 'staff'] },
     ],
   },
 ];

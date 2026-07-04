@@ -397,3 +397,77 @@ export const accountingAPI = {
   export: (params) => apiCall('GET', `/accounting/export?${new URLSearchParams(params || {})}`),
 };
 
+// ============================================================
+// Document Review Module API
+// ============================================================
+export const documentReviewAPI = {
+  // Projects
+  getReviewProjects: (params) => apiCall('GET', `/doc-review?${new URLSearchParams(params || {})}`),
+  createReviewProject: (data) => apiCall('POST', '/doc-review', data),
+  getReviewProject: (id) => apiCall('GET', `/doc-review/${id}`),
+  updateReviewProject: (id, data) => apiCall('PUT', `/doc-review/${id}`, data),
+  deleteReviewProject: (id) => apiCall('DELETE', `/doc-review/${id}`),
+  getReviewSummary: () => apiCall('GET', '/doc-review/dashboard/summary'),
+
+  // Submission Packages
+  getPackages: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/packages`),
+  createPackage: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/packages`, data),
+  getPackage: (packageId) => apiCall('GET', `/doc-review/packages/${packageId}`),
+  updatePackage: (packageId, data) => apiCall('PUT', `/doc-review/packages/${packageId}`, data),
+  deletePackage: (packageId) => apiCall('DELETE', `/doc-review/packages/${packageId}`),
+  generateChecklist: (packageId, templateId) => apiCall('POST', `/doc-review/packages/${packageId}/generate-checklist`, { template_id: templateId }),
+
+  // Checklists
+  getReviewChecklists: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/checklists`),
+  createReviewChecklist: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/checklists`, data),
+  createChecklistsFromTemplate: (projectId, templateId) => apiCall('POST', `/doc-review/projects/${projectId}/checklists/from-template`, { template_id: templateId }),
+  updateReviewChecklist: (id, data) => apiCall('PUT', `/doc-review/checklists/${id}`, data),
+  deleteReviewChecklist: (id) => apiCall('DELETE', `/doc-review/checklists/${id}`),
+
+  // Files
+  uploadReviewFile: (checklistId, formData) => {
+    const token = localStorage.getItem('token');
+    return axios.post(`${API_BASE_URL}/doc-review/checklists/${checklistId}/files`, formData, {
+      headers: { 'Authorization': token ? `Bearer ${token}` : '', 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
+  },
+  getReviewFiles: (checklistId) => apiCall('GET', `/doc-review/checklists/${checklistId}/files`),
+  downloadReviewFile: (fileId) => `${API_BASE_URL}/doc-review/files/${fileId}/download`,
+  deleteReviewFile: (fileId) => apiCall('DELETE', `/doc-review/files/${fileId}`),
+
+  // Comments
+  addReviewComment: (checklistId, data) => apiCall('POST', `/doc-review/checklists/${checklistId}/comments`, data),
+  getReviewComments: (checklistId, params) => apiCall('GET', `/doc-review/checklists/${checklistId}/comments?${new URLSearchParams(params || {})}`),
+
+  // Approvals
+  approveProject: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/approve`, data),
+  rejectProject: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/reject`, data),
+  getProjectApprovals: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/approvals`),
+
+  // Agency Submissions
+  submitToAgency: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/submit`, data),
+  updateSubmission: (submissionId, data) => apiCall('PUT', `/doc-review/submissions/${submissionId}`, data),
+  getProjectSubmissions: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/submissions`),
+
+  // Template Checklists
+  getTemplateChecklists: (params) => apiCall('GET', `/doc-review/template-checklists?${new URLSearchParams(params || {})}`),
+  getTemplateChecklist: (id) => apiCall('GET', `/doc-review/template-checklists/${id}`),
+  createTemplateChecklist: (data) => apiCall('POST', '/doc-review/template-checklists', data),
+  updateTemplateChecklist: (id, data) => apiCall('PUT', `/doc-review/template-checklists/${id}`, data),
+  deleteTemplateChecklist: (id) => apiCall('DELETE', `/doc-review/template-checklists/${id}`),
+  copyTemplateChecklist: (id, data) => apiCall('POST', `/doc-review/template-checklists/${id}/copy`, data),
+
+  // Document Receipts - บันทึกการรับเอกสารจากลูกค้า
+  createReceipt: (data) => apiCall('POST', '/doc-review/receipts', data),
+  getReceiptsByChecklist: (checklistId) => apiCall('GET', `/doc-review/receipts/checklists/${checklistId}`),
+
+  // Document Issues - จัดการปัญหาที่ต้องแก้ไข
+  createIssue: (data) => apiCall('POST', '/doc-review/issues', data),
+  resolveIssue: (issueId) => apiCall('PUT', `/doc-review/issues/${issueId}/resolve`),
+  getIssuesByPackage: (packageId) => apiCall('GET', `/doc-review/packages/${packageId}/issues`),
+
+  // Correction Reports - รายงานส่งลูกค้า
+  createCorrectionReport: (data) => apiCall('POST', '/doc-review/correction-reports', data),
+  getCorrectionReport: (id) => apiCall('GET', `/doc-review/correction-reports/${id}`),
+};
+

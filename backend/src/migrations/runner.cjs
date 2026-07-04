@@ -55,10 +55,13 @@ async function runMigrations(db) {
     console.log(`  ⏳ กำลังรัน migration: ${name}`);
     try {
       const migration = require(path.join(migrationsDir, file));
-      if (typeof migration.up !== 'function') {
-        throw new Error(`Migration ${file} ไม่มี up() function`);
+      if (typeof migration.up === 'function') {
+        await migration.up(runSql);
+      } else if (typeof migration.up === 'string') {
+        await runSql(migration.up);
+      } else {
+        throw new Error(`Migration ${file} ไม่มี up() function หรือ SQL string`);
       }
-      await migration.up(runSql);
       await runSql('INSERT INTO schema_migrations (name) VALUES (?)', [name]);
       console.log(`  ✅ Migration ${name} สำเร็จ`);
       ran++;

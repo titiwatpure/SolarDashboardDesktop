@@ -30,6 +30,12 @@ const Accounting = lazy(() => import('./pages/Accounting'));
 const Quotations = lazy(() => import('./pages/Quotations'));
 const OrganizationContacts = lazy(() => import('./pages/OrganizationContacts'));
 const Help = lazy(() => import('./pages/Help'));
+const DocReviewDashboard = lazy(() => import('./pages/DocReviewDashboard'));
+const DocReviewNew = lazy(() => import('./pages/DocReviewNew'));
+const DocReviewDetail = lazy(() => import('./pages/DocReviewDetail'));
+const DocReviewTemplateChecklists = lazy(() => import('./pages/DocReviewTemplateChecklists'));
+const DocReviewAgencyTracking = lazy(() => import('./pages/DocReviewAgencyTracking'));
+const DocReviewCorrectionReport = lazy(() => import('./pages/DocReviewCorrectionReport'));
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -137,6 +143,12 @@ function AppContent() {
             <Route path="/quotations" element={<Quotations />} />
             <Route path="/portal" element={<CustomerPortal />} />
             <Route path="/accounting" element={<ProtectedRoute roles={['admin', 'engineer']}><Accounting /></ProtectedRoute>} />
+            <Route path="/doc-review" element={<DocReviewDashboard />} />
+            <Route path="/doc-review/new" element={<DocReviewNew />} />
+            <Route path="/doc-review/templates" element={<DocReviewTemplateChecklists />} />
+            <Route path="/doc-review/agency-tracking" element={<DocReviewAgencyTracking />} />
+            <Route path="/doc-review/correction-report/:id" element={<DocReviewCorrectionReport />} />
+            <Route path="/doc-review/:id" element={<DocReviewDetail />} />
             <Route path="/help" element={<Help />} />
           </Routes>
           </Suspense>
