@@ -9,6 +9,7 @@
  */
 
 import axios from 'axios';
+import { cachedFetch, clearCacheByPrefix } from './apiCache';
 
 // ❗ กำหนด URL ของ Backend API ที่นี่
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -162,6 +163,22 @@ export const apiCall = async (method, url, data = null) => {
     console.error('API Error:', error);
     throw error;
   }
+};
+
+/**
+ * GET request ที่ใช้ cache — ป้องกัน re-fetch ซ้ำภายใน TTL
+ * @param {string} url
+ * @param {number} ttl - cache duration in ms (default 30s)
+ */
+export const cachedGET = (url, ttl = 30_000) => {
+  return cachedFetch(`GET:${url}`, () => apiCall('GET', url), ttl);
+};
+
+/**
+ * ล้าง cache เมื่อมีการ write operation
+ */
+export const invalidateCache = (prefix) => {
+  clearCacheByPrefix(prefix);
 };
 
 export const authAPI = {
@@ -401,13 +418,13 @@ export const accountingAPI = {
 // Document Review Module API
 // ============================================================
 export const documentReviewAPI = {
-  // Projects
-  getReviewProjects: (params) => apiCall('GET', `/doc-review?${new URLSearchParams(params || {})}`),
-  createReviewProject: (data) => apiCall('POST', '/doc-review', data),
-  getReviewProject: (id) => apiCall('GET', `/doc-review/${id}`),
-  updateReviewProject: (id, data) => apiCall('PUT', `/doc-review/${id}`, data),
-  deleteReviewProject: (id) => apiCall('DELETE', `/doc-review/${id}`),
-  getReviewSummary: () => apiCall('GET', '/doc-review/dashboard/summary'),
+  // Projects — cached 30s
+  getReviewProjects: (params) => cachedGET(`/doc-review?${new URLSearchParams(params || {})}`, 30_000),
+  createReviewProject: (data) => { invalidateCache('/doc-review'); return apiCall('POST', '/doc-review', data); },
+  getReviewProject: (id) => cachedGET(`/doc-review/${id}`, 30_000),
+  updateReviewProject: (id, data) => { invalidateCache('/doc-review'); return apiCall('PUT', `/doc-review/${id}`, data); },
+  deleteReviewProject: (id) => { invalidateCache('/doc-review'); return apiCall('DELETE', `/doc-review/${id}`); },
+  getReviewSummary: () => cachedGET('/doc-review/dashboard/summary', 30_000),
 
   // Submission Packages
   getPackages: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/packages`),
