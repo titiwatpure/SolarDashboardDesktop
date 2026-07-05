@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { documentReviewAPI } from '../utils/api';
+import { SARABUN_BASE64 } from '../utils/thaiFont';
 
 export default function DocReviewCorrectionReport() {
   const { id } = useParams();
@@ -22,34 +23,104 @@ export default function DocReviewCorrectionReport() {
   };
 
   const exportPDF = async () => {
+    if (!report) return;
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text('Correction Report', 14, 20);
-    doc.setFontSize(11);
-    doc.text(`Project: ${report.project_code} - ${report.project_name}`, 14, 30);
-    doc.text(`Package: ${report.package_name}`, 14, 36);
-    doc.text(`Date: ${report.created_at}`, 14, 42);
+    const doc = new jsPDF('p', 'mm', 'a4');
 
-    const rows = (report.issue_details || []).map((issue, i) => [
-      i + 1,
+    // Embed Sarabun Thai font
+    doc.addFileToVFS('Sarabun.ttf', SARABUN_BASE64);
+    doc.addFont('Sarabun.ttf', 'Sarabun', 'normal');
+    doc.addFont('Sarabun.ttf', 'Sarabun', 'bold');
+    doc.setFont('Sarabun');
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 15;
+
+    // Title
+    doc.setFontSize(18);
+    doc.text('รายงานแก้ไขเอกสาร', pageWidth / 2, y, { align: 'center' });
+    y += 8;
+    doc.setFontSize(10);
+    doc.text('(Correction Report)', pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    // Meta info
+    doc.setFontSize(11);
+    doc.text(`รหัสโครงการ: ${report.project_code || '-'}`, 14, y);
+    doc.text(`ชื่อโครงการ: ${report.project_name || '-'}`, pageWidth / 2 + 5, y);
+    y += 6;
+    doc.text(`ชุดเอกสาร: ${report.package_name || '-'}`, 14, y);
+    doc.text(`สร้างเมื่อ: ${report.created_at || '-'}`, pageWidth / 2 + 5, y);
+    y += 4;
+
+    // Divider
+    doc.setDrawColor(139, 92, 246);
+    doc.setLineWidth(0.5);
+    doc.line(14, y, pageWidth - 14, y);
+    y += 8;
+
+    // Table
+    const issues = report.issue_details || [];
+    const rows = issues.map((issue, i) => [
+      `${i + 1}`,
       issue.document_name || '-',
-      issue.issue_source === 'agency' ? 'Agency' : 'Internal',
-      issue.description,
+      issue.issue_source === 'agency' ? 'จากหน่วยงาน' : 'ตรวจสอบภายใน',
+      issue.description || '-',
       issue.required_action || '-',
-      issue.status === 'open' ? 'Open' : 'Resolved',
+      issue.status === 'open' ? 'ยังไม่แก้' : 'แก้แล้ว',
     ]);
 
     autoTable(doc, {
-      startY: 50,
-      head: [['#', 'Document', 'Source', 'Issue', 'Action Required', 'Status']],
+      startY: y,
+      head: [['#', 'เอกสาร', 'แหล่งที่มา', 'ปัญหาที่พบ', 'ต้องแก้ไข', 'สถานะ']],
       body: rows,
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [139, 92, 246] },
+      styles: { font: 'Sarabun', fontSize: 9 },
+      headStyles: { fillColor: [139, 92, 246], font: 'Sarabun', fontSize: 10 },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 45 },
+        4: { cellWidth: 35 },
+        5: { cellWidth: 20 },
+      },
     });
 
-    doc.save(`correction-report-${report.project_code}.pdf`);
+    doc.save(`รายงานแก้ไขเอกสาร-${report.project_code || 'unknown'}.pdf`);
+  };
+
+  const exportExcel = () => {
+    if (!report) return;
+    const issues = report.issue_details || [];
+
+    const BOM = '\uFEFF';
+    const headers = ['ลำดับ', 'เอกสาร', 'แหล่งที่มา', 'ปัญหาที่พบ', 'ต้องแก้ไข', 'สถานะ'];
+    const rows = issues.map((issue, i) => [
+      i + 1,
+      issue.document_name || '-',
+      issue.issue_source === 'agency' ? 'จากหน่วยงาน' : 'ตรวจสอบภายใน',
+      issue.description || '-',
+      issue.required_action || '-',
+      issue.status === 'open' ? 'ยังไม่แก้' : 'แก้แล้ว',
+    ]);
+
+    const csvContent = BOM + [
+      `รายงานแก้ไขเอกสาร - ${report.project_code} - ${report.project_name}`,
+      `ชุดเอกสาร: ${report.package_name}`,
+      `สร้างเมื่อ: ${report.created_at}`,
+      '',
+      headers.join(','),
+      ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `รายงานแก้ไขเอกสาร-${report.project_code || 'unknown'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><p className="text-slate-400">กำลังโหลด...</p></div>;
@@ -58,16 +129,21 @@ export default function DocReviewCorrectionReport() {
   return (
     <div className="space-y-6">
       <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
-        <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:text-blue-700 mb-3">← กลับ</button>
+        <button onClick={() => navigate('/doc-review/agency-tracking')} className="text-sm text-blue-600 hover:text-blue-700 mb-3">← กลับไปติดตามยื่นหน่วยงาน</button>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">รายงานแก้ไขเอกสาร</h1>
             <p className="text-slate-500 mt-1">{report.project_code} | {report.package_name}</p>
             <p className="text-xs text-slate-400 mt-1">สร้างเมื่อ: {report.created_at} โดย {report.created_by_name || 'system'}</p>
           </div>
-          <button onClick={exportPDF} className="px-5 py-2.5 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700">
-            Export PDF
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={exportExcel} className="px-4 py-2.5 rounded-xl bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700">
+              Export Excel
+            </button>
+            <button onClick={exportPDF} className="px-5 py-2.5 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700">
+              Export PDF
+            </button>
+          </div>
         </div>
       </section>
 

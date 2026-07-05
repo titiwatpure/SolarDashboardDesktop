@@ -29,7 +29,7 @@ router.post('/projects/:projectId/submit', authenticateToken, async (req, res) =
 
     // Business Rule: ยังไม่ internal approved → ห้ามยื่นหน่วยงาน
     const project = projectCheck.rows[0];
-    if (!['ready_to_submit', 'agency_revision', 'submitted'].includes(project.project_status)) {
+    if (!['ready_to_submit', 'agency_revision', 'submitted_agency'].includes(project.project_status)) {
       return res.status(400).json({ error: 'โครงการยังไม่ได้รับการอนุมัติภายใน หรืออยู่ในสถานะที่ไม่สามารถยื่นหน่วยงานได้' });
     }
 
@@ -51,7 +51,7 @@ router.post('/projects/:projectId/submit', authenticateToken, async (req, res) =
       // Update project status
       await tx.query(
         'UPDATE doc_review_projects SET project_status = ?, updated_at = datetime("now") WHERE id = ?',
-        ['submitted', req.params.projectId]
+        ['submitted_agency', req.params.projectId]
       );
 
       const row = await tx.query('SELECT * FROM doc_agency_submissions WHERE id = ?', [id]);
@@ -107,7 +107,7 @@ router.put('/submissions/:id', authenticateToken, async (req, res) => {
 
       // Update project status based on agency response
       if (agency_status) {
-        let newProjectStatus = 'submitted';
+        let newProjectStatus = 'submitted_agency';
 
         if (agency_status === 'approved') {
           newProjectStatus = 'approved';
@@ -126,6 +126,25 @@ router.put('/submissions/:id', authenticateToken, async (req, res) => {
 
     const result = await pool.query('SELECT * FROM doc_agency_submissions WHERE id = ?', [req.params.id]);
     res.json(result.rows[0]);
+  } catch (error) {
+    console.error('[DOC_REVIEW_SUBMISSIONS]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
+// GET /api/doc-review/submissions - ดึง submissions ทั้งหมด (สำหรับ Agency Tracking)
+// ============================================================
+router.get('/submissions', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT s.*, p.project_code, p.project_name, pk.package_name
+       FROM doc_agency_submissions s
+       LEFT JOIN doc_review_projects p ON s.project_id = p.id
+       LEFT JOIN doc_submission_packages pk ON s.project_id = pk.project_id AND s.agency_name = pk.agency
+       ORDER BY s.submitted_date DESC`
+    );
+    res.json(result.rows);
   } catch (error) {
     console.error('[DOC_REVIEW_SUBMISSIONS]', error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentReviewAPI } from '../utils/api';
-import VirtualizedTable from '../components/VirtualizedTable';
 
 const STATUS_COLORS = {
   pending: 'bg-amber-100 text-amber-700',
@@ -10,17 +9,17 @@ const STATUS_COLORS = {
   resubmitted: 'bg-blue-100 text-blue-700',
 };
 
-const STATUS_STYLES = {
-  approved: 'border-emerald-500 bg-emerald-50',
-  revision_requested: 'border-red-500 bg-red-50',
-  resubmitted: 'border-blue-500 bg-blue-50',
-};
-
 const STATUS_LABELS = {
   pending: 'รอตรวจสอบ',
   approved: 'อนุมัติแล้ว',
   revision_requested: 'ให้แก้ไข',
   resubmitted: 'ยื่นใหม่แล้ว',
+};
+
+const STATUS_STYLES = {
+  approved: 'border-emerald-500 bg-emerald-50',
+  revision_requested: 'border-red-500 bg-red-50',
+  resubmitted: 'border-blue-500 bg-blue-50',
 };
 
 export default function DocReviewAgencyTracking() {
@@ -35,18 +34,8 @@ export default function DocReviewAgencyTracking() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const projList = await documentReviewAPI.getReviewProjects();
-      const projArray = Array.isArray(projList) ? projList : [];
-      const allSubs = [];
-      for (const p of projArray) {
-        try {
-          const subs = await documentReviewAPI.getProjectSubmissions(p.id);
-          if (Array.isArray(subs)) {
-            subs.forEach(s => { allSubs.push({ ...s, project_code: p.project_code, project_name: p.project_name }); });
-          }
-        } catch (e) { /* skip */ }
-      }
-      setSubmissions(allSubs);
+      const data = await documentReviewAPI.getAllSubmissions();
+      setSubmissions(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -95,61 +84,63 @@ export default function DocReviewAgencyTracking() {
 
       {/* Submissions Table */}
       <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="px-6 py-10 text-center text-slate-400">ยังไม่มีประวัติการยื่นหน่วยงาน</div>
-        ) : (
-          <VirtualizedTable
-            maxHeight={600}
-            rowHeight={64}
-            headers={[
-              { label: 'โครงการ', className: 'w-[22%]' },
-              { label: 'หน่วยงาน', className: 'w-[15%]' },
-              { label: 'รอบที่ยื่น', className: 'w-[10%] text-center' },
-              { label: 'วันที่ยื่น', className: 'w-[12%]' },
-              { label: 'สถานะ', className: 'w-[12%]' },
-              { label: 'คอมเมนต์หน่วยงาน', className: 'w-[19%]' },
-              { label: 'จัดการ', className: 'w-[10%]' },
-            ]}
-            rows={filtered}
-            renderRow={(sub) => (
-              <div className="flex items-center text-sm border-b border-slate-100 hover:bg-slate-50">
-                <div className="px-6 py-4 cursor-pointer w-[22%]" onClick={() => navigate(`/doc-review/${sub.project_id}`)}>
-                  <p className="font-medium text-blue-600">{sub.project_code}</p>
-                  <p className="text-xs text-slate-500">{sub.project_name}</p>
-                </div>
-                <div className="px-6 py-4 text-slate-700 w-[15%]">{sub.agency_name}</div>
-                <div className="px-6 py-4 text-center w-[10%]">
-                  <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-xs font-semibold">รอบ {sub.submission_round}</span>
-                </div>
-                <div className="px-6 py-4 text-slate-600 w-[12%]">{sub.submitted_date || '-'}</div>
-                <div className="px-6 py-4 w-[12%]">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[sub.agency_status] || 'bg-slate-100 text-slate-600'}`}>
-                    {STATUS_LABELS[sub.agency_status] || sub.agency_status}
-                  </span>
-                </div>
-                <div className="px-6 py-4 text-slate-600 text-xs truncate w-[19%]">{sub.agency_comment || '-'}</div>
-                <div className="px-6 py-4 w-[10%]">
-                  {sub.agency_status === 'pending' && (
-                    <button onClick={() => setEditSub(sub)} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-xs font-medium text-white hover:bg-indigo-700">
-                      บันทึกผล
-                    </button>
-                  )}
-                  {sub.agency_status === 'revision_requested' && (
-                    <button onClick={() => navigate(`/doc-review/${sub.project_id}`)} className="px-3 py-1.5 rounded-lg bg-blue-600 text-xs font-medium text-white hover:bg-blue-700">
-                      ไปแก้ไข
-                    </button>
-                  )}
-                  {sub.agency_status === 'approved' && (
-                    <span className="text-xs text-emerald-600 font-medium">เสร็จสิ้น</span>
-                  )}
-                </div>
-              </div>
-            )}
-          />
-        )}
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead className="bg-slate-50 text-sm text-slate-500">
+              <tr>
+                <th className="px-6 py-4 text-left font-semibold">โครงการ</th>
+                <th className="px-6 py-4 text-left font-semibold">ชุดเอกสาร</th>
+                <th className="px-6 py-4 text-left font-semibold">หน่วยงาน</th>
+                <th className="px-6 py-4 text-center font-semibold">รอบที่ยื่น</th>
+                <th className="px-6 py-4 text-left font-semibold">วันที่ยื่น</th>
+                <th className="px-6 py-4 text-left font-semibold">สถานะ</th>
+                <th className="px-6 py-4 text-left font-semibold">คอมเมนต์หน่วยงาน</th>
+                <th className="px-6 py-4 text-left font-semibold">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {filtered.length === 0 ? (
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-400">ยังไม่มีประวัติการยื่นหน่วยงาน</td></tr>
+              ) : filtered.map(sub => (
+                <tr key={sub.id} className="hover:bg-slate-50">
+                  <td className="px-6 py-4 cursor-pointer" onClick={() => navigate(`/doc-review/${sub.project_id}`)}>
+                    <p className="font-medium text-blue-600">{sub.project_code}</p>
+                    <p className="text-xs text-slate-500">{sub.project_name}</p>
+                  </td>
+                  <td className="px-6 py-4 text-slate-700">{sub.package_name || '-'}</td>
+                  <td className="px-6 py-4 text-slate-700">{sub.agency_name}</td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-xs font-semibold">รอบ {sub.submission_round}</span>
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">{sub.submitted_date || '-'}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[sub.agency_status] || 'bg-slate-100 text-slate-600'}`}>
+                      {STATUS_LABELS[sub.agency_status] || sub.agency_status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-slate-600 text-xs max-w-[200px] truncate">{sub.agency_comment || '-'}</td>
+                  <td className="px-6 py-4">
+                    {sub.agency_status === 'pending' && (
+                      <button onClick={() => setEditSub(sub)} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-xs font-medium text-white hover:bg-indigo-700">
+                        บันทึกผล
+                      </button>
+                    )}
+                    {sub.agency_status === 'revision_requested' && (
+                      <button onClick={() => navigate(`/doc-review/${sub.project_id}`)} className="px-3 py-1.5 rounded-lg bg-blue-600 text-xs font-medium text-white hover:bg-blue-700">
+                        ไปแก้ไข
+                      </button>
+                    )}
+                    {sub.agency_status === 'approved' && (
+                      <span className="text-xs text-emerald-600 font-medium">เสร็จสิ้น</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      {/* Update Submission Modal */}
       {editSub && (
         <UpdateSubmissionModal
           submission={editSub}

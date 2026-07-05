@@ -84,17 +84,22 @@ router.post('/packages/:packageId/generate-checklist', authenticateToken, async 
       return res.status(404).json({ error: 'ไม่พบชุดเอกสาร' });
     }
 
-    // Find template
-    const template = checklistTemplates.find(t => t.id === template_id);
-    if (!template) {
+    // Find template from database
+    const templateResult = await pool.query('SELECT * FROM document_checklists WHERE id = ? AND is_template = 1', [template_id]);
+    if (templateResult.rows.length === 0) {
       return res.status(404).json({ error: 'ไม่พบ template' });
     }
+    const template = templateResult.rows[0];
+
+    // Get template items from database
+    const itemsResult = await pool.query('SELECT * FROM checklist_items WHERE checklist_id = ? ORDER BY item_order', [template_id]);
+    const templateItems = itemsResult.rows;
 
     // Create checklists from template
     const created = await pool.transaction(async (tx) => {
       const ids = [];
-      for (let i = 0; i < template.items.length; i++) {
-        const item = template.items[i];
+      for (let i = 0; i < templateItems.length; i++) {
+        const item = templateItems[i];
         const id = uuidv4();
         await tx.query(
           `INSERT INTO doc_review_checklists (id, project_id, package_id, checklist_template_id, document_name, description, is_required, sort_order)
@@ -189,7 +194,7 @@ router.put('/packages/:packageId', authenticateToken, async (req, res) => {
     const setClauses = [];
     const values = [];
 
-    const VALID_PACKAGE_STATUSES = ['draft', 'waiting_documents', 'internal_review', 'ready_to_submit', 'submitted', 'agency_revision', 'approved', 'closed'];
+    const VALID_PACKAGE_STATUSES = ['waiting_documents', 'internal_review', 'customer_revision', 'ready_to_submit', 'submitted_agency', 'agency_revision', 'approved'];
 
     if (package_name !== undefined) { setClauses.push('package_name = ?'); values.push(package_name); }
     if (agency !== undefined) { setClauses.push('agency = ?'); values.push(agency); }

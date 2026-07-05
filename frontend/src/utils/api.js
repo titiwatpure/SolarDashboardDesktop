@@ -424,7 +424,7 @@ export const documentReviewAPI = {
   getReviewProject: (id) => cachedGET(`/doc-review/${id}`, 30_000),
   updateReviewProject: (id, data) => { invalidateCache('/doc-review'); return apiCall('PUT', `/doc-review/${id}`, data); },
   deleteReviewProject: (id) => { invalidateCache('/doc-review'); return apiCall('DELETE', `/doc-review/${id}`); },
-  getReviewSummary: () => cachedGET('/doc-review/dashboard/summary', 30_000),
+  getReviewSummary: () => apiCall('GET', '/doc-review/dashboard/summary'),
 
   // Submission Packages
   getPackages: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/packages`),
@@ -465,6 +465,7 @@ export const documentReviewAPI = {
   submitToAgency: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/submit`, data),
   updateSubmission: (submissionId, data) => apiCall('PUT', `/doc-review/submissions/${submissionId}`, data),
   getProjectSubmissions: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/submissions`),
+  getAllSubmissions: () => cachedGET('/doc-review/submissions', 30_000),
 
   // Template Checklists
   getTemplateChecklists: (params) => apiCall('GET', `/doc-review/template-checklists?${new URLSearchParams(params || {})}`),

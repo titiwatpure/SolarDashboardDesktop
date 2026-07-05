@@ -103,6 +103,21 @@ app.use('/api/contracts', require('./routes/contracts'));
 app.use('/api/portal', require('./routes/portal'));
 app.use('/api/accounting', require('./routes/accounting'));
 
+// Document Review & Agency Submission Tracking
+// Mount template-checklists FIRST to avoid /:id conflict with packages
+app.use('/api/doc-review/template-checklists', require('./routes/doc-review-template-checklists'));
+// Mount packages BEFORE other routes to avoid /:id conflict
+app.use('/api/doc-review', require('./routes/doc-review-packages'));
+app.use('/api/doc-review', require('./routes/doc-review-checklists'));
+app.use('/api/doc-review', require('./routes/doc-review-files'));
+app.use('/api/doc-review', require('./routes/doc-review-comments'));
+app.use('/api/doc-review', require('./routes/doc-review-approvals'));
+app.use('/api/doc-review', require('./routes/doc-review-submissions'));
+app.use('/api/doc-review', require('./routes/doc-review-projects'));
+app.use('/api/doc-review', require('./routes/doc-review-receipts'));
+app.use('/api/doc-review', require('./routes/doc-review-issues'));
+app.use('/api/doc-review', require('./routes/doc-review-correction-reports'));
+
 // Health check with DB connectivity
 const pool = require('./database');
 app.get('/api/health', async (req, res) => {

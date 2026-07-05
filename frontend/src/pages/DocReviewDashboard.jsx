@@ -1,96 +1,84 @@
 /**
  * DocReviewDashboard - แดชบอร์ดสรุปสถานะเอกสาร
+ * Source of truth: submission_packages.package_status
  */
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentReviewAPI } from '../utils/api';
 
-const STATUS_LABELS = {
-  waiting_documents: 'รอเอกสาร',
-  internal_review: 'กำลังตรวจ',
-  waiting_customer_revision: 'รอลูกค้าแก้',
-  ready_to_submit: 'พร้อมยื่น',
-  submitted: 'ยื่นแล้ว',
-  agency_revision: 'หน่วยงานให้แก้',
-  approved: 'อนุมัติแล้ว',
-  closed: 'ปิดงาน'
+const UNIFIED_STATUSES = {
+  waiting_documents: { label: 'รอเอกสาร', color: 'bg-slate-400' },
+  internal_review: { label: 'กำลังตรวจ', color: 'bg-blue-500' },
+  customer_revision: { label: 'รอลูกค้าแก้', color: 'bg-orange-500' },
+  ready_to_submit: { label: 'พร้อมยื่น', color: 'bg-purple-500' },
+  submitted_agency: { label: 'ยื่นแล้ว', color: 'bg-indigo-500' },
+  agency_revision: { label: 'หน่วยงานให้แก้', color: 'bg-red-500' },
+  approved: { label: 'อนุมัติแล้ว', color: 'bg-emerald-500' },
 };
 
-const STATUS_COLORS = {
+const STATUS_BADGE = {
   waiting_documents: 'bg-slate-100 text-slate-700',
   internal_review: 'bg-blue-100 text-blue-700',
-  waiting_customer_revision: 'bg-orange-100 text-orange-700',
+  customer_revision: 'bg-orange-100 text-orange-700',
   ready_to_submit: 'bg-purple-100 text-purple-700',
-  submitted: 'bg-amber-100 text-amber-700',
+  submitted_agency: 'bg-indigo-100 text-indigo-700',
   agency_revision: 'bg-red-100 text-red-700',
   approved: 'bg-emerald-100 text-emerald-700',
-  closed: 'bg-slate-100 text-slate-500'
 };
-
-const PERMIT_TYPES = {
-  a1: 'อ.1 ขออนุญาตก่อสร้าง',
-  rong4: 'รง.4 แจ้งประกอบกิจการ',
-  pck2: 'พค.2 ใบอนุญาตผลิตพลังงานควบคุม',
-  erc: 'อนุมัติ กกพ.',
-  sld: 'SLD ผังระบบไฟฟ้า'
-};
-
-const PIPELINE_BG = {
-  emerald: 'bg-emerald-100',
-  blue: 'bg-blue-100',
-  purple: 'bg-purple-100',
-  indigo: 'bg-indigo-100',
-  cyan: 'bg-cyan-100',
-  green: 'bg-green-100',
-};
-
-const PIPELINE_STAGES = [
-  { key: 'receiving', label: 'รับเอกสาร', color: 'emerald', icon: '📥' },
-  { key: 'reviewing', label: 'กำลังตรวจ', color: 'blue', icon: '🔍' },
-  { key: 'passed', label: 'ผ่านแล้ว', color: 'purple', icon: '✓' },
-  { key: 'submitted', label: 'ยื่นแล้ว', color: 'indigo', icon: '📤' },
-  { key: 'tracking', label: 'ติดตามผล', color: 'cyan', icon: '📋' },
-  { key: 'approved', label: 'อนุมัติ', color: 'green', icon: '✅' },
-];
-
-function getProjectStage(project) {
-  const s = project.project_status;
-  if (s === 'waiting_documents' || s === 'waiting_customer_revision') return 'receiving';
-  if (s === 'internal_review') return 'reviewing';
-  if (s === 'ready_to_submit') return 'passed';
-  if (s === 'submitted') return 'submitted';
-  if (s === 'agency_revision') return 'tracking';
-  if (s === 'approved' || s === 'closed') return 'approved';
-  return 'receiving';
-}
 
 export default function DocReviewDashboard() {
   const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
-  const [projects, setProjects] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({ status: '', permit_type: '', search: '' });
+  const [filter, setFilter] = useState({ status: '', search: '' });
 
-  useEffect(() => {
-    loadData();
-  }, [filter]);
+  useEffect(() => { loadData(); }, [filter]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [summaryRes, projectsRes] = await Promise.all([
+      const [summaryRes] = await Promise.all([
         documentReviewAPI.getReviewSummary(),
-        documentReviewAPI.getReviewProjects(filter)
       ]);
       setSummary(summaryRes);
-      setProjects(Array.isArray(projectsRes) ? projectsRes : []);
+
+      // ดึง packages ทั้งหมด (ผ่าน projects แต่ละตัว)
+      const projList = await documentReviewAPI.getReviewProjects();
+      const projArray = Array.isArray(projList) ? projList : [];
+      const allPkgs = [];
+      for (const p of projArray) {
+        try {
+          const pkgs = await documentReviewAPI.getPackages(p.id);
+          if (Array.isArray(pkgs)) {
+            pkgs.forEach(pkg => {
+              allPkgs.push({
+                ...pkg,
+                project_code: p.project_code,
+                project_name: p.project_name,
+                customer_name: p.customer_name,
+              });
+            });
+          }
+        } catch (e) { /* skip */ }
+      }
+      setPackages(allPkgs);
     } catch (error) {
       console.error('Failed to load dashboard:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const filtered = packages.filter(p => {
+    if (filter.status && p.package_status !== filter.status) return false;
+    if (filter.search) {
+      const q = filter.search.toLowerCase();
+      if (!p.project_code?.toLowerCase().includes(q) && !p.package_name?.toLowerCase().includes(q) && !p.project_name?.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -110,29 +98,21 @@ export default function DocReviewDashboard() {
         </div>
       </section>
 
-      {/* Summary Cards */}
+      {/* KPI Cards */}
       {summary && (
-        <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-          <SummaryCard label="ทั้งหมด" count={summary.total || 0} color="bg-slate-500" />
-          <SummaryCard label="รอเอกสาร" count={summary.waiting_documents || 0} color="bg-slate-400" />
-          <SummaryCard label="กำลังตรวจ" count={summary.internal_review || 0} color="bg-blue-500" />
-          <SummaryCard label="รอลูกค้าแก้" count={summary.waiting_customer_revision || 0} color="bg-orange-500" />
-          <SummaryCard label="พร้อมยื่น" count={summary.ready_to_submit || 0} color="bg-purple-500" />
-          <SummaryCard label="ยื่นแล้ว" count={summary.submitted || 0} color="bg-amber-500" />
-          <SummaryCard label="หน่วยงานให้แก้" count={summary.agency_revision || 0} color="bg-red-500" />
-          <SummaryCard label="อนุมัติแล้ว" count={summary.approved || 0} color="bg-emerald-500" />
+        <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          {Object.entries(UNIFIED_STATUSES).map(([key, { label, color }]) => (
+            <SummaryCard key={key} label={label} count={summary[key] || 0} color={color} />
+          ))}
         </section>
       )}
-
-      {/* Pipeline View */}
-      {projects.length > 0 && <PipelineSummary projects={projects} />}
 
       {/* Filters */}
       <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-4">
           <input
             type="text"
-            placeholder="ค้นหาโครงการ..."
+            placeholder="ค้นหาโครงการ / ชุดเอกสาร..."
             value={filter.search}
             onChange={(e) => setFilter({ ...filter, search: e.target.value })}
             className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:bg-white"
@@ -143,34 +123,23 @@ export default function DocReviewDashboard() {
             className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
           >
             <option value="">ทุกสถานะ</option>
-            {Object.entries(STATUS_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-          <select
-            value={filter.permit_type}
-            onChange={(e) => setFilter({ ...filter, permit_type: e.target.value })}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
-          >
-            <option value="">ทุกประเภท</option>
-            {Object.entries(PERMIT_TYPES).map(([key, label]) => (
+            {Object.entries(UNIFIED_STATUSES).map(([key, { label }]) => (
               <option key={key} value={key}>{label}</option>
             ))}
           </select>
         </div>
       </section>
 
-      {/* Project List */}
+      {/* Package Table */}
       <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50 text-sm text-slate-500">
               <tr>
                 <th className="px-6 py-4 text-left font-semibold">รหัสโครงการ</th>
-                <th className="px-6 py-4 text-left font-semibold">ชื่อโครงการ</th>
+                <th className="px-6 py-4 text-left font-semibold">ชุดเอกสาร / หน่วยงาน</th>
                 <th className="px-6 py-4 text-left font-semibold">ลูกค้า</th>
-                <th className="px-6 py-4 text-left font-semibold">ประเภทใบอนุญาต</th>
-                <th className="px-6 py-4 text-left font-semibold">Pipeline</th>
+                <th className="px-6 py-4 text-left font-semibold">สถานะ</th>
                 <th className="px-6 py-4 text-left font-semibold">ความคืบหน้า</th>
                 <th className="px-6 py-4 text-left font-semibold">กำหนดส่ง</th>
                 <th className="px-6 py-4 text-left font-semibold">จัดการ</th>
@@ -179,33 +148,35 @@ export default function DocReviewDashboard() {
             <tbody className="divide-y divide-slate-100 text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-10 text-center text-slate-400">กำลังโหลด...</td>
+                  <td colSpan="7" className="px-6 py-10 text-center text-slate-400">กำลังโหลด...</td>
                 </tr>
-              ) : projects.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-10 text-center text-slate-400">ยังไม่มีโครงการ</td>
+                  <td colSpan="7" className="px-6 py-10 text-center text-slate-400">ยังไม่มีชุดเอกสาร</td>
                 </tr>
               ) : (
-                projects.map((project) => (
-                  <tr key={project.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/doc-review/${project.id}`)}>
-                    <td className="px-6 py-4 font-medium text-blue-600">{project.project_code}</td>
-                    <td className="px-6 py-4 font-medium text-slate-900">{project.project_name}</td>
-                    <td className="px-6 py-4 text-slate-600">{project.customer_name || '-'}</td>
+                filtered.map((pkg) => (
+                  <tr key={pkg.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/doc-review/${pkg.project_id}`)}>
+                    <td className="px-6 py-4 font-medium text-blue-600">{pkg.project_code}</td>
                     <td className="px-6 py-4">
-                      <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">{PERMIT_TYPES[project.permit_type] || project.permit_type}</span>
+                      <p className="font-medium text-slate-900">{pkg.package_name}</p>
+                      <p className="text-xs text-slate-500">{pkg.agency || '-'}</p>
                     </td>
+                    <td className="px-6 py-4 text-slate-600">{pkg.customer_name || '-'}</td>
                     <td className="px-6 py-4">
-                      <PipelineBadge project={project} />
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_BADGE[pkg.package_status] || 'bg-slate-100 text-slate-600'}`}>
+                        {UNIFIED_STATUSES[pkg.package_status]?.label || pkg.package_status}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${project.progress || 0}%` }} />
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pkg.total_docs > 0 ? Math.round((pkg.passed_docs / pkg.total_docs) * 100) : 0}%` }} />
                         </div>
-                        <span className="text-xs text-slate-500">{project.progress || 0}%</span>
+                        <span className="text-xs text-slate-500">{pkg.passed_docs || 0}/{pkg.total_docs || 0}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-slate-500">{project.due_date || '-'}</td>
+                    <td className="px-6 py-4 text-slate-500">{pkg.due_date || '-'}</td>
                     <td className="px-6 py-4">
                       <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">ดู →</button>
                     </td>
@@ -229,48 +200,5 @@ function SummaryCard({ label, count, color }) {
       </div>
       <p className="text-2xl font-bold text-slate-900 mt-2">{count}</p>
     </div>
-  );
-}
-
-function PipelineSummary({ projects }) {
-  const counts = PIPELINE_STAGES.map(s => ({
-    ...s,
-    count: projects.filter(p => getProjectStage(p) === s.key).length
-  }));
-  return (
-    <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
-      <h3 className="text-sm font-semibold text-slate-500 mb-3">Pipeline สถานะเอกสาร</h3>
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {counts.map((stage, i) => (
-          <div key={stage.key} className="flex items-center gap-2 flex-shrink-0">
-            <div className={`w-10 h-10 rounded-xl ${PIPELINE_BG[stage.color] || 'bg-slate-100'} flex items-center justify-center text-lg`}>{stage.icon}</div>
-            <div>
-              <p className="text-xl font-bold text-slate-900">{stage.count}</p>
-              <p className="text-xs text-slate-500 whitespace-nowrap">{stage.label}</p>
-            </div>
-            {i < counts.length - 1 && <span className="text-slate-300 mx-1 text-lg">→</span>}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-const PIPELINE_BADGE = {
-  emerald: 'bg-emerald-100 text-emerald-700',
-  blue: 'bg-blue-100 text-blue-700',
-  purple: 'bg-purple-100 text-purple-700',
-  indigo: 'bg-indigo-100 text-indigo-700',
-  cyan: 'bg-cyan-100 text-cyan-700',
-  green: 'bg-green-100 text-green-700',
-};
-
-function PipelineBadge({ project }) {
-  const stage = PIPELINE_STAGES.find(s => s.key === getProjectStage(project));
-  if (!stage) return null;
-  return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${PIPELINE_BADGE[stage.color] || 'bg-slate-100 text-slate-700'}`}>
-      {stage.icon} {stage.label}
-    </span>
   );
 }

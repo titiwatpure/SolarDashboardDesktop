@@ -10,12 +10,21 @@ import { documentReviewAPI } from '../utils/api';
 const STATUS_LABELS = {
   waiting_documents: 'รอเอกสาร',
   internal_review: 'กำลังตรวจ',
-  waiting_customer_revision: 'รอลูกค้าแก้',
+  customer_revision: 'รอลูกค้าแก้',
   ready_to_submit: 'พร้อมยื่น',
-  submitted: 'ยื่นแล้ว',
+  submitted_agency: 'ยื่นแล้ว',
   agency_revision: 'หน่วยงานให้แก้',
   approved: 'อนุมัติแล้ว',
-  closed: 'ปิดงาน'
+};
+
+const STATUS_BADGE = {
+  waiting_documents: 'bg-slate-100 text-slate-700',
+  internal_review: 'bg-blue-100 text-blue-700',
+  customer_revision: 'bg-orange-100 text-orange-700',
+  ready_to_submit: 'bg-purple-100 text-purple-700',
+  submitted_agency: 'bg-indigo-100 text-indigo-700',
+  agency_revision: 'bg-red-100 text-red-700',
+  approved: 'bg-emerald-100 text-emerald-700',
 };
 
 const CHECKLIST_STATUS = {
@@ -117,6 +126,18 @@ export default function DocReviewDetail() {
     }
   };
 
+  const handleDeleteProject = async () => {
+    // eslint-disable-next-line no-restricted-globals
+    if (!window.confirm(`ต้องการลบโครงการ "${project.project_code} - ${project.project_name}" พร้อมข้อมูลทั้งหมด (${packages.length} ชุดเอกสาร) หรือไม่?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+    try {
+      await documentReviewAPI.deleteReviewProject(id);
+      navigate('/doc-review');
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      alert('ลบไม่สำเร็จ');
+    }
+  };
+
   if (loading) return <div className="flex items-center justify-center py-20"><p className="text-slate-400">กำลังโหลด...</p></div>;
   if (!project) return <div className="flex items-center justify-center py-20"><p className="text-red-500">ไม่พบโครงการ</p></div>;
 
@@ -138,6 +159,9 @@ export default function DocReviewDetail() {
             <span className="px-4 py-2 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold">
               {STATUS_LABELS[project.project_status] || project.project_status}
             </span>
+            <button onClick={handleDeleteProject} className="px-3 py-2 rounded-xl border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition">
+              ลบโครงการ
+            </button>
           </div>
         </div>
       </section>
@@ -362,7 +386,12 @@ function PackageCard({ pkg, onClick, onDelete }) {
         <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={onClick}>
           <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center text-lg">📋</div>
           <div>
-            <p className="font-semibold text-slate-900 text-sm">{pkg.package_name}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-slate-900 text-sm">{pkg.package_name}</p>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_BADGE[pkg.package_status] || 'bg-slate-100 text-slate-500'}`}>
+                {STATUS_LABELS[pkg.package_status] || pkg.package_status}
+              </span>
+            </div>
             <p className="text-xs text-slate-500">{pkg.agency}</p>
           </div>
         </div>
@@ -482,6 +511,15 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
     }
   };
 
+  const handleToggleRequired = async (item) => {
+    try {
+      await documentReviewAPI.updateReviewChecklist(item.id, { is_required: !item.is_required });
+      setChecklists(prev => prev.map(c => c.id === item.id ? { ...c, is_required: !item.is_required ? 1 : 0 } : c));
+    } catch (error) {
+      console.error('Failed to toggle required:', error);
+    }
+  };
+
   const handleResolveIssue = async (issueId) => {
     try {
       await documentReviewAPI.resolveIssue(issueId);
@@ -594,11 +632,17 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
                       {item.description && <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {item.is_required ? (
-                        <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">จำเป็น</span>
-                      ) : (
-                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">ไม่บังคับ</span>
-                      )}
+                      <button
+                        onClick={() => handleToggleRequired(item)}
+                        className={`text-xs px-2 py-1 rounded cursor-pointer transition font-semibold ${
+                          item.is_required
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                        title="คลิกเพื่อสลับสถานะ จำเป็น / ไม่บังคับ"
+                      >
+                        {item.is_required ? 'จำเป็น' : 'ไม่บังคับ'}
+                      </button>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`text-xs px-3 py-1 rounded-full font-semibold ${CHECKLIST_STATUS[item.status]?.color || ''}`}>

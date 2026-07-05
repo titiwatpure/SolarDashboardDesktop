@@ -13,14 +13,13 @@ const router = express.Router();
 
 // Status labels
 const PROJECT_STATUS_LABELS = {
-  waiting_documents: 'รอเอกสารจากลูกค้า',
-  internal_review: 'กำลังตรวจภายใน',
-  waiting_customer_revision: 'รอลูกค้าแก้เอกสาร',
-  ready_to_submit: 'พร้อมยื่นหน่วยงาน',
-  submitted: 'ยื่นหน่วยงานแล้ว',
+  waiting_documents: 'รอเอกสาร',
+  internal_review: 'กำลังตรวจ',
+  customer_revision: 'รอลูกค้าแก้',
+  ready_to_submit: 'พร้อมยื่น',
+  submitted_agency: 'ยื่นแล้ว',
   agency_revision: 'หน่วยงานให้แก้',
   approved: 'อนุมัติแล้ว',
-  closed: 'ปิดงาน'
 };
 
 // ============================================================
@@ -124,15 +123,14 @@ router.get('/dashboard/summary', authenticateToken, async (req, res) => {
     const result = await pool.query(`
       SELECT 
         COUNT(*) as total,
-        COUNT(CASE WHEN project_status = 'waiting_documents' THEN 1 END) as waiting_documents,
-        COUNT(CASE WHEN project_status = 'internal_review' THEN 1 END) as internal_review,
-        COUNT(CASE WHEN project_status = 'waiting_customer_revision' THEN 1 END) as waiting_customer_revision,
-        COUNT(CASE WHEN project_status = 'ready_to_submit' THEN 1 END) as ready_to_submit,
-        COUNT(CASE WHEN project_status = 'submitted' THEN 1 END) as submitted,
-        COUNT(CASE WHEN project_status = 'agency_revision' THEN 1 END) as agency_revision,
-        COUNT(CASE WHEN project_status = 'approved' THEN 1 END) as approved,
-        COUNT(CASE WHEN project_status = 'closed' THEN 1 END) as closed
-      FROM doc_review_projects
+        COUNT(CASE WHEN package_status = 'waiting_documents' THEN 1 END) as waiting_documents,
+        COUNT(CASE WHEN package_status = 'internal_review' THEN 1 END) as internal_review,
+        COUNT(CASE WHEN package_status = 'customer_revision' THEN 1 END) as customer_revision,
+        COUNT(CASE WHEN package_status = 'ready_to_submit' THEN 1 END) as ready_to_submit,
+        COUNT(CASE WHEN package_status = 'submitted_agency' THEN 1 END) as submitted_agency,
+        COUNT(CASE WHEN package_status = 'agency_revision' THEN 1 END) as agency_revision,
+        COUNT(CASE WHEN package_status = 'approved' THEN 1 END) as approved
+      FROM doc_submission_packages
     `);
 
     res.json(result.rows[0]);
@@ -269,7 +267,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// DELETE /api/doc-review/projects/:id - ลบโครงการ
+// DELETE /api/doc-review/projects/:id - ลบโครงการ (cascade)
 // ============================================================
 router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
@@ -278,10 +276,54 @@ router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, r
       return res.status(404).json({ error: 'ไม่พบโครงการ' });
     }
 
-    await pool.query('DELETE FROM doc_review_projects WHERE id = ?', [req.params.id]);
-    logActivity(req.user.id, 'delete', 'doc_review_project', req.params.id, { project_code: existing.rows[0].project_code });
+    const projectId = req.params.id;
+    const projectCode = existing.rows[0].project_code;
 
-    res.json({ message: 'ลบโครงการสำเร็จ' });
+    // ดึง packages ทั้งหมดของ project นี้
+    const packages = await pool.query('SELECT id FROM doc_submission_packages WHERE project_id = ?', [projectId]);
+    const packageIds = packages.rows.map(p => p.id);
+
+    await pool.transaction(async (tx) => {
+      if (packageIds.length > 0) {
+        const ph = packageIds.map(() => '?').join(',');
+
+        // ดึง checklist IDs ของทุก package
+        const checklists = await tx.query(`SELECT id FROM doc_review_checklists WHERE package_id IN (${ph})`, packageIds);
+        const checklistIds = checklists.rows.map(c => c.id);
+
+        if (checklistIds.length > 0) {
+          const cph = checklistIds.map(() => '?').join(',');
+
+          // ลบลูกของ checklist
+          await tx.query(`DELETE FROM document_receipts WHERE checklist_item_id IN (${cph})`, checklistIds);
+          await tx.query(`DELETE FROM document_issues WHERE checklist_item_id IN (${cph})`, checklistIds);
+          await tx.query(`DELETE FROM doc_review_comments WHERE checklist_id IN (${cph})`, checklistIds);
+          await tx.query(`DELETE FROM doc_review_files WHERE checklist_id IN (${cph})`, checklistIds);
+        }
+
+        // ลบ checklists
+        await tx.query(`DELETE FROM doc_review_checklists WHERE package_id IN (${ph})`, packageIds);
+
+        // ลบลูกของ package
+        await tx.query(`DELETE FROM doc_review_approvals WHERE package_id IN (${ph})`, packageIds);
+        await tx.query(`DELETE FROM doc_agency_submissions WHERE package_id IN (${ph})`, packageIds);
+        await tx.query(`DELETE FROM correction_reports WHERE package_id IN (${ph})`, packageIds);
+      }
+
+      // ลบลูกของ project โดยตรง
+      await tx.query('DELETE FROM doc_review_approvals WHERE project_id = ?', [projectId]);
+      await tx.query('DELETE FROM doc_agency_submissions WHERE project_id = ?', [projectId]);
+
+      // ลบ packages
+      await tx.query('DELETE FROM doc_submission_packages WHERE project_id = ?', [projectId]);
+
+      // ลบ project
+      await tx.query('DELETE FROM doc_review_projects WHERE id = ?', [projectId]);
+    });
+
+    logActivity(req.user.id, 'delete', 'doc_review_project', projectId, { project_code: projectCode });
+
+    res.json({ message: 'ลบโครงการสำเร็จ', deleted: { project: projectCode, packages: packageIds.length } });
   } catch (error) {
     console.error('[DOC_REVIEW_PROJECTS]', error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
