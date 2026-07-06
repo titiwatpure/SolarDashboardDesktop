@@ -124,6 +124,12 @@ export default function DocReviewDetail() {
       <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
+            <button
+              onClick={() => navigate('/doc-review')}
+              className="text-sm text-slate-500 hover:text-slate-700 mb-3 inline-flex items-center gap-1"
+            >
+              ← กลับไปแดชบอร์ด
+            </button>
             <nav className="flex items-center gap-2 text-sm text-slate-500 mb-2">
               <a href="/doc-review" className="hover:text-blue-600">ระบบตรวจเอกสาร</a>
               <span>/</span>
@@ -610,7 +616,7 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
             {(() => {
               const requiredNotPassed = checklists.filter(c => c.is_required && c.status !== 'passed').length;
               const openIssuesList = issues.filter(i => i.status === 'open');
-              const canApprove = isAllRequiredPassed && !hasOpenIssues;
+              const canApprove = isAllRequiredPassed;
               const approval = pkg?.latest_approval;
               return (
                 <div className={`p-5 rounded-xl border-2 ${canApprove ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
@@ -644,7 +650,7 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
                     disabled={!canApprove}
                     className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    อนุมัติภายใน
+                    {approval && approval.approval_status === 'approved' ? 'อนุมัติแล้ว ✓' : 'อนุมัติภายใน'}
                   </button>
                 </div>
               );
@@ -653,7 +659,9 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
             {/* Agency Submission */}
             {(() => {
               const projectStatus = pkg?.package_status;
-              const canSubmit = projectStatus === 'ready_to_submit' || projectStatus === 'agency_revision' || projectStatus === 'submitted_agency';
+              const hasApproved = pkg?.latest_approval?.approval_status === 'approved';
+              const canSubmit = projectStatus === 'ready_to_submit' || projectStatus === 'agency_revision' || projectStatus === 'submitted_agency' || hasApproved;
+              const latestSubmission = pkg?.latest_submission;
               return (
                 <div className={`p-5 rounded-xl border-2 ${canSubmit ? 'border-indigo-200 bg-indigo-50' : 'border-slate-200 bg-slate-50'}`}>
                   <h4 className="font-semibold text-slate-900 mb-2">ยื่นหน่วยงาน</h4>
@@ -662,12 +670,20 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
                   ) : (
                     <p className="text-sm text-slate-500 mb-3">บันทึกการยื่นเอกสารให้หน่วยงาน พร้อมวันที่ หน่วยงาน และรอบการยื่น</p>
                   )}
+                  {latestSubmission && (
+                    <div className="mb-3 p-3 rounded-lg bg-indigo-50 border border-indigo-200">
+                      <p className="text-xs text-indigo-600 font-medium">ยื่นล่าสุด รอบที่ {latestSubmission.submission_round}</p>
+                      <p className="text-sm text-slate-700">หน่วยงาน: {latestSubmission.agency_name || '-'}</p>
+                      <p className="text-xs text-slate-500">วันที่ยื่น: {latestSubmission.submitted_date || '-'}</p>
+                      <p className="text-xs text-slate-500">บันทึกเมื่อ: {(() => { try { return new Date(latestSubmission.created_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }); } catch (e) { return latestSubmission.created_at; } })()}</p>
+                    </div>
+                  )}
                   <button
                     onClick={() => setShowAgencySubmitModal(true)}
                     disabled={!canSubmit}
                     className="px-6 py-2.5 rounded-xl bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    บันทึกการยื่นหน่วยงาน
+                    {latestSubmission ? 'บันทึกการยื่นหน่วยงาน (รอบใหม่)' : 'บันทึกการยื่นหน่วยงาน'}
                   </button>
                 </div>
               );

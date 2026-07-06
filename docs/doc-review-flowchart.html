@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Review - Flowchart (From Real Code)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'IBM Plex Sans Thai', sans-serif; }
+    .mermaid { display: flex; justify-content: center; }
+    .section-title { border-left: 4px solid #7C3AED; padding-left: 12px; }
+    .code-box { background: #1E293B; color: #E2E8F0; padding: 12px 16px; border-radius: 8px; font-family: monospace; font-size: 12px; overflow-x: auto; }
+    .code-box .keyword { color: #C084FC; }
+    .code-box .string { color: #34D399; }
+    .code-box .comment { color: #64748B; }
+    .code-box .func { color: #60A5FA; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <div class="max-w-7xl mx-auto px-8 py-10">
+
+    <!-- Header -->
+    <div class="mb-10">
+      <h1 class="text-3xl font-bold text-slate-900">แผนผังระบบตรวจเอกสารและยื่นหน่วยงาน</h1>
+      <p class="text-slate-500 mt-2">Doc Review & Agency Submission - Flowchart (อ้างอิงจากโค้ดจริง)</p>
+    </div>
+
+    <!-- 1. Main Workflow -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-8">
+      <h2 class="text-xl font-bold text-slate-900 section-title mb-6">1. Main Workflow (จาก index.js + Routes)</h2>
+      <div class="mermaid">
+flowchart LR
+    A[สร้างโครงการ] --> B[เพิ่มชุดเอกสาร]
+    B --> C[เพิ่มรายการเอกสาร]
+    C --> D[ตรวจเอกสาร]
+    D --> E{ผลตรวจ?}
+    E -->|ผ่าน| F[_status = passed]
+    E -->|ไม่ผ่าน/ต้องแก้| G[_status = failed/needs_revision]
+    G --> H[สร้าง Issue]
+    H --> D
+    F --> I{เอกสารจำเป็นครบ 100%?}
+    I -->|ไม่ครบ| D
+    I -->|ครบ| J[อนุมัติภายใน]
+    J --> K[ยื่นหน่วยงาน]
+    K --> L{หน่วยงานตอบกลับ}
+    L -->|อนุมัติ| M[✅ approved]
+    L -->|ให้แก้| N[agency_revision]
+    N --> D
+
+    style A fill:#10B981,color:#fff
+    style B fill:#3B82F6,color:#fff
+    style C fill:#8B5CF6,color:#fff
+    style D fill:#F59E0B,color:#fff
+    style J fill:#10B981,color:#fff
+    style K fill:#6366F1,color:#fff
+    style M fill:#10B981,color:#fff
+    style N fill:#EF4444,color:#fff
+      </div>
+    </div>
+
+    <!-- 2. Frontend Routes -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-8">
+      <h2 class="text-xl font-bold text-slate-900 section-title mb-6">2. Frontend Routes (จาก App.jsx)</h2>
+      <div class="code-box">
+<span class="comment">// App.jsx - Route definitions</span>
+&lt;Route path="/doc-review" element={&lt;DocReviewDashboard /&gt;} /&gt;
+&lt;Route path="/doc-review/new" element={&lt;DocReviewNew /&gt;} /&gt;
+&lt;Route path="/doc-review/templates" element={&lt;DocReviewTemplateChecklists /&gt;} /&gt;
+&lt;Route path="/doc-review/agency-tracking" element={&lt;DocReviewAgencyTracking /&gt;} /&gt;
+&lt;Route path="/doc-review/correction-report/:id" element={&lt;DocReviewCorrectionReport /&gt;} /&gt;
+&lt;Route path="/doc-review/:id" element={&lt;DocReviewDetail /&gt;} /&gt;
+      </div>
+    </div>
+
+    <!-- 3. Approval Logic -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+
+      <!-- Frontend Approval -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+        <h2 class="text-xl font-bold text-slate-900 section-title mb-6">3.1 การอนุมัติภายใน (Frontend)</h2>
+        <div class="code-box mb-4">
+<span class="comment">// DocReviewDetail.jsx - PackageDetail</span>
+<span class="keyword">const</span> requiredItems = checklists.<span class="func">filter</span>(c =&gt; c.is_required);
+<span class="keyword">const</span> requiredPassed = requiredItems.<span class="func">filter</span>(c =&gt; c.status === <span class="string">'passed'</span>).length;
+<span class="keyword">const</span> requiredTotal = requiredItems.length;
+<span class="keyword">const</span> isAllRequiredPassed = requiredTotal &gt; 0 &amp;&amp; requiredPassed === requiredTotal;
+
+<span class="comment">// ปุ่มอนุมัติเปิดใช้เมื่อ: เอกสารจำเป็นผ่านครบ 100%</span>
+<span class="keyword">const</span> canApprove = isAllRequiredPassed;
+        </div>
+        <div class="mermaid">
+flowchart TD
+    A[เปิดแท็บ อนุมัติ / ยื่นหน่วยงาน] --> B[กรอง checklists ที่ is_required=1]
+    B --> C[นับ requiredPassed vs requiredTotal]
+    C --> D{requiredPassed === requiredTotal?}
+    D -->|ใช่ 100%| E[canApprove = true]
+    D -->|ไม่| F[canApprove = false]
+    E --> G[ปุ่ม อนุมัติภายใน เปิดใช้งาน]
+    F --> H[ปุ่ม อนุมัติภายใน ปิดใช้งาน]
+
+    style E fill:#10B981,color:#fff
+    style F fill:#EF4444,color:#fff
+    style G fill:#10B981,color:#fff
+    style H fill:#94A3B8,color:#fff
+        </div>
+      </div>
+
+      <!-- Backend Approval -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+        <h2 class="text-xl font-bold text-slate-900 section-title mb-6">3.2 การอนุมัติภายใน (Backend)</h2>
+        <div class="code-box mb-4">
+<span class="comment">// doc-review-approvals.js</span>
+router.<span class="func">post</span>(<span class="string">'/projects/:projectId/approve'</span>, async (req, res) =&gt; {
+  <span class="comment">// ตรวจเอกสารจำเป็นที่ยังไม่ผ่าน</span>
+  <span class="keyword">const</span> pendingDocs = <span class="keyword">await</span> pool.<span class="func">query</span>(<span class="string">`
+    SELECT COUNT(*) as count FROM doc_review_checklists
+    WHERE project_id = ? AND is_required = 1 AND status != 'passed'
+  `</span>, [projectId]);
+
+  <span class="keyword">if</span> (pendingDocs.rows[0].count &gt; 0) {
+    <span class="keyword">return</span> res.<span class="func">status</span>(400).<span class="func">json</span>({
+      error: <span class="string">`ยังมีเอกสารจำเป็น ${count} รายการที่ยังไม่ผ่าน`</span>
+    });
+  }
+
+  <span class="comment">// INSERT doc_review_approvals</span>
+  <span class="comment">// UPDATE project_status = 'ready_to_submit'</span>
+});
+        </div>
+        <div class="mermaid">
+flowchart TD
+    A[POST /api/doc-review/projects/:id/approve] --> B[SELECT COUNT FROM doc_review_checklists]
+    B --> C{is_required=1 AND status != passed?}
+    C -->|count > 0| D[RETURN 400: ยังมีเอกสารไม่ผ่าน]
+    C -->|count = 0| E[INSERT doc_review_approvals]
+    E --> F[UPDATE project_status = ready_to_submit]
+
+    style D fill:#EF4444,color:#fff
+    style E fill:#3B82F6,color:#fff
+    style F fill:#10B981,color:#fff
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 4. Submission Logic -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+
+      <!-- Frontend Submission -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+        <h2 class="text-xl font-bold text-slate-900 section-title mb-6">4.1 การยื่นหน่วยงาน (Frontend)</h2>
+        <div class="code-box mb-4">
+<span class="comment">// DocReviewDetail.jsx - PackageDetail</span>
+<span class="keyword">const</span> projectStatus = pkg?.package_status;
+<span class="keyword">const</span> hasApproved = pkg?.latest_approval?.approval_status === <span class="string">'approved'</span>;
+
+<span class="comment">// ปุ่มยื่นเปิดใช้เมื่อ:</span>
+<span class="comment">// 1. package_status อยู่ใน ['ready_to_submit', 'agency_revision', 'submitted_agency']</span>
+<span class="comment">// 2. หรือ มี approval ที่ status = 'approved'</span>
+<span class="keyword">const</span> canSubmit = projectStatus === <span class="string">'ready_to_submit'</span>
+    || projectStatus === <span class="string">'agency_revision'</span>
+    || projectStatus === <span class="string">'submitted_agency'</span>
+    || hasApproved;
+        </div>
+        <div class="mermaid">
+flowchart TD
+    A[เปิดแท็บ อนุมัติ / ยื่นหน่วยงาน] --> B{package_status?}
+    B -->|ready_to_submit| C[canSubmit = true]
+    B -->|agency_revision| C
+    B -->|submitted_agency| C
+    B -->|อื่นๆ| D{latest_approval.status = approved?}
+    D -->|ใช่| C
+    D -->|ไม่| E[canSubmit = false]
+    C --> F[ปุ่ม บันทึกการยื่นหน่วยงาน เปิดใช้งาน]
+    E --> G[ปุ่ม บันทึกการยื่นหน่วยงาน ปิดใช้งาน]
+
+    style C fill:#10B981,color:#fff
+    style E fill:#EF4444,color:#fff
+    style F fill:#10B981,color:#fff
+    style G fill:#94A3B8,color:#fff
+        </div>
+      </div>
+
+      <!-- Backend Submission -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+        <h2 class="text-xl font-bold text-slate-900 section-title mb-6">4.2 การยื่นหน่วยงาน (Backend)</h2>
+        <div class="code-box mb-4">
+<span class="comment">// doc-review-submissions.js</span>
+router.<span class="func">post</span>(<span class="string">'/projects/:projectId/submit'</span>, async (req, res) =&gt; {
+  <span class="keyword">const</span> project = projectCheck.rows[0];
+  <span class="keyword">const</span> allowedStatuses = [<span class="string">'ready_to_submit'</span>, <span class="string">'agency_revision'</span>, <span class="string">'submitted_agency'</span>];
+
+  <span class="comment">// ตรวจ: project_status อยู่ใน allowedStatuses</span>
+  <span class="comment">// หรือ มี approval record ที่ status = 'approved'</span>
+  <span class="keyword">const</span> hasApproval = <span class="keyword">await</span> pool.<span class="func">query</span>(<span class="string">`
+    SELECT id FROM doc_review_approvals
+    WHERE project_id = ? AND approval_status = 'approved' LIMIT 1
+  `</span>, [projectId]);
+
+  <span class="keyword">if</span> (!allowedStatuses.<span class="func">includes</span>(project.project_status)
+      &amp;&amp; hasApproval.rows.length === 0) {
+    <span class="keyword">return</span> res.<span class="func">status</span>(400).<span class="func">json</span>({
+      error: <span class="string">'โครงการยังไม่ได้รับการอนุมัติภายใน'</span>
+    });
+  }
+
+  <span class="comment">// INSERT doc_agency_submissions</span>
+  <span class="comment">// UPDATE project_status = 'submitted_agency'</span>
+});
+        </div>
+        <div class="mermaid">
+flowchart TD
+    A[POST /api/doc-review/projects/:id/submit] --> B{project_status in allowedStatuses?}
+    B -->|ใช่| C[INSERT doc_agency_submissions]
+    B -->|ไม่| D{มี approval record?}
+    D -->|มี| C
+    D -->|ไม่มี| E[RETURN 400: ยังไม่อนุมัติ]
+    C --> F[UPDATE project_status = submitted_agency]
+    F --> G[RETURN 201: สำเร็จ]
+
+    style C fill:#3B82F6,color:#fff
+    style E fill:#EF4444,color:#fff
+    style F fill:#10B981,color:#fff
+    style G fill:#10B981,color:#fff
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 5. Comment/Review Logic -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-8">
+      <h2 class="text-xl font-bold text-slate-900 section-title mb-6">5. การตรวจเอกสาร (CommentModal)</h2>
+      <div class="code-box mb-4">
+<span class="comment">// DocReviewDetail.jsx - CommentModal</span>
+<span class="keyword">const</span> [reviewStatus, setReviewStatus] = <span class="func">useState</span>(<span class="string">'needs_revision'</span>);
+
+<span class="comment">// บันทึกได้เมื่อ:</span>
+<span class="comment">// - reviewStatus ไม่ใช่ 'passed' (ส่งกลับแก้ไข/ไม่ผ่าน)</span>
+<span class="comment">// - หรือ ไม่มี open issues (openIssuesCount === 0)</span>
+<span class="keyword">const</span> canSubmit = reviewStatus !== <span class="string">'passed'</span> || openIssuesCount === 0;
+
+<span class="comment">// ผลตรวจ 3 แบบ:</span>
+<span class="comment">// 'passed' - ผ่าน</span>
+<span class="comment">// 'failed' - ไม่ผ่าน</span>
+<span class="comment">// 'needs_revision' - ต้องแก้ไข</span>
+
+<span class="comment">// ส่งไป API:</span>
+<span class="func">addReviewComment</span>(checklist.id, {
+  comment_type: <span class="string">'internal'</span>,
+  review_status: reviewStatus,  <span class="comment">// passed/failed/needs_revision</span>
+  comment
+});
+      </div>
+      <div class="mermaid">
+flowchart TD
+    A[กดปุ่ม ตรวจ บน checklist item] --> B[เปิด CommentModal]
+    B --> C{เลือกผลตรวจ}
+    C -->|ผ่าน| D[reviewStatus = passed]
+    C -->|ไม่ผ่าน| E[reviewStatus = failed]
+    C -->|ต้องแก้ไข| F[reviewStatus = needs_revision]
+    D --> G{openIssuesCount = 0?}
+    G -->|ใช่| H[canSubmit = true]
+    G -->|ไม่| I[canSubmit = false]
+    E --> H
+    F --> H
+    H --> J[POST /api/doc-review/checklists/:id/comments]
+    J --> K[อัปเดต status checklist]
+    K --> L[คำนวณ Progress ใหม่]
+
+    style D fill:#10B981,color:#fff
+    style E fill:#EF4444,color:#fff
+    style F fill:#F59E0B,color:#fff
+    style H fill:#10B981,color:#fff
+    style I fill:#94A3B8,color:#fff
+      </div>
+    </div>
+
+    <!-- 6. Agency Response Logic -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-8">
+      <h2 class="text-xl font-bold text-slate-900 section-title mb-6">6. การตอบกลับจากหน่วยงาน (PUT /submissions/:id)</h2>
+      <div class="code-box mb-4">
+<span class="comment">// doc-review-submissions.js - PUT /api/doc-review/submissions/:id</span>
+<span class="keyword">const</span> { agency_status, agency_comment, response_date, next_action } = req.body;
+
+<span class="comment">// อัปเดต doc_agency_submissions</span>
+<span class="comment">// agency_status: 'pending' | 'approved' | 'revision_requested' | 'resubmitted'</span>
+
+<span class="comment">// อัปเดต project_status ตาม agency_status:</span>
+<span class="keyword">if</span> (agency_status === <span class="string">'approved'</span>) {
+  newProjectStatus = <span class="string">'approved'</span>;
+} <span class="keyword">else if</span> (agency_status === <span class="string">'revision_requested'</span>) {
+  newProjectStatus = <span class="string">'agency_revision'</span>;
+} <span class="keyword">else</span> {
+  newProjectStatus = <span class="string">'submitted_agency'</span>;  <span class="comment">// pending/resubmitted</span>
+}
+      </div>
+      <div class="mermaid">
+flowchart TD
+    A[PUT /api/doc-review/submissions/:id] --> B[อัปเดต doc_agency_submissions]
+    B --> C{agency_status?}
+    C -->|approved| D[project_status = approved]
+    C -->|revision_requested| E[project_status = agency_revision]
+    C -->|pending| F[project_status = submitted_agency]
+    C -->|resubmitted| F
+    D --> G[✅ เสร็จสิ้น]
+    E --> H[ต้องแก้ไขแล้วยื่นใหม่]
+    F --> I[รอผลจากหน่วยงาน]
+
+    style D fill:#10B981,color:#fff
+    style E fill:#EF4444,color:#fff
+    style F fill:#6366F1,color:#fff
+    style G fill:#10B981,color:#fff
+    style H fill:#F59E0B,color:#fff
+      </div>
+    </div>
+
+    <!-- 7. Database Schema -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-8">
+      <h2 class="text-xl font-bold text-slate-900 section-title mb-6">7. Database Schema (จาก init-db.cjs + Migrations)</h2>
+      <div class="mermaid">
+erDiagram
+    doc_review_projects ||--o{ doc_submission_packages : "1:N"
+    doc_review_projects ||--o{ doc_review_checklists : "1:N"
+    doc_review_projects ||--o{ doc_review_approvals : "1:N"
+    doc_review_projects ||--o{ doc_agency_submissions : "1:N"
+    doc_submission_packages ||--o{ doc_review_checklists : "1:N"
+    doc_submission_packages ||--o{ document_receipts : "1:N"
+    doc_submission_packages ||--o{ document_issues : "1:N"
+    doc_review_checklists ||--o{ doc_review_files : "1:N"
+    doc_review_checklists ||--o{ doc_review_comments : "1:N"
+    doc_review_template_checklists ||--o{ doc_review_template_items : "1:N"
+
+    doc_review_projects {
+        text id PK
+        text project_code UK
+        text project_name
+        text customer_name
+        text permit_type "pck2|a1|rong4|erc|sld"
+        text project_status "7 states"
+        text owner_id FK
+        date due_date
+    }
+
+    doc_submission_packages {
+        text id PK
+        text project_id FK
+        text package_name
+        text permit_type
+        text agency
+        text package_status "7 states"
+        date due_date
+    }
+
+    doc_review_checklists {
+        text id PK
+        text project_id FK
+        text package_id FK
+        text document_name
+        int is_required "0|1"
+        text status "pending|checking|failed|customer_revision|passed"
+    }
+
+    doc_review_approvals {
+        text id PK
+        text project_id FK
+        text approver_id FK
+        text approval_status "approved|rejected"
+        text comment
+        datetime approved_at
+    }
+
+    doc_agency_submissions {
+        text id PK
+        text project_id FK
+        text package_id FK
+        text agency_name
+        int submission_round
+        date submitted_date
+        text agency_status "pending|approved|revision_requested|resubmitted"
+        text agency_comment
+    }
+      </div>
+    </div>
+
+    <!-- 8. API Endpoints -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-8">
+      <h2 class="text-xl font-bold text-slate-900 section-title mb-6">8. API Endpoints (จาก index.js Routes)</h2>
+      <div class="code-box mb-4">
+<span class="comment">// index.js - Route mounting</span>
+app.<span class="func">use</span>(<span class="string">'/api/doc-review/template-checklists'</span>, require(<span class="string">'./routes/doc-review-template-checklists'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-packages'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-checklists'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-files'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-comments'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-approvals'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-submissions'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-projects'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-receipts'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-issues'</span>));
+app.<span class="func">use</span>(<span class="string">'/api/doc-review'</span>, require(<span class="string">'./routes/doc-review-correction-reports'</span>));
+      </div>
+      <div class="mermaid">
+flowchart LR
+    subgraph Projects["doc-review-projects.js"]
+        P1[GET / - list]
+        P2[POST / - create]
+        P3[GET /:id - detail]
+        P4[PUT /:id - update]
+        P5[DELETE /:id - delete]
+        P6[GET /dashboard/summary]
+    end
+
+    subgraph Packages["doc-review-packages.js"]
+        PK1[GET /projects/:id/packages]
+        PK2[POST /projects/:id/packages]
+        PK3[GET /packages/:id]
+        PK4[PUT /packages/:id]
+        PK5[DELETE /packages/:id]
+    end
+
+    subgraph Checklists["doc-review-checklists.js"]
+        C1[GET /projects/:id/checklists]
+        C2[POST /projects/:id/checklists]
+        C3[POST /projects/:id/checklists/from-template]
+        C4[PUT /checklists/:id]
+        C5[DELETE /checklists/:id]
+    end
+
+    subgraph Approvals["doc-review-approvals.js"]
+        A1[POST /projects/:id/approve]
+        A2[POST /projects/:id/reject]
+        A3[GET /projects/:id/approvals]
+    end
+
+    subgraph Submissions["doc-review-submissions.js"]
+        S1[POST /projects/:id/submit]
+        S2[PUT /submissions/:id]
+        S3[DELETE /submissions/:id]
+        S4[GET /submissions]
+    end
+
+    style Projects fill:#3B82F6,color:#fff
+    style Packages fill:#8B5CF6,color:#fff
+    style Checklists fill:#F59E0B,color:#fff
+    style Approvals fill:#10B981,color:#fff
+    style Submissions fill:#6366F1,color:#fff
+      </div>
+    </div>
+
+    <!-- 9. Complete Flow -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+      <h2 class="text-xl font-bold text-slate-900 section-title mb-6">9. Complete Flow (ภาพรวมทั้งระบบ)</h2>
+      <div class="mermaid">
+flowchart TD
+    subgraph Create["สร้างโครงการ"]
+        C1[DocReviewNew.jsx] --> C2[POST /api/doc-review]
+        C2 --> C3[INSERT doc_review_projects]
+    end
+
+    subgraph Package["เพิ่มชุดเอกสาร"]
+        PK1[AddPackageModal] --> PK2[POST /api/doc-review/projects/:id/packages]
+        PK2 --> PK3[INSERT doc_submission_packages]
+    end
+
+    subgraph Checklist["เพิ่มรายการเอกสาร"]
+        CL1[AddChecklistItemModal / From Template] --> CL2[POST /api/doc-review/projects/:id/checklists]
+        CL2 --> CL3[INSERT doc_review_checklists]
+    end
+
+    subgraph Review["ตรวจเอกสาร"]
+        R1[CommentModal - เลือก passed/failed/needs_revision] --> R2[POST /api/doc-review/checklists/:id/comments]
+        R2 --> R3[UPDATE doc_review_checklists.status]
+        R3 --> R4[INSERT doc_review_comments]
+    end
+
+    subgraph Issue["จัดการปัญหา"]
+        I1[CreateIssueModal] --> I2[POST /api/doc-review/issues]
+        I2 --> I3[INSERT document_issues]
+        I4[กด แก้ไขแล้ว] --> I5[PUT /api/doc-review/issues/:id/resolve]
+        I5 --> I6[UPDATE document_issues.status = resolved]
+    end
+
+    subgraph Approve["อนุมัติภายใน"]
+        AP1[ตรวจสอบ: is_required=1 ผ่านครบ 100%] --> AP2[POST /api/doc-review/projects/:id/approve]
+        AP2 --> AP3[INSERT doc_review_approvals]
+        AP3 --> AP4[UPDATE project_status = ready_to_submit]
+    end
+
+    subgraph Submit["ยื่นหน่วยงาน"]
+        SU1[AgencySubmitModal] --> SU2[POST /api/doc-review/projects/:id/submit]
+        SU2 --> SU3[INSERT doc_agency_submissions]
+        SU3 --> SU4[UPDATE project_status = submitted_agency]
+    end
+
+    subgraph Response["ตอบกลับจากหน่วยงาน"]
+        RE1[UpdateSubmissionModal] --> RE2[PUT /api/doc-review/submissions/:id]
+        RE2 --> RE3{agency_status?}
+        RE3 -->|approved| RE4[project_status = approved]
+        RE3 -->|revision_requested| RE5[project_status = agency_revision]
+    end
+
+    Create --> Package
+    Package --> Checklist
+    Checklist --> Review
+    Review --> Issue
+    Issue --> Review
+    Review --> Approve
+    Approve --> Submit
+    Submit --> Response
+    Response -->|agency_revision| Review
+
+    style Create fill:#10B981,color:#fff
+    style Package fill:#3B82F6,color:#fff
+    style Checklist fill:#8B5CF6,color:#fff
+    style Review fill:#F59E0B,color:#fff
+    style Issue fill:#EF4444,color:#fff
+    style Approve fill:#10B981,color:#fff
+    style Submit fill:#6366F1,color:#fff
+    style Response fill:#06B6D4,color:#fff
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#E0E7FF',
+        primaryTextColor: '#1E293B',
+        primaryBorderColor: '#818CF8',
+        lineColor: '#94A3B8',
+        secondaryColor: '#F1F5F9',
+        tertiaryColor: '#F8FAFC',
+        fontSize: '14px'
+      },
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis'
+      }
+    });
+  </script>
+
+</body>
+</html>

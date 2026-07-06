@@ -29,7 +29,12 @@ router.post('/projects/:projectId/submit', authenticateToken, async (req, res) =
 
     // Business Rule: ยังไม่ internal approved → ห้ามยื่นหน่วยงาน
     const project = projectCheck.rows[0];
-    if (!['ready_to_submit', 'agency_revision', 'submitted_agency'].includes(project.project_status)) {
+    const allowedStatuses = ['ready_to_submit', 'agency_revision', 'submitted_agency'];
+    const hasApproval = await pool.query(
+      `SELECT id FROM doc_review_approvals WHERE project_id = ? AND approval_status = 'approved' LIMIT 1`,
+      [req.params.projectId]
+    );
+    if (!allowedStatuses.includes(project.project_status) && hasApproval.rows.length === 0) {
       return res.status(400).json({ error: 'โครงการยังไม่ได้รับการอนุมัติภายใน หรืออยู่ในสถานะที่ไม่สามารถยื่นหน่วยงานได้' });
     }
 
@@ -162,6 +167,33 @@ router.get('/projects/:projectId/submissions', authenticateToken, async (req, re
     );
 
     res.json(result.rows);
+  } catch (error) {
+    console.error('[DOC_REVIEW_SUBMISSIONS]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
+// DELETE /api/doc-review/submissions/:id
+// ============================================================
+router.delete('/submissions/:id', authenticateToken, async (req, res) => {
+  try {
+    const existing = await pool.query('SELECT * FROM doc_agency_submissions WHERE id = ?', [req.params.id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'ไม่พบรายการยื่น' });
+    }
+
+    const submission = existing.rows[0];
+
+    await pool.query('DELETE FROM doc_agency_submissions WHERE id = ?', [req.params.id]);
+
+    logActivity(req.user.id, 'delete', 'doc_agency_submission', req.params.id, {
+      agency_name: submission.agency_name,
+      submission_round: submission.submission_round,
+      project_id: submission.project_id
+    });
+
+    res.json({ message: 'ลบรายการยื่นสำเร็จ' });
   } catch (error) {
     console.error('[DOC_REVIEW_SUBMISSIONS]', error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

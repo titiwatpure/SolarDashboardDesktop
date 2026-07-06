@@ -79,6 +79,12 @@ export default function DocReviewTemplateChecklists() {
       <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
+            <button
+              onClick={() => navigate('/doc-review')}
+              className="text-sm text-slate-500 hover:text-slate-700 mb-3 inline-flex items-center gap-1"
+            >
+              ← กลับไปแดชบอร์ด
+            </button>
             <h1 className="text-4xl font-bold tracking-tight text-slate-900">Template Checklist</h1>
             <p className="mt-2 text-base text-slate-500">จัดการ Template รายการเอกสารสำหรับยื่นขออนุญาต</p>
           </div>

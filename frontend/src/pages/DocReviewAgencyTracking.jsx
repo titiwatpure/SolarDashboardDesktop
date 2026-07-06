@@ -54,14 +54,14 @@ export default function DocReviewAgencyTracking() {
     }
   };
 
-  const handleDeleteProject = async (projectId, projectCode, projectName) => {
+  const handleDeleteSubmission = async (submissionId, agencyName, round) => {
     // eslint-disable-next-line no-restricted-globals
-    if (!window.confirm(`ต้องการลบโครงการ "${projectCode} - ${projectName}" พร้อมข้อมูลทั้งหมดหรือไม่?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+    if (!window.confirm(`ต้องการลบรายการยื่น "${agencyName} รอบที่ ${round}" หรือไม่?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
     try {
-      await documentReviewAPI.deleteReviewProject(projectId);
+      await documentReviewAPI.deleteSubmission(submissionId);
       loadData();
     } catch (error) {
-      console.error('Failed to delete project:', error);
+      console.error('Failed to delete submission:', error);
       alert('ลบไม่สำเร็จ');
     }
   };
@@ -146,7 +146,7 @@ export default function DocReviewAgencyTracking() {
                       {sub.agency_status === 'approved' && (
                         <span className="text-xs text-emerald-600 font-medium">เสร็จสิ้น</span>
                       )}
-                       <button onClick={(e) => { e.stopPropagation(); handleDeleteProject(sub.project_id, sub.project_code, sub.project_name); }} className="px-2 py-1.5 rounded-lg text-red-500 hover:bg-red-50 transition" title="ลบโครงการ">
+                       <button onClick={(e) => { e.stopPropagation(); handleDeleteSubmission(sub.id, sub.agency_name, sub.submission_round); }} className="px-2 py-1.5 rounded-lg text-red-500 hover:bg-red-50 transition" title="ลบรายการยื่น">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                        </button>
                      </div>

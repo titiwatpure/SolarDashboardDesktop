@@ -464,6 +464,7 @@ export const documentReviewAPI = {
   // Agency Submissions
   submitToAgency: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/submit`, data),
   updateSubmission: (submissionId, data) => apiCall('PUT', `/doc-review/submissions/${submissionId}`, data),
+  deleteSubmission: (submissionId) => apiCall('DELETE', `/doc-review/submissions/${submissionId}`),
   getProjectSubmissions: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/submissions`),
   getAllSubmissions: () => cachedGET('/doc-review/submissions', 30_000),
 
