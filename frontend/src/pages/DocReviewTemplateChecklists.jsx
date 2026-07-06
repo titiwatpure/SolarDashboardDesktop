@@ -160,7 +160,11 @@ export default function DocReviewTemplateChecklists() {
                           ดูรายละเอียด
                         </button>
                         <button
-                          onClick={() => { setEditingTemplate(template); setShowForm(true); }}
+                          onClick={async () => {
+                            const detail = await documentReviewAPI.getTemplateChecklist(template.id);
+                            setEditingTemplate(detail);
+                            setShowForm(true);
+                          }}
                           className="text-xs text-blue-600 hover:text-blue-700 font-medium"
                         >
                           แก้ไข
