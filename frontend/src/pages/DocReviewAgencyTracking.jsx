@@ -54,6 +54,18 @@ export default function DocReviewAgencyTracking() {
     }
   };
 
+  const handleDeleteProject = async (projectId, projectCode, projectName) => {
+    // eslint-disable-next-line no-restricted-globals
+    if (!window.confirm(`ต้องการลบโครงการ "${projectCode} - ${projectName}" พร้อมข้อมูลทั้งหมดหรือไม่?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+    try {
+      await documentReviewAPI.deleteReviewProject(projectId);
+      loadData();
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      alert('ลบไม่สำเร็จ');
+    }
+  };
+
   const filtered = filterStatus ? submissions.filter(s => s.agency_status === filterStatus) : submissions;
 
   if (loading) return <div className="flex items-center justify-center py-20"><p className="text-slate-400">กำลังโหลด...</p></div>;
@@ -120,20 +132,25 @@ export default function DocReviewAgencyTracking() {
                   </td>
                   <td className="px-6 py-4 text-slate-600 text-xs max-w-[200px] truncate">{sub.agency_comment || '-'}</td>
                   <td className="px-6 py-4">
-                    {sub.agency_status === 'pending' && (
-                      <button onClick={() => setEditSub(sub)} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-xs font-medium text-white hover:bg-indigo-700">
-                        บันทึกผล
-                      </button>
-                    )}
-                    {sub.agency_status === 'revision_requested' && (
-                      <button onClick={() => navigate(`/doc-review/${sub.project_id}`)} className="px-3 py-1.5 rounded-lg bg-blue-600 text-xs font-medium text-white hover:bg-blue-700">
-                        ไปแก้ไข
-                      </button>
-                    )}
-                    {sub.agency_status === 'approved' && (
-                      <span className="text-xs text-emerald-600 font-medium">เสร็จสิ้น</span>
-                    )}
-                  </td>
+                    <div className="flex items-center gap-2">
+                      {sub.agency_status === 'pending' && (
+                        <button onClick={() => setEditSub(sub)} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-xs font-medium text-white hover:bg-indigo-700">
+                          บันทึกผล
+                        </button>
+                      )}
+                      {sub.agency_status === 'revision_requested' && (
+                        <button onClick={() => navigate(`/doc-review/${sub.project_id}`)} className="px-3 py-1.5 rounded-lg bg-blue-600 text-xs font-medium text-white hover:bg-blue-700">
+                          ไปแก้ไข
+                        </button>
+                      )}
+                      {sub.agency_status === 'approved' && (
+                        <span className="text-xs text-emerald-600 font-medium">เสร็จสิ้น</span>
+                      )}
+                       <button onClick={(e) => { e.stopPropagation(); handleDeleteProject(sub.project_id, sub.project_code, sub.project_name); }} className="px-2 py-1.5 rounded-lg text-red-500 hover:bg-red-50 transition" title="ลบโครงการ">
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                       </button>
+                     </div>
+                   </td>
                 </tr>
               ))}
             </tbody>

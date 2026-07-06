@@ -7,14 +7,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentReviewAPI, projectsAPI } from '../utils/api';
 
-const PERMIT_TYPES = [
-  { value: 'pck2', label: 'พค.2 ใบอนุญาตผลิตพลังงานควบคุม' },
-  { value: 'a1', label: 'อ.1 ขออนุญาตก่อสร้าง' },
-  { value: 'rong4', label: 'รง.4 แจ้งประกอบกิจการ' },
-  { value: 'erc', label: 'อนุมัติ กกพ.' },
-  { value: 'sld', label: 'SLD ผังระบบไฟฟ้า' },
-];
-
 const AGENCIES = [
   { value: 'กกพ.', label: 'กกพ. (คณะกรรมการกำกับกิจการพลังงาน)' },
   { value: 'พพ.', label: 'พพ. (กรมพัฒนาพลังงานทดแทนและอนุรักษ์พลังงาน)' },
@@ -32,6 +24,7 @@ export default function DocReviewNew() {
   const [error, setError] = useState('');
   const [existingProjects, setExistingProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [templates, setTemplates] = useState([]);
   const [formData, setFormData] = useState({
     project_code: '',
     project_name: '',
@@ -45,20 +38,24 @@ export default function DocReviewNew() {
     notes: '',
   });
 
-  // ดึงรายการโครงการที่มีอยู่แล้ว
+  // ดึงรายการโครงการที่มีอยู่แล้ว + templates
   useEffect(() => {
-    const fetchProjects = async () => {
+    const fetchData = async () => {
       try {
         setLoadingProjects(true);
-        const result = await projectsAPI.getAll({});
-        setExistingProjects(Array.isArray(result) ? result : (result.data || []));
+        const [projResult, tplResult] = await Promise.all([
+          projectsAPI.getAll({}),
+          documentReviewAPI.getTemplateChecklists()
+        ]);
+        setExistingProjects(Array.isArray(projResult) ? projResult : (projResult.data || []));
+        setTemplates(Array.isArray(tplResult) ? tplResult : []);
       } catch (err) {
-        console.error('Failed to fetch projects:', err);
+        console.error('Failed to fetch data:', err);
       } finally {
         setLoadingProjects(false);
       }
     };
-    fetchProjects();
+    fetchData();
   }, []);
 
   const handleChange = (e) => {
@@ -210,8 +207,8 @@ export default function DocReviewNew() {
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
                 required
               >
-                {PERMIT_TYPES.map(pt => (
-                  <option key={pt.value} value={pt.value}>{pt.label}</option>
+                {templates.map(t => (
+                  <option key={t.id} value={t.permit_type}>{t.name} ({t.item_count} รายการ)</option>
                 ))}
               </select>
             </div>

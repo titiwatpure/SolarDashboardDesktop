@@ -62,10 +62,6 @@ export default function DocReviewDetail() {
   const [loading, setLoading] = useState(true);
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [showAddPackageModal, setShowAddPackageModal] = useState(false);
-  const [selectedChecklist, setSelectedChecklist] = useState(null);
-  const [showCommentModal, setShowCommentModal] = useState(false);
-  const [showSummaryMatrix, setShowSummaryMatrix] = useState(true);
-  const [packageDetails, setPackageDetails] = useState({});
 
   useEffect(() => { loadProject(); }, [id]);
 
@@ -93,25 +89,6 @@ export default function DocReviewDetail() {
       console.error('Failed to load package:', error);
     }
   };
-
-  const loadAllPackageDetails = async () => {
-    const details = {};
-    for (const pkg of packages) {
-      try {
-        const data = await documentReviewAPI.getPackage(pkg.id);
-        details[pkg.id] = data;
-      } catch (error) {
-        console.error('Failed to load package:', pkg.id, error);
-      }
-    }
-    setPackageDetails(details);
-  };
-
-  useEffect(() => {
-    if (packages.length > 0 && showSummaryMatrix) {
-      loadAllPackageDetails();
-    }
-  }, [packages, showSummaryMatrix]);
 
   const handleDeletePackage = async (packageId, packageName) => {
     // eslint-disable-next-line no-restricted-globals
@@ -168,20 +145,6 @@ export default function DocReviewDetail() {
 
       {/* Content: Show Packages or Package Detail */}
       {!selectedPackage ? (
-        <>
-          {/* Summary Tabs */}
-          <div className="flex gap-2 mb-4">
-            <button onClick={() => setShowSummaryMatrix(true)} className={`px-4 py-2 rounded-xl text-sm font-medium transition ${showSummaryMatrix ? 'bg-purple-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-              📊 ภาพรวมทั้งหมด
-            </button>
-            <button onClick={() => setShowSummaryMatrix(false)} className={`px-4 py-2 rounded-xl text-sm font-medium transition ${!showSummaryMatrix ? 'bg-purple-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-              📁 ชุดเอกสาร
-            </button>
-          </div>
-
-          {showSummaryMatrix ? (
-            <SummaryMatrix packages={packages} packageDetails={packageDetails} />
-          ) : (
           /* Package List */
           <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
@@ -206,19 +169,16 @@ export default function DocReviewDetail() {
               </div>
             )}
           </section>
-          )}
-        </>
       ) : (
-        <>
+          <>
           {/* Package Detail */}
           <PackageDetail
             pkg={selectedPackage}
             onBack={() => { setSelectedPackage(null); loadProject(); }}
-            onComment={(cl) => { setSelectedChecklist(cl); setShowCommentModal(true); }}
             onRefresh={() => loadPackageDetail(selectedPackage.id)}
             onDeletePackage={handleDeletePackage}
           />
-        </>
+          </>
       )}
 
       {/* Modals */}
@@ -229,151 +189,10 @@ export default function DocReviewDetail() {
           onCreated={() => { setShowAddPackageModal(false); loadProject(); }}
         />
       )}
-
-      {showCommentModal && selectedChecklist && (
-        <CommentModal
-          checklist={selectedChecklist}
-          onClose={() => { setShowCommentModal(false); setSelectedChecklist(null); }}
-          onCommented={() => { setShowCommentModal(false); setSelectedChecklist(null); loadPackageDetail(selectedPackage.id); }}
-        />
-      )}
     </div>
   );
 }
 
-// ============================================================
-// SummaryMatrix Component - ตารางสรุปสถานะเอกสารทั้งหมด
-// ============================================================
-function SummaryMatrix({ packages, packageDetails }) {
-  const statusColors = {
-    pending: 'bg-slate-100 text-slate-600',
-    checking: 'bg-blue-100 text-blue-700',
-    customer_revision: 'bg-orange-100 text-orange-700',
-    passed: 'bg-emerald-100 text-emerald-700',
-    failed: 'bg-red-100 text-red-700'
-  };
-
-  const statusIcons = {
-    pending: '-',
-    checking: '⏳',
-    customer_revision: '⚠',
-    passed: '✓',
-    failed: '✗'
-  };
-
-  // รวม checklist items ทั้งหมดจากทุก package
-  const allItems = [];
-  const packageNames = [];
-
-  packages.forEach(pkg => {
-    packageNames.push({ id: pkg.id, name: pkg.package_name, agency: pkg.agency });
-    const details = packageDetails[pkg.id];
-    if (details && details.checklists) {
-      details.checklists.forEach(item => {
-        const existing = allItems.find(i => i.document_name === item.document_name);
-        if (existing) {
-          existing.packages[pkg.id] = item.status || 'pending';
-        } else {
-          allItems.push({
-            document_name: item.document_name,
-            packages: { [pkg.id]: item.status || 'pending' }
-          });
-        }
-      });
-    }
-  });
-
-  // คำนวณสรุปแต่ละ package
-  const packageSummary = packageNames.map(pkg => {
-    const details = packageDetails[pkg.id];
-    const checklists = details?.checklists || [];
-    const passed = checklists.filter(c => c.status === 'passed').length;
-    const total = checklists.length;
-    return {
-      ...pkg,
-      passed,
-      total,
-      progress: total > 0 ? Math.round((passed / total) * 100) : 0
-    };
-  });
-
-  if (packages.length === 0) {
-    return (
-      <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-10 shadow-sm text-center">
-        <p className="text-slate-400">ยังไม่มีชุดเอกสาร</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-hidden">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-6 border-b border-slate-100">
-        {packageSummary.map(pkg => (
-          <div key={pkg.id} className="p-4 rounded-xl border border-slate-200 hover:border-purple-300 transition">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">📋</span>
-              <span className="font-semibold text-sm text-slate-900 truncate">{pkg.name}</span>
-            </div>
-            <p className="text-xs text-slate-500 mb-2">{pkg.agency}</p>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-slate-600">{pkg.passed}/{pkg.total} ผ่าน</span>
-              <span className="font-semibold text-slate-900">{pkg.progress}%</span>
-            </div>
-            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-              <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${pkg.progress}%` }} />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Matrix Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">รายการเอกสาร</th>
-              {packageNames.map(pkg => (
-                <th key={pkg.id} className="px-4 py-4 text-center text-sm font-semibold text-purple-700">
-                  <div>{pkg.name.split(' ')[0]}</div>
-                  <div className="text-xs font-normal text-slate-500">{pkg.agency}</div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {allItems.map((item, idx) => (
-              <tr key={idx} className="hover:bg-slate-50">
-                <td className="px-6 py-3 text-sm font-medium text-slate-900">{item.document_name}</td>
-                {packageNames.map(pkg => {
-                  const status = item.packages[pkg.id] || 'pending';
-                  return (
-                    <td key={pkg.id} className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${statusColors[status]}`}>
-                        {statusIcons[status]} {status === 'passed' ? 'ผ่าน' : status === 'failed' ? 'ขาด' : status === 'checking' ? 'รอตรวจ' : status === 'customer_revision' ? 'ต้องแก้' : '-'}
-                      </span>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Legend */}
-      <div className="px-6 py-4 border-t border-slate-100 bg-slate-50">
-        <div className="flex items-center gap-4 text-xs">
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-100 text-emerald-700">✓ ผ่าน</span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700">✗ ขาด</span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-100 text-blue-700">⏳ รอตรวจ</span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-orange-100 text-orange-700">⚠ ต้องแก้</span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 text-slate-600">- ยังไม่มี</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ============================================================
 // PackageCard Component
@@ -429,6 +248,8 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
   const [selectedChecklistItem, setSelectedChecklistItem] = useState(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showAgencySubmitModal, setShowAgencySubmitModal] = useState(false);
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [selectedChecklist, setSelectedChecklist] = useState(null);
   const [receipts, setReceipts] = useState([]);
   const [receiptsLoading, setReceiptsLoading] = useState(false);
 
@@ -541,15 +362,16 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
     }
   };
 
-  const passed = checklists.filter(c => c.status === 'passed').length;
-  const total = checklists.length;
-  const progress = total > 0 ? Math.round((passed / total) * 100) : 0;
+  const requiredItems = checklists.filter(c => c.is_required);
+  const requiredPassed = requiredItems.filter(c => c.status === 'passed').length;
+  const requiredTotal = requiredItems.length;
+  const requiredProgress = requiredTotal > 0 ? Math.round((requiredPassed / requiredTotal) * 100) : 0;
   const openIssues = issues.filter(i => i.status === 'open').length;
-  const isAllPassed = total > 0 && passed === total;
+  const isAllRequiredPassed = requiredTotal > 0 && requiredPassed === requiredTotal;
   const hasOpenIssues = openIssues > 0;
 
   const tabs = [
-    { id: 'checklist', label: 'รายการเอกสาร', count: total },
+    { id: 'checklist', label: 'รายการเอกสาร', count: checklists.length },
     { id: 'issues', label: 'ปัญหา', count: openIssues },
     { id: 'receipts', label: 'ประวัติรับเอกสาร' },
     { id: 'approval', label: 'อนุมัติ / ยื่นหน่วยงาน' },
@@ -573,11 +395,11 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
           </div>
           <div className="text-right">
             <p className="text-sm text-slate-500">Progress</p>
-            <p className="text-2xl font-bold text-slate-900">{passed}/{total} ({progress}%)</p>
+            <p className="text-2xl font-bold text-slate-900">{requiredPassed}/{requiredTotal} ({requiredProgress}%)</p>
           </div>
         </div>
         <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden mt-4">
-          <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+          <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${requiredProgress}%` }} />
         </div>
       </section>
 
@@ -607,7 +429,7 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
       {activeTab === 'checklist' && (
         <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-slate-900">รายการเอกสาร ({total})</h3>
+            <h3 className="text-lg font-bold text-slate-900">รายการเอกสาร ({checklists.length})</h3>
             <button onClick={() => setShowAddChecklist(true)} className="px-4 py-2 rounded-xl bg-purple-600 text-sm font-semibold text-white hover:bg-purple-700">
               + เพิ่มหัวข้อ
             </button>
@@ -663,7 +485,7 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => onComment(item)} className="px-3 py-1.5 rounded-lg bg-purple-600 text-xs font-medium text-white hover:bg-purple-700">ตรวจ</button>
+                        <button onClick={() => { setSelectedChecklist(item); setShowCommentModal(true); }} className="px-3 py-1.5 rounded-lg bg-purple-600 text-xs font-medium text-white hover:bg-purple-700">ตรวจ</button>
                         <button onClick={() => { setSelectedChecklistItem(item); setShowReceiptModal(true); }} className="px-3 py-1.5 rounded-lg bg-blue-100 text-xs font-medium text-blue-700 hover:bg-blue-200">บันทึกรับ</button>
                         <button onClick={() => { setSelectedChecklistItem(item); setShowIssueModal(true); }} className="px-3 py-1.5 rounded-lg bg-red-100 text-xs font-medium text-red-700 hover:bg-red-200">สร้าง Issue</button>
                         <button onClick={() => handleRemoveItem(item.id)} className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50">🗑</button>
@@ -785,33 +607,71 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
           </div>
           <div className="p-6 space-y-4">
             {/* Internal Approval */}
-            <div className={`p-5 rounded-xl border-2 ${isAllPassed && !hasOpenIssues ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-              <h4 className="font-semibold text-slate-900 mb-2">อนุมัติภายใน (Approve to Submit)</h4>
-              <p className="text-sm text-slate-500 mb-3">
-                {isAllPassed && !hasOpenIssues
-                  ? 'เอกสารผ่านทั้งหมดแล้ว พร้อมอนุมัติภายใน'
-                  : `ต้องตรวจผ่านทั้งหมดและไม่มีปัญหาค้าง (${passed}/${total} ผ่าน, ${openIssues} ปัญหาค้าง)`}
-              </p>
-              <button
-                onClick={() => setShowApproveModal(true)}
-                disabled={!isAllPassed || hasOpenIssues}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                อนุมัติภายใน
-              </button>
-            </div>
+            {(() => {
+              const requiredNotPassed = checklists.filter(c => c.is_required && c.status !== 'passed').length;
+              const openIssuesList = issues.filter(i => i.status === 'open');
+              const canApprove = isAllRequiredPassed && !hasOpenIssues;
+              const approval = pkg?.latest_approval;
+              return (
+                <div className={`p-5 rounded-xl border-2 ${canApprove ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+                  <h4 className="font-semibold text-slate-900 mb-2">อนุมัติภายใน (Approve to Submit)</h4>
+                  {canApprove ? (
+                    <p className="text-sm text-emerald-700 mb-3">✓ เอกสารผ่านทั้งหมดแล้ว พร้อมอนุมัติภายใน</p>
+                  ) : (
+                    <div className="text-sm text-amber-700 mb-3 space-y-1">
+                      {requiredNotPassed > 0 && <p>• เอกสารจำเป็นยังไม่ผ่าน {requiredNotPassed} รายการ ({requiredPassed}/{requiredTotal} ผ่าน)</p>}
+                      {openIssuesList.length > 0 && <p>• ปัญหาค้าง {openIssuesList.length} รายการ (ต้อง Resolve ให้ครบ)</p>}
+                    </div>
+                  )}
+                  {approval && approval.approval_status === 'approved' && (
+                    <div className="mb-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                      <p className="text-xs text-emerald-600 font-medium">อนุมัติแล้ว</p>
+                      <p className="text-sm text-slate-700">ผู้อนุมัติ: {approval.approver_name || '-'}</p>
+                      <p className="text-xs text-slate-500">วันที่: {(() => { try { return new Date(approval.approved_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }); } catch (e) { return approval.approved_at; } })()}</p>
+                      {approval.comment && <p className="text-xs text-slate-500 mt-1">หมายเหตุ: {approval.comment}</p>}
+                    </div>
+                  )}
+                  {approval && approval.approval_status === 'rejected' && (
+                    <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200">
+                      <p className="text-xs text-red-600 font-medium">ตีกลับ</p>
+                      <p className="text-sm text-slate-700">ผู้ตีกลับ: {approval.approver_name || '-'}</p>
+                      <p className="text-xs text-slate-500">วันที่: {(() => { try { return new Date(approval.approved_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }); } catch (e) { return approval.approved_at; } })()}</p>
+                      {approval.comment && <p className="text-xs text-red-500 mt-1">เหตุผล: {approval.comment}</p>}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowApproveModal(true)}
+                    disabled={!canApprove}
+                    className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    อนุมัติภายใน
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Agency Submission */}
-            <div className="p-5 rounded-xl border-2 border-indigo-200 bg-indigo-50">
-              <h4 className="font-semibold text-slate-900 mb-2">ยื่นหน่วยงาน</h4>
-              <p className="text-sm text-slate-500 mb-3">บันทึกการยื่นเอกสารให้หน่วยงาน พร้อมวันที่ หน่วยงาน และรอบการยื่น</p>
-              <button
-                onClick={() => setShowAgencySubmitModal(true)}
-                className="px-6 py-2.5 rounded-xl bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700"
-              >
-                บันทึกการยื่นหน่วยงาน
-              </button>
-            </div>
+            {(() => {
+              const projectStatus = pkg?.package_status;
+              const canSubmit = projectStatus === 'ready_to_submit' || projectStatus === 'agency_revision' || projectStatus === 'submitted_agency';
+              return (
+                <div className={`p-5 rounded-xl border-2 ${canSubmit ? 'border-indigo-200 bg-indigo-50' : 'border-slate-200 bg-slate-50'}`}>
+                  <h4 className="font-semibold text-slate-900 mb-2">ยื่นหน่วยงาน</h4>
+                  {!canSubmit ? (
+                    <p className="text-sm text-slate-500 mb-3">ต้องอนุมัติภายในก่อนจึงจะยื่นหน่วยงานได้</p>
+                  ) : (
+                    <p className="text-sm text-slate-500 mb-3">บันทึกการยื่นเอกสารให้หน่วยงาน พร้อมวันที่ หน่วยงาน และรอบการยื่น</p>
+                  )}
+                  <button
+                    onClick={() => setShowAgencySubmitModal(true)}
+                    disabled={!canSubmit}
+                    className="px-6 py-2.5 rounded-xl bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    บันทึกการยื่นหน่วยงาน
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </section>
       )}
@@ -821,6 +681,16 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
         <AddChecklistItemModal
           onAdd={handleAddItem}
           onClose={() => setShowAddChecklist(false)}
+        />
+      )}
+
+      {/* Comment Modal */}
+      {showCommentModal && selectedChecklist && (
+        <CommentModal
+          checklist={selectedChecklist}
+          openIssuesCount={issues.filter(i => i.checklist_item_id === selectedChecklist.id && i.status === 'open').length}
+          onClose={() => { setShowCommentModal(false); setSelectedChecklist(null); }}
+          onCommented={() => { setShowCommentModal(false); setSelectedChecklist(null); onRefresh(); }}
         />
       )}
 
@@ -1226,13 +1096,16 @@ function AgencySubmitModal({ packageData, onClose, onCreated }) {
 // ============================================================
 // CommentModal Component
 // ============================================================
-function CommentModal({ checklist, onClose, onCommented }) {
-  const [reviewStatus, setReviewStatus] = useState('passed');
+function CommentModal({ checklist, onClose, onCommented, openIssuesCount = 0 }) {
+  const [reviewStatus, setReviewStatus] = useState('needs_revision');
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const canSubmit = reviewStatus !== 'passed' || openIssuesCount === 0;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canSubmit) return;
     try {
       setSubmitting(true);
       await documentReviewAPI.addReviewComment(checklist.id, {
@@ -1271,6 +1144,11 @@ function CommentModal({ checklist, onClose, onCommented }) {
                 </label>
               ))}
             </div>
+            {reviewStatus === 'passed' && openIssuesCount > 0 && (
+              <div className="mt-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
+                <p className="text-xs text-amber-700">⚠ เลือก "ผ่าน" ไม่ได้ — ยังมีปัญหาค้าง {openIssuesCount} รายการ Resolve ก่อน</p>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">คอมเมนต์</label>
@@ -1278,7 +1156,7 @@ function CommentModal({ checklist, onClose, onCommented }) {
           </div>
           <div className="flex items-center justify-end gap-3 pt-4">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600">ยกเลิก</button>
-            <button type="submit" disabled={submitting} className="px-6 py-2.5 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+            <button type="submit" disabled={submitting || !canSubmit} className="px-6 py-2.5 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
               {submitting ? 'กำลังบันทึก...' : 'บันทึกผลตรวจ'}
             </button>
           </div>

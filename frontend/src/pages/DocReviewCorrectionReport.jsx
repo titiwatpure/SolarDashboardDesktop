@@ -28,37 +28,50 @@ export default function DocReviewCorrectionReport() {
     const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    // Embed Sarabun Thai font
     doc.addFileToVFS('Sarabun.ttf', SARABUN_BASE64);
     doc.addFont('Sarabun.ttf', 'Sarabun', 'normal');
     doc.addFont('Sarabun.ttf', 'Sarabun', 'bold');
     doc.setFont('Sarabun');
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 15;
+    const ml = 14;
+    let y = 18;
 
     // Title
     doc.setFontSize(18);
+    doc.setFont('Sarabun', 'bold');
     doc.text('รายงานแก้ไขเอกสาร', pageWidth / 2, y, { align: 'center' });
     y += 8;
     doc.setFontSize(10);
+    doc.setFont('Sarabun', 'normal');
     doc.text('(Correction Report)', pageWidth / 2, y, { align: 'center' });
-    y += 10;
+    y += 14;
 
-    // Meta info
-    doc.setFontSize(11);
-    doc.text(`รหัสโครงการ: ${report.project_code || '-'}`, 14, y);
-    doc.text(`ชื่อโครงการ: ${report.project_name || '-'}`, pageWidth / 2 + 5, y);
-    y += 6;
-    doc.text(`ชุดเอกสาร: ${report.package_name || '-'}`, 14, y);
-    doc.text(`สร้างเมื่อ: ${report.created_at || '-'}`, pageWidth / 2 + 5, y);
-    y += 4;
+    // Meta info — one field per line, no overlap
+    doc.setFontSize(10);
+    const addMetaLine = (label, value) => {
+      doc.setFont('Sarabun', 'bold');
+      doc.text(label, ml, y);
+      doc.setFont('Sarabun', 'normal');
+      const display = (value || '-').length > 55 ? (value || '-').substring(0, 55) + '...' : (value || '-');
+      doc.text(display, ml + 30, y);
+      y += 7;
+    };
+
+    addMetaLine('รหัสโครงการ:', report.project_code);
+    addMetaLine('ชื่อโครงการ:', report.project_name);
+    addMetaLine('ชุดเอกสาร:', report.package_name);
+    addMetaLine('สร้างเมื่อ:', (() => {
+      try { return new Date(report.created_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }); }
+      catch (e) { return report.created_at; }
+    })());
+    y += 3;
 
     // Divider
     doc.setDrawColor(139, 92, 246);
     doc.setLineWidth(0.5);
-    doc.line(14, y, pageWidth - 14, y);
-    y += 8;
+    doc.line(ml, y, pageWidth - ml, y);
+    y += 6;
 
     // Table
     const issues = report.issue_details || [];
@@ -68,24 +81,59 @@ export default function DocReviewCorrectionReport() {
       issue.issue_source === 'agency' ? 'จากหน่วยงาน' : 'ตรวจสอบภายใน',
       issue.description || '-',
       issue.required_action || '-',
+      issue.reviewer_name || '-',
       issue.status === 'open' ? 'ยังไม่แก้' : 'แก้แล้ว',
     ]);
 
     autoTable(doc, {
       startY: y,
-      head: [['#', 'เอกสาร', 'แหล่งที่มา', 'ปัญหาที่พบ', 'ต้องแก้ไข', 'สถานะ']],
+      margin: { left: ml, right: ml },
+      head: [['#', 'เอกสาร', 'แหล่งที่มา', 'ปัญหาที่พบ', 'ต้องแก้ไข', 'ผู้ตรวจ', 'สถานะ']],
       body: rows,
-      styles: { font: 'Sarabun', fontSize: 9 },
-      headStyles: { fillColor: [139, 92, 246], font: 'Sarabun', fontSize: 10 },
+      styles: { font: 'Sarabun', fontSize: 8, cellPadding: 3, overflow: 'linebreak' },
+      headStyles: { fillColor: [139, 92, 246], font: 'Sarabun', fontSize: 9, fontStyle: 'bold' },
       columnStyles: {
-        0: { cellWidth: 10 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 45 },
-        4: { cellWidth: 35 },
-        5: { cellWidth: 20 },
+        0: { cellWidth: 8 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 42 },
+        4: { cellWidth: 28 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 16 },
+      },
+      didDrawPage: (data) => {
+        // Footer on every page
+        doc.setFontSize(8);
+        doc.setFont('Sarabun', 'normal');
+        doc.text(`หน้า ${doc.internal.getCurrentPageInfo().pageNumber}`, pageWidth / 2, 287, { align: 'center' });
       },
     });
+
+    // ส่วนผู้เกี่ยวข้อง (หลังตาราง)
+    let personY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.setFont('Sarabun', 'bold');
+    doc.text('ผู้เกี่ยวข้อง', ml, personY);
+    personY += 7;
+
+    doc.setFontSize(9);
+    doc.setFont('Sarabun', 'normal');
+
+    const addPerson = (label, name, detail) => {
+      doc.setFont('Sarabun', 'bold');
+      doc.text(`${label}: `, ml, personY);
+      doc.setFont('Sarabun', 'normal');
+      doc.text(name || '-', ml + 30, personY);
+      if (detail) {
+        doc.text(detail, ml + 75, personY);
+      }
+      personY += 6;
+    };
+
+    addPerson('ผู้สร้างรายงาน', report.created_by_name);
+    if (report.latest_receipt) {
+      addPerson('ผู้รับเอกสาร', report.latest_receipt.received_by_name, report.latest_receipt.received_from || '');
+    }
 
     doc.save(`รายงานแก้ไขเอกสาร-${report.project_code || 'unknown'}.pdf`);
   };
@@ -134,7 +182,7 @@ export default function DocReviewCorrectionReport() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">รายงานแก้ไขเอกสาร</h1>
             <p className="text-slate-500 mt-1">{report.project_code} | {report.package_name}</p>
-            <p className="text-xs text-slate-400 mt-1">สร้างเมื่อ: {report.created_at} โดย {report.created_by_name || 'system'}</p>
+            <p className="text-xs text-slate-400 mt-1">สร้างเมื่อ: {(() => { try { return new Date(report.created_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }); } catch (e) { return report.created_at; } })()} โดย {report.created_by_name || 'system'}</p>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={exportExcel} className="px-4 py-2.5 rounded-xl bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700">
@@ -147,6 +195,26 @@ export default function DocReviewCorrectionReport() {
         </div>
       </section>
 
+      {/* ผู้เกี่ยวข้อง */}
+      <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+        <h3 className="text-lg font-bold text-slate-900 mb-4">ผู้เกี่ยวข้อง</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <p className="text-xs text-slate-400 mb-1">ผู้สร้างรายงาน</p>
+            <p className="text-sm font-semibold text-slate-900">{report.created_by_name || '-'}</p>
+            <p className="text-xs text-slate-500">{(() => { try { return new Date(report.created_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }); } catch (e) { return report.created_at; } })()}</p>
+          </div>
+          {report.latest_receipt && (
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <p className="text-xs text-slate-400 mb-1">ผู้รับเอกสารล่าสุด</p>
+              <p className="text-sm font-semibold text-slate-900">{report.latest_receipt.received_by_name || '-'}</p>
+              <p className="text-xs text-slate-500">{report.latest_receipt.received_from || ''} ({report.latest_receipt.received_channel || '-'})</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* รายการปัญหา */}
       <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h3 className="text-lg font-bold text-slate-900">รายการปัญหา ({(report.issue_details || []).length})</h3>
