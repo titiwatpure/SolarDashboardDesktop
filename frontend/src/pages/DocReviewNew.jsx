@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { documentReviewAPI, projectsAPI, usersAPI } from '../utils/api';
+import { documentReviewAPI, projectsAPI, usersAPI, customersAPI } from '../utils/api';
 
 const AGENCIES = [
   { value: 'กกพ.', label: 'กกพ. (คณะกรรมการกำกับกิจการพลังงาน)' },
@@ -26,10 +26,12 @@ export default function DocReviewNew() {
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [templates, setTemplates] = useState([]);
   const [users, setUsers] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const [formData, setFormData] = useState({
     project_code: '',
     project_name: '',
+    customer_id: '',
     customer_name: '',
     customer_phone: '',
     customer_email: '',
@@ -46,14 +48,16 @@ export default function DocReviewNew() {
     const fetchData = async () => {
       try {
         setLoadingProjects(true);
-        const [projResult, tplResult, usersResult] = await Promise.all([
+        const [projResult, tplResult, usersResult, customersResult] = await Promise.all([
           projectsAPI.getAll({}),
           documentReviewAPI.getTemplateChecklists(),
-          usersAPI.getAll()
+          usersAPI.getAll(),
+          customersAPI.getAll()
         ]);
         setExistingProjects(Array.isArray(projResult) ? projResult : (projResult.data || []));
         setTemplates(Array.isArray(tplResult) ? tplResult : []);
         setUsers(Array.isArray(usersResult) ? usersResult : (usersResult.data || []));
+        setCustomers(Array.isArray(customersResult) ? customersResult : (customersResult.data || []));
       } catch (err) {
         console.error('Failed to fetch data:', err);
       } finally {
@@ -79,6 +83,7 @@ export default function DocReviewNew() {
       setFormData({
         project_code: '',
         project_name: '',
+        customer_id: '',
         customer_name: '',
         customer_phone: '',
         customer_email: '',
@@ -86,6 +91,7 @@ export default function DocReviewNew() {
         permit_type: 'pck2',
         agency: '',
         due_date: '',
+        owner_user_id: currentUser.id || '',
         notes: '',
       });
       return;
@@ -263,13 +269,48 @@ export default function DocReviewNew() {
           <h2 className="text-lg font-semibold text-slate-900 mb-4">ข้อมูลลูกค้า</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">เลือกลูกค้า</label>
+              <select
+                value={formData.customer_id || ''}
+                onChange={(e) => {
+                  const customerId = e.target.value;
+                  if (customerId) {
+                    const selected = customers.find(c => c.id === customerId);
+                    if (selected) {
+                      setFormData(prev => ({
+                        ...prev,
+                        customer_id: customerId,
+                        customer_name: selected.customer_name || '',
+                        customer_phone: selected.contact_phone || '',
+                        customer_email: selected.contact_email || '',
+                      }));
+                    }
+                  } else {
+                    setFormData(prev => ({
+                      ...prev,
+                      customer_id: '',
+                      customer_name: '',
+                      customer_phone: '',
+                      customer_email: '',
+                    }));
+                  }
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+              >
+                <option value="">-- เลือกลูกค้าจากฐานข้อมูล --</option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>{c.customer_name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อลูกค้า / บริษัท</label>
               <input
                 type="text"
                 name="customer_name"
                 value={formData.customer_name}
                 onChange={handleChange}
-                placeholder="เช่น บริษัท ABC จำกัด"
+                placeholder="หรือกรอกใหม่ถ้าไม่มีในรายการ"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
               />
             </div>
