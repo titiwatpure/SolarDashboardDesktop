@@ -67,6 +67,14 @@ router.post('/checklists/:checklistId/comments', authenticateToken, async (req, 
       comment_type: comment_type || 'internal'
     });
 
+    // บันทึก timeline
+    const { logTimelineEvent } = require('./doc-review-checklists');
+    const eventData = { review_status, comment: comment || null };
+    if (review_status === 'passed') eventData.action = 'ตรวจผ่าน';
+    else if (review_status === 'failed') eventData.action = 'ตรวจไม่ผ่าน';
+    else if (review_status === 'needs_revision') eventData.action = 'ส่งกลับแก้ไข';
+    await logTimelineEvent(req.params.checklistId, review_status === 'passed' ? 'passed' : review_status === 'failed' ? 'failed' : 'revision', eventData, req.user.id, null);
+
     const result = await pool.query('SELECT * FROM doc_review_comments WHERE id = ?', [id]);
     res.status(201).json(result.rows[0]);
   } catch (error) {

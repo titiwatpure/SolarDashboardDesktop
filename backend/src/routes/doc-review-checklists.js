@@ -89,6 +89,47 @@ async function syncProjectStatus(projectId) {
 }
 
 // ============================================================
+// Helper: บันทึก timeline event
+// ============================================================
+async function logTimelineEvent(checklistId, eventType, eventData, userId, packageId) {
+  try {
+    await pool.query(
+      `INSERT INTO doc_review_timeline (id, checklist_id, package_id, event_type, event_data, performed_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), checklistId, packageId || null, eventType, eventData ? JSON.stringify(eventData) : null, userId]
+    );
+  } catch (error) {
+    console.error('[LOG_TIMELINE]', error);
+  }
+}
+
+// ============================================================
+// GET /api/doc-review/checklists/:id/timeline
+// ============================================================
+router.get('/checklists/:id/timeline', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT t.*, u.full_name as performer_name
+       FROM doc_review_timeline t
+       LEFT JOIN users u ON t.performed_by = u.id
+       WHERE t.checklist_id = ?
+       ORDER BY t.created_at ASC`,
+      [req.params.id]
+    );
+
+    const timeline = result.rows.map(row => ({
+      ...row,
+      event_data: row.event_data ? JSON.parse(row.event_data) : null
+    }));
+
+    res.json(timeline);
+  } catch (error) {
+    console.error('[DOC_REVIEW_TIMELINE]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
 // GET /api/doc-review/projects/:projectId/checklists
 // ============================================================
 router.get('/projects/:projectId/checklists', authenticateToken, async (req, res) => {
@@ -237,6 +278,16 @@ router.put('/checklists/:id', authenticateToken, async (req, res) => {
       values
     );
 
+    // บันทึก timeline ถ้าสถานะเปลี่ยน
+    if (status) {
+      const eventData = {};
+      if (status === 'checking') eventData.action = 'เริ่มตรวจสอบ';
+      else if (status === 'passed') eventData.action = 'ตรวจผ่าน';
+      else if (status === 'failed') eventData.action = 'ตรวจไม่ผ่าน';
+      else if (status === 'customer_revision') eventData.action = 'ส่งกลับแก้ไข';
+      await logTimelineEvent(req.params.id, status, eventData, req.user.id, existing.rows[0].package_id);
+    }
+
     logActivity(req.user.id, 'update', 'doc_review_checklist', req.params.id, { status });
 
     const result = await pool.query('SELECT * FROM doc_review_checklists WHERE id = ?', [req.params.id]);
@@ -297,6 +348,7 @@ router.post('/projects/:projectId/checklists/batch-receive', authenticateToken, 
         [require('uuid').v4(), item.id, item.package_id, received_from, received_channel || 'other', received_date || new Date().toISOString().split('T')[0], revResult.rows[0].next_rev, file_reference || null, notes || null, req.user.id]
       );
       await pool.query("UPDATE doc_review_checklists SET status = 'received', updated_at = datetime('now') WHERE id = ?", [item.id]);
+      await logTimelineEvent(item.id, 'received', { received_from, received_channel, file_reference }, req.user.id, item.package_id);
       results.received.push(item.id);
     }
 
@@ -338,6 +390,7 @@ router.post('/checklists/batch-approve', authenticateToken, async (req, res) => 
         continue;
       }
       await pool.query("UPDATE doc_review_checklists SET status = 'passed', updated_at = datetime('now') WHERE id = ?", [item.id]);
+      await logTimelineEvent(item.id, 'passed', {}, req.user.id, null);
       results.passed.push(item.id);
     }
 
@@ -375,6 +428,7 @@ router.post('/checklists/batch-reject', authenticateToken, async (req, res) => {
     for (const item of items.rows) {
       if (['passed', 'customer_revision', 'not_received', 'pending'].includes(item.status)) continue;
       await pool.query("UPDATE doc_review_checklists SET status = 'customer_revision', updated_at = datetime('now') WHERE id = ?", [item.id]);
+      await logTimelineEvent(item.id, 'revision', { reason }, req.user.id, item.package_id);
       if (item.package_id) {
         await pool.query(
           "INSERT INTO document_issues (id, checklist_item_id, package_id, issue_source, description, status, created_by) VALUES (?, ?, ?, 'internal', ?, 'open', ?)",

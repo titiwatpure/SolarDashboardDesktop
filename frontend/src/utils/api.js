@@ -444,6 +444,9 @@ export const documentReviewAPI = {
   batchApproveChecklists: (data) => apiCall('POST', '/doc-review/checklists/batch-approve', data),
   batchRejectChecklists: (data) => apiCall('POST', '/doc-review/checklists/batch-reject', data),
 
+  // Timeline
+  getChecklistTimeline: (checklistId) => apiCall('GET', '/doc-review/checklists/' + checklistId + '/timeline'),
+
   // Files
   uploadReviewFile: (checklistId, formData) => {
     const token = localStorage.getItem('token');

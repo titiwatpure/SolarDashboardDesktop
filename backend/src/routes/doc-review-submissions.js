@@ -69,6 +69,16 @@ router.post('/projects/:projectId/submit', authenticateToken, async (req, res) =
       submitted_date
     });
 
+    // บันทึก timeline สำหรับ checklist items ที่เกี่ยวข้อง
+    const { logTimelineEvent } = require('./doc-review-checklists');
+    const checklists = await pool.query(
+      'SELECT id, package_id FROM doc_review_checklists WHERE project_id = ? AND package_id IS NOT NULL',
+      [req.params.projectId]
+    );
+    for (const cl of checklists.rows) {
+      await logTimelineEvent(cl.id, 'submitted', { agency_name, round: result.nextRound }, req.user.id, cl.package_id);
+    }
+
     res.status(201).json(result.submission);
   } catch (error) {
     console.error('[DOC_REVIEW_SUBMISSIONS]', error);

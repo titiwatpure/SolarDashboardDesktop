@@ -385,6 +385,7 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
     { id: 'issues', label: 'ปัญหา', count: openIssues },
     { id: 'receipts', label: 'ประวัติรับเอกสาร' },
     { id: 'approval', label: 'อนุมัติ / ยื่นหน่วยงาน' },
+    { id: 'timeline', label: 'ประวัติ' },
   ];
 
   return (
@@ -728,6 +729,11 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
             })()}
           </div>
         </section>
+      )}
+
+      {/* Timeline Tab */}
+      {activeTab === 'timeline' && (
+        <TimelineTab packageId={pkg.id} />
       )}
 
       {/* Add Checklist Item Modal */}
@@ -1411,5 +1417,148 @@ function BulkRejectModal({ checklistIds, onClose, onDone }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ============================================================
+// TimelineTab Component
+// ============================================================
+function TimelineTab({ packageId }) {
+  const [timeline, setTimeline] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadTimeline();
+  }, [packageId]);
+
+  const loadTimeline = async () => {
+    try {
+      setLoading(true);
+      const checklistsRes = await documentReviewAPI.getReviewChecklists(packageId);
+      const allTimeline = [];
+
+      for (const cl of (Array.isArray(checklistsRes) ? checklistsRes : [])) {
+        try {
+          const tl = await documentReviewAPI.getChecklistTimeline(cl.id);
+          if (Array.isArray(tl)) {
+            tl.forEach(item => {
+              allTimeline.push({ ...item, document_name: cl.document_name });
+            });
+          }
+        } catch (e) { /* skip */ }
+      }
+
+      allTimeline.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setTimeline(allTimeline);
+    } catch (error) {
+      console.error('Failed to load timeline:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getEventIcon = (eventType) => {
+    const icons = {
+      created: { icon: '+', color: 'bg-slate-400' },
+      received: { icon: '\u2713', color: 'bg-blue-500' },
+      checking: { icon: '?', color: 'bg-violet-500' },
+      passed: { icon: '\u2713', color: 'bg-emerald-500' },
+      failed: { icon: '\u2717', color: 'bg-red-500' },
+      revision: { icon: '!', color: 'bg-orange-500' },
+      issue: { icon: '!', color: 'bg-orange-500' },
+      issue_resolved: { icon: '\u2713', color: 'bg-emerald-500' },
+      file_uploaded: { icon: '\u2191', color: 'bg-blue-500' },
+      submitted: { icon: '\u2192', color: 'bg-indigo-500' },
+      agency_response: { icon: '\u2190', color: 'bg-cyan-500' }
+    };
+    return icons[eventType] || { icon: '?', color: 'bg-slate-400' };
+  };
+
+  const getEventLabel = (eventType) => {
+    const labels = {
+      created: 'สร้างรายการเอกสาร', received: 'บันทึกรับเอกสาร', checking: 'เริ่มตรวจสอบ',
+      passed: 'ตรวจผ่าน', failed: 'ตรวจไม่ผ่าน', revision: 'ส่งกลับแก้ไข',
+      issue: 'สร้างปัญหา', issue_resolved: 'แก้ไขปัญหาแล้ว', file_uploaded: 'อัปโหลดไฟล์',
+      submitted: 'ยื่นหน่วยงาน', agency_response: 'ผลจากหน่วยงาน'
+    };
+    return labels[eventType] || eventType;
+  };
+
+  const formatDateTime = (dateStr) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+             d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+    } catch { return dateStr; }
+  };
+
+  if (loading) {
+    return (
+      <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm p-6">
+        <div className="text-center py-8">
+          <div className="inline-block w-6 h-6 border-2 border-slate-300 border-t-violet-600 rounded-full animate-spin"></div>
+          <p className="text-sm text-slate-500 mt-2">กำลังโหลด...</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100">
+        <h3 className="text-lg font-bold text-slate-900">ประวัติการดำเนินงาน ({timeline.length} รายการ)</h3>
+      </div>
+      {timeline.length === 0 ? (
+        <div className="px-6 py-12 text-center">
+          <svg className="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p className="text-sm text-slate-400">ยังไม่มีประวัติการดำเนินงาน</p>
+        </div>
+      ) : (
+        <div className="px-6 py-4">
+          {timeline.map((item, index) => {
+            const { icon, color } = getEventIcon(item.event_type);
+            const isLast = index === timeline.length - 1;
+            return (
+              <div key={item.id} className="relative" style={{ paddingLeft: '40px', paddingBottom: isLast ? '0' : '24px' }}>
+                {!isLast && (
+                  <div className="absolute left-[15px] top-[32px] bottom-0 w-0.5" style={{ borderLeft: '2px dashed #10B981' }}></div>
+                )}
+                <div className={`absolute left-0 top-1 w-8 h-8 rounded-full ${color} flex items-center justify-center text-white text-sm`}>
+                  {icon}
+                </div>
+                <div className="ml-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-semibold text-slate-900">{getEventLabel(item.event_type)}</span>
+                    <span className="text-xs text-slate-400">{formatDateTime(item.created_at)}</span>
+                  </div>
+                  {item.event_type === 'received' && item.event_data && (
+                    <div className="text-xs text-slate-500 space-y-0.5">
+                      <p>รับจาก: {item.event_data.received_from || '-'}</p>
+                      <p>ช่องทาง: {item.event_data.received_channel || '-'}</p>
+                      {item.event_data.file_reference && <p>ไฟล์: {item.event_data.file_reference}</p>}
+                    </div>
+                  )}
+                  {item.event_type === 'failed' && item.event_data && item.event_data.action && (
+                    <p className="text-xs text-red-600 mt-1">{item.event_data.action}</p>
+                  )}
+                  {item.event_type === 'issue' && item.event_data && (
+                    <div className="flex gap-2 mt-1">
+                      <span className="px-2 py-0.5 rounded bg-orange-100 text-orange-700 text-xs">{item.event_data.issue_source || 'ตรวจสอบภายใน'}</span>
+                      <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs">ยังไม่แก้</span>
+                    </div>
+                  )}
+                  {item.event_type === 'submitted' && item.event_data && (
+                    <p className="text-xs text-slate-500 mt-1">ยื่นให้: {item.event_data.agency_name} (รอบ {item.event_data.round})</p>
+                  )}
+                  <p className="text-xs text-slate-400 mt-1">โดย: {item.performer_name || 'ไม่ระบุ'}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

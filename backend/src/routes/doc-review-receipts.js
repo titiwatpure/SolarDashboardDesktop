@@ -55,6 +55,10 @@ router.post('/receipts', authenticateToken, async (req, res) => {
 
     logActivity(req.user.id, 'create', 'document_receipt', result.id, { checklist_item_id, revision_round: result.revision_round });
 
+    // บันทึก timeline
+    const { logTimelineEvent } = require('./doc-review-checklists');
+    await logTimelineEvent(checklist_item_id, 'received', { received_from, received_channel, revision_round: result.revision_round }, req.user.id, package_id);
+
     res.status(201).json(result);
   } catch (error) {
     console.error('[DOC_RECEIPTS]', error);

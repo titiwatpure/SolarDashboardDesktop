@@ -49,6 +49,10 @@ router.post('/issues', authenticateToken, async (req, res) => {
 
     logActivity(req.user.id, 'create', 'document_issue', result.id, { checklist_item_id, issue_source });
 
+    // บันทึก timeline
+    const { logTimelineEvent } = require('./doc-review-checklists');
+    await logTimelineEvent(checklist_item_id, 'issue', { issue_source, description }, req.user.id, package_id);
+
     res.status(201).json(result);
   } catch (error) {
     console.error('[DOC_ISSUES]', error);
@@ -94,6 +98,10 @@ router.put('/issues/:id/resolve', authenticateToken, async (req, res) => {
     });
 
     logActivity(req.user.id, 'resolve', 'document_issue', req.params.id, {});
+
+    // บันทึก timeline
+    const { logTimelineEvent } = require('./doc-review-checklists');
+    await logTimelineEvent(issue.checklist_item_id, 'issue_resolved', { issue_id: req.params.id }, req.user.id, issue.package_id);
 
     res.json({ message: 'แก้ไข Issue สำเร็จ' });
   } catch (error) {
