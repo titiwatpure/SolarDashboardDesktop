@@ -29,6 +29,7 @@ const STATUS_BADGE = {
 
 const CHECKLIST_STATUS = {
   pending: { label: 'รอตรวจ', color: 'bg-slate-100 text-slate-600' },
+  received: { label: 'รับแล้ว', color: 'bg-cyan-100 text-cyan-700' },
   checking: { label: 'กำลังตรวจ', color: 'bg-blue-100 text-blue-700' },
   customer_revision: { label: 'ส่งกลับแก้ไข', color: 'bg-orange-100 text-orange-700' },
   passed: { label: 'ผ่านแล้ว', color: 'bg-emerald-100 text-emerald-700' },
@@ -204,7 +205,8 @@ export default function DocReviewDetail() {
 // PackageCard Component
 // ============================================================
 function PackageCard({ pkg, onClick, onDelete }) {
-  const progress = pkg.total_docs > 0 ? Math.round((pkg.passed_docs / pkg.total_docs) * 100) : 0;
+  // ใช้ required_passed/required_total เหมือน PackageDetail เพื่อให้ตรงกัน
+  const progress = pkg.required_total > 0 ? Math.round((pkg.required_passed / pkg.required_total) * 100) : 0;
   return (
     <div className="p-5 rounded-2xl border-2 border-slate-200 hover:border-purple-400 transition hover:shadow-md">
       <div className="flex items-start justify-between mb-3">
@@ -225,7 +227,7 @@ function PackageCard({ pkg, onClick, onDelete }) {
         </button>
       </div>
       <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
-        <span>{pkg.passed_docs || 0}/{pkg.total_docs || 0} เอกสาร</span>
+        <span>{pkg.required_passed || 0}/{pkg.required_total || 0} จำเป็น</span>
         <span>{progress}%</span>
       </div>
       <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
@@ -261,6 +263,7 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
   const [bulkSelected, setBulkSelected] = useState([]);
   const [showBulkReceive, setShowBulkReceive] = useState(false);
   const [showBulkApprove, setShowBulkApprove] = useState(false);
+  const [showBulkForcePass, setShowBulkForcePass] = useState(false);
   const [showBulkReject, setShowBulkReject] = useState(false);
 
   const loadCommentsForChecklists = async (items) => {
@@ -345,7 +348,8 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
   const handleToggleRequired = async (item) => {
     try {
       await documentReviewAPI.updateReviewChecklist(item.id, { is_required: !item.is_required });
-      setChecklists(prev => prev.map(c => c.id === item.id ? { ...c, is_required: !item.is_required ? 1 : 0 } : c));
+      // Refresh จาก server เพื่อให้ recalculate package status + required counts ถูกต้อง
+      onRefresh();
     } catch (error) {
       console.error('Failed to toggle required:', error);
     }
@@ -404,14 +408,48 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
             <h2 className="text-2xl font-bold text-slate-900">{pkg.package_name}</h2>
             <p className="text-slate-500 mt-1">{pkg.agency} | กำหนด: {pkg.due_date || 'ไม่กำหนด'}</p>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-slate-500">Progress</p>
-            <p className="text-2xl font-bold text-slate-900">{requiredPassed}/{requiredTotal} ({requiredProgress}%)</p>
+          <div className="flex items-center gap-4">
+            {/* Status Badge — แสดงสถานะปัจจุบันของ package */}
+            <span className={`px-4 py-1.5 rounded-full text-sm font-semibold ${STATUS_BADGE[pkg.package_status] || 'bg-slate-100 text-slate-600'}`}>
+              {STATUS_LABELS[pkg.package_status] || pkg.package_status}
+            </span>
+            <div className="text-right">
+              <p className="text-sm text-slate-500">Progress (จำเป็น)</p>
+              <p className={`text-2xl font-bold ${requiredProgress === 100 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                {requiredPassed}/{requiredTotal} ({requiredProgress}%)
+              </p>
+            </div>
           </div>
         </div>
         <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden mt-4">
-          <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${requiredProgress}%` }} />
+          <div
+            className={`h-full rounded-full transition-all ${requiredProgress === 100 ? 'bg-emerald-500' : requiredProgress >= 50 ? 'bg-blue-500' : 'bg-purple-500'}`}
+            style={{ width: `${requiredProgress}%` }}
+          />
         </div>
+
+        {/* Banner เมื่อเอกสารครบ 100% */}
+        {isAllRequiredPassed && !hasOpenIssues && (
+          <div className="mt-4 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+            <span className="text-emerald-600 text-lg">✓</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-emerald-800">เอกสารจำเป็นครบทุกรายการ</p>
+              <p className="text-xs text-emerald-600">ไปที่แท็บ "อนุมัติ / ยื่นหน่วยงาน" เพื่อดำเนินการต่อ</p>
+            </div>
+            <button
+              onClick={() => setActiveTab('approval')}
+              className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700 shrink-0"
+            >
+              ไปอนุมัติ →
+            </button>
+          </div>
+        )}
+        {isAllRequiredPassed && hasOpenIssues && (
+          <div className="mt-4 flex items-center gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+            <span className="text-amber-600 text-lg">⚠</span>
+            <p className="text-sm text-amber-700">เอกสารครบแล้ว แต่ยังมีปัญหาค้าง {openIssues} รายการ กรุณา Resolve ก่อนอนุมัติ</p>
+          </div>
+        )}
       </section>
 
       {/* Tabs */}
@@ -464,6 +502,11 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
               {bulkSelected.some(id => checklists.find(c => c.id === id && approvable.includes(c.status))) && (
                 <button onClick={() => setShowBulkApprove(true)} className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700">
                   ตรวจผ่านรายการที่เลือก
+                </button>
+              )}
+              {bulkSelected.some(id => checklists.find(c => c.id === id && c.status !== 'passed')) && (
+                <button onClick={() => setShowBulkForcePass(true)} className="px-4 py-2 rounded-xl bg-green-700 text-xs font-semibold text-white hover:bg-green-800">
+                  ✓ ผ่านทั้งหมดที่เลือก
                 </button>
               )}
               <button onClick={() => setShowBulkReject(true)} className="px-4 py-2 rounded-xl bg-orange-500 text-xs font-semibold text-white hover:bg-orange-600">
@@ -817,6 +860,15 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
           checklistIds={bulkSelected.filter(id => checklists.find(c => c.id === id && ['received', 'checking'].includes(c.status)))}
           onClose={() => setShowBulkApprove(false)}
           onDone={() => { setShowBulkApprove(false); setBulkSelected([]); onRefresh(); }}
+        />
+      )}
+
+      {/* Bulk Force Pass Modal */}
+      {showBulkForcePass && (
+        <BulkForcePassModal
+          checklistIds={bulkSelected.filter(id => checklists.find(c => c.id === id && c.status !== 'passed'))}
+          onClose={() => setShowBulkForcePass(false)}
+          onDone={() => { setShowBulkForcePass(false); setBulkSelected([]); onRefresh(); }}
         />
       )}
 
@@ -1373,6 +1425,57 @@ function BulkApproveModal({ checklistIds, onClose, onDone }) {
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600">ยกเลิก</button>
           <button onClick={handleConfirm} disabled={submitting} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
             {submitting ? 'กำลังดำเนินการ...' : 'ยืนยัน'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// BulkForcePassModal - ผ่านทั้งหมดที่เลือก (ไม่จำกัดสถานะ)
+// ============================================================
+function BulkForcePassModal({ checklistIds, onClose, onDone }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleConfirm = async () => {
+    try {
+      setSubmitting(true);
+      const res = await documentReviewAPI.batchForcePassChecklists({ checklist_ids: checklistIds });
+      setResult(res);
+      if (res.passed && res.passed.length > 0) setTimeout(() => onDone(), 1500);
+    } catch (error) {
+      alert('ไม่สำเร็จ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (result) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 p-6">
+          <h2 className="text-lg font-bold text-slate-900 mb-3">✓ ผ่านแล้ว</h2>
+          <p className="text-sm text-emerald-600 font-medium">ผ่าน {result.passed.length} รายการ</p>
+          {result.skipped && result.skipped.length > 0 && (
+            <p className="text-sm text-slate-400 mt-1">ข้าม {result.skipped.length} รายการ (ผ่านแล้ว)</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 p-6">
+        <h2 className="text-lg font-bold text-slate-900 mb-2">✓ ผ่านทั้งหมดที่เลือก</h2>
+        <p className="text-sm text-slate-600 mb-1">ยืนยันให้ผ่านทุกรายการที่เลือก {checklistIds.length} รายการ?</p>
+        <p className="text-xs text-amber-600 mb-4">⚠ รายการทุกสถานะจะถูกตั้งเป็น "ผ่านแล้ว" ยกเว้นที่ผ่านแล้ว</p>
+        <div className="flex items-center justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600">ยกเลิก</button>
+          <button onClick={handleConfirm} disabled={submitting} className="px-6 py-2.5 rounded-xl bg-green-700 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50">
+            {submitting ? 'กำลังดำเนินการ...' : `ยืนยัน (${checklistIds.length} รายการ)`}
           </button>
         </div>
       </div>

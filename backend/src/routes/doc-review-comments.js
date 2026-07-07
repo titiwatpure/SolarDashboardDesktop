@@ -57,7 +57,9 @@ router.post('/checklists/:checklistId/comments', authenticateToken, async (req, 
         await recalculatePackageStatus(package_id);
         await syncProjectStatus(project_id);
       } else {
-        await updateProjectStatus(project_id);
+        // ไม่มี package_id — sync project status จาก packages ที่มีอยู่
+        const { syncProjectStatus } = require('./doc-review-checklists');
+        await syncProjectStatus(project_id);
       }
     }
 

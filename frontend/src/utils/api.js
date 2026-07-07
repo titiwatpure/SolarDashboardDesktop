@@ -418,31 +418,35 @@ export const accountingAPI = {
 // Document Review Module API
 // ============================================================
 export const documentReviewAPI = {
+  // helper ภายใน: clear cache ทุก key ที่เกี่ยวกับ doc-review
+  _invalidate: () => invalidateCache('GET:/doc-review'),
+
   // Projects — cached 30s
   getReviewProjects: (params) => cachedGET(`/doc-review?${new URLSearchParams(params || {})}`, 30_000),
-  createReviewProject: (data) => { invalidateCache('/doc-review'); return apiCall('POST', '/doc-review', data); },
+  createReviewProject: (data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', '/doc-review', data); },
   getReviewProject: (id) => cachedGET(`/doc-review/${id}`, 30_000),
-  updateReviewProject: (id, data) => { invalidateCache('/doc-review'); return apiCall('PUT', `/doc-review/${id}`, data); },
-  deleteReviewProject: (id) => { invalidateCache('/doc-review'); return apiCall('DELETE', `/doc-review/${id}`); },
+  updateReviewProject: (id, data) => { invalidateCache('GET:/doc-review'); return apiCall('PUT', `/doc-review/${id}`, data); },
+  deleteReviewProject: (id) => { invalidateCache('GET:/doc-review'); return apiCall('DELETE', `/doc-review/${id}`); },
   getReviewSummary: () => apiCall('GET', '/doc-review/dashboard/summary'),
 
   // Submission Packages
   getPackages: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/packages`),
-  createPackage: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/packages`, data),
+  createPackage: (projectId, data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', `/doc-review/projects/${projectId}/packages`, data); },
   getPackage: (packageId) => apiCall('GET', `/doc-review/packages/${packageId}`),
-  updatePackage: (packageId, data) => apiCall('PUT', `/doc-review/packages/${packageId}`, data),
-  deletePackage: (packageId) => apiCall('DELETE', `/doc-review/packages/${packageId}`),
-  generateChecklist: (packageId, templateId) => apiCall('POST', `/doc-review/packages/${packageId}/generate-checklist`, { template_id: templateId }),
+  updatePackage: (packageId, data) => { invalidateCache('GET:/doc-review'); return apiCall('PUT', `/doc-review/packages/${packageId}`, data); },
+  deletePackage: (packageId) => { invalidateCache('GET:/doc-review'); return apiCall('DELETE', `/doc-review/packages/${packageId}`); },
+  generateChecklist: (packageId, templateId) => { invalidateCache('GET:/doc-review'); return apiCall('POST', `/doc-review/packages/${packageId}/generate-checklist`, { template_id: templateId }); },
 
   // Checklists
   getReviewChecklists: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/checklists`),
-  createReviewChecklist: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/checklists`, data),
-  createChecklistsFromTemplate: (projectId, templateId) => apiCall('POST', `/doc-review/projects/${projectId}/checklists/from-template`, { template_id: templateId }),
-  updateReviewChecklist: (id, data) => apiCall('PUT', `/doc-review/checklists/${id}`, data),
-  deleteReviewChecklist: (id) => apiCall('DELETE', `/doc-review/checklists/${id}`),
-  batchReceiveChecklists: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/checklists/batch-receive`, data),
-  batchApproveChecklists: (data) => apiCall('POST', '/doc-review/checklists/batch-approve', data),
-  batchRejectChecklists: (data) => apiCall('POST', '/doc-review/checklists/batch-reject', data),
+  createReviewChecklist: (projectId, data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', `/doc-review/projects/${projectId}/checklists`, data); },
+  createChecklistsFromTemplate: (projectId, templateId) => { invalidateCache('GET:/doc-review'); return apiCall('POST', `/doc-review/projects/${projectId}/checklists/from-template`, { template_id: templateId }); },
+  updateReviewChecklist: (id, data) => { invalidateCache('GET:/doc-review'); return apiCall('PUT', `/doc-review/checklists/${id}`, data); },
+  deleteReviewChecklist: (id) => { invalidateCache('GET:/doc-review'); return apiCall('DELETE', `/doc-review/checklists/${id}`); },
+  batchReceiveChecklists: (projectId, data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', `/doc-review/projects/${projectId}/checklists/batch-receive`, data); },
+  batchApproveChecklists: (data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', '/doc-review/checklists/batch-approve', data); },
+  batchForcePassChecklists: (data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', '/doc-review/checklists/batch-force-pass', data); },
+  batchRejectChecklists: (data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', '/doc-review/checklists/batch-reject', data); },
 
   // Timeline
   getChecklistTimeline: (checklistId) => apiCall('GET', '/doc-review/checklists/' + checklistId + '/timeline'),
@@ -456,21 +460,21 @@ export const documentReviewAPI = {
   },
   getReviewFiles: (checklistId) => apiCall('GET', `/doc-review/checklists/${checklistId}/files`),
   downloadReviewFile: (fileId) => `${API_BASE_URL}/doc-review/files/${fileId}/download`,
-  deleteReviewFile: (fileId) => apiCall('DELETE', `/doc-review/files/${fileId}`),
+  deleteReviewFile: (fileId) => { invalidateCache('GET:/doc-review'); return apiCall('DELETE', `/doc-review/files/${fileId}`); },
 
   // Comments
-  addReviewComment: (checklistId, data) => apiCall('POST', `/doc-review/checklists/${checklistId}/comments`, data),
+  addReviewComment: (checklistId, data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', `/doc-review/checklists/${checklistId}/comments`, data); },
   getReviewComments: (checklistId, params) => apiCall('GET', `/doc-review/checklists/${checklistId}/comments?${new URLSearchParams(params || {})}`),
 
   // Approvals
-  approveProject: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/approve`, data),
-  rejectProject: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/reject`, data),
+  approveProject: (projectId, data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', `/doc-review/projects/${projectId}/approve`, data); },
+  rejectProject: (projectId, data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', `/doc-review/projects/${projectId}/reject`, data); },
   getProjectApprovals: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/approvals`),
 
   // Agency Submissions
-  submitToAgency: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/submit`, data),
-  updateSubmission: (submissionId, data) => apiCall('PUT', `/doc-review/submissions/${submissionId}`, data),
-  deleteSubmission: (submissionId) => apiCall('DELETE', `/doc-review/submissions/${submissionId}`),
+  submitToAgency: (projectId, data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', `/doc-review/projects/${projectId}/submit`, data); },
+  updateSubmission: (submissionId, data) => { invalidateCache('GET:/doc-review'); return apiCall('PUT', `/doc-review/submissions/${submissionId}`, data); },
+  deleteSubmission: (submissionId) => { invalidateCache('GET:/doc-review'); return apiCall('DELETE', `/doc-review/submissions/${submissionId}`); },
   getProjectSubmissions: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/submissions`),
   getAllSubmissions: () => cachedGET('/doc-review/submissions', 30_000),
 
@@ -483,12 +487,12 @@ export const documentReviewAPI = {
   copyTemplateChecklist: (id, data) => apiCall('POST', `/doc-review/template-checklists/${id}/copy`, data),
 
   // Document Receipts - บันทึกการรับเอกสารจากลูกค้า
-  createReceipt: (data) => apiCall('POST', '/doc-review/receipts', data),
+  createReceipt: (data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', '/doc-review/receipts', data); },
   getReceiptsByChecklist: (checklistId) => apiCall('GET', `/doc-review/receipts/checklists/${checklistId}`),
 
   // Document Issues - จัดการปัญหาที่ต้องแก้ไข
-  createIssue: (data) => apiCall('POST', '/doc-review/issues', data),
-  resolveIssue: (issueId) => apiCall('PUT', `/doc-review/issues/${issueId}/resolve`),
+  createIssue: (data) => { invalidateCache('GET:/doc-review'); return apiCall('POST', '/doc-review/issues', data); },
+  resolveIssue: (issueId) => { invalidateCache('GET:/doc-review'); return apiCall('PUT', `/doc-review/issues/${issueId}/resolve`); },
   getIssuesByPackage: (packageId) => apiCall('GET', `/doc-review/packages/${packageId}/issues`),
 
   // Correction Reports - รายงานส่งลูกค้า

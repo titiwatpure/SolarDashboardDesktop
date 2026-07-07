@@ -38,25 +38,49 @@ router.post('/projects/:projectId/submit', authenticateToken, async (req, res) =
       return res.status(400).json({ error: 'โครงการยังไม่ได้รับการอนุมัติภายใน หรืออยู่ในสถานะที่ไม่สามารถยื่นหน่วยงานได้' });
     }
 
+    const { package_id } = req.body;
+
     const result = await pool.transaction(async (tx) => {
-      // Get next round number
-      const roundResult = await tx.query(
-        'SELECT COALESCE(MAX(submission_round), 0) + 1 as next_round FROM doc_agency_submissions WHERE project_id = ?',
-        [req.params.projectId]
-      );
+      // นับรอบยื่นเฉพาะของ package นี้ (ถ้ามี) หรือของทั้งโครงการ
+      const roundResult = package_id
+        ? await tx.query(
+            'SELECT COALESCE(MAX(submission_round), 0) + 1 as next_round FROM doc_agency_submissions WHERE package_id = ?',
+            [package_id]
+          )
+        : await tx.query(
+            'SELECT COALESCE(MAX(submission_round), 0) + 1 as next_round FROM doc_agency_submissions WHERE project_id = ?',
+            [req.params.projectId]
+          );
       const nextRound = roundResult.rows[0].next_round;
 
       const id = uuidv4();
       await tx.query(
-        `INSERT INTO doc_agency_submissions (id, project_id, agency_name, submission_round, submitted_date, agency_status, next_action)
-         VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
-        [id, req.params.projectId, agency_name, nextRound, submitted_date, notes || null]
+        `INSERT INTO doc_agency_submissions (id, project_id, package_id, agency_name, submission_round, submitted_date, agency_status, next_action)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
+        [id, req.params.projectId, package_id || null, agency_name, nextRound, submitted_date, notes || null]
       );
 
-      // Update project status
+      // อัป package_status ถ้ามี package_id
+      if (package_id) {
+        await tx.query(
+          'UPDATE doc_submission_packages SET package_status = ?, updated_at = datetime("now") WHERE id = ?',
+          ['submitted_agency', package_id]
+        );
+      }
+
+      // Sync project_status
+      const pkgs = await tx.query('SELECT package_status FROM doc_submission_packages WHERE project_id = ?', [req.params.projectId]);
+      const statuses = pkgs.rows.map(p => p.package_status);
+      let projectStatus = 'submitted_agency';
+      if (statuses.every(s => s === 'approved')) projectStatus = 'approved';
+      else if (statuses.some(s => s === 'submitted_agency')) projectStatus = 'submitted_agency';
+      else if (statuses.some(s => s === 'agency_revision')) projectStatus = 'agency_revision';
+      else if (statuses.some(s => s === 'customer_revision')) projectStatus = 'customer_revision';
+      else if (statuses.some(s => s === 'ready_to_submit')) projectStatus = 'ready_to_submit';
+
       await tx.query(
         'UPDATE doc_review_projects SET project_status = ?, updated_at = datetime("now") WHERE id = ?',
-        ['submitted_agency', req.params.projectId]
+        [projectStatus, req.params.projectId]
       );
 
       const row = await tx.query('SELECT * FROM doc_agency_submissions WHERE id = ?', [id]);
@@ -120,15 +144,30 @@ router.put('/submissions/:id', authenticateToken, async (req, res) => {
         values
       );
 
-      // Update project status based on agency response
+      // อัป package_status และ project_status ตามผลตอบกลับจากหน่วยงาน
       if (agency_status) {
-        let newProjectStatus = 'submitted_agency';
+        let newPackageStatus = 'submitted_agency';
+        if (agency_status === 'approved') newPackageStatus = 'approved';
+        else if (agency_status === 'revision_requested') newPackageStatus = 'agency_revision';
+        else if (agency_status === 'resubmitted') newPackageStatus = 'submitted_agency';
 
-        if (agency_status === 'approved') {
-          newProjectStatus = 'approved';
-        } else if (agency_status === 'revision_requested') {
-          newProjectStatus = 'agency_revision';
+        // อัป package_status ถ้า submission มี package_id
+        if (submission.package_id) {
+          await tx.query(
+            'UPDATE doc_submission_packages SET package_status = ?, updated_at = datetime("now") WHERE id = ?',
+            [newPackageStatus, submission.package_id]
+          );
         }
+
+        // Sync project_status จาก package_status ทั้งหมด
+        const pkgs = await tx.query('SELECT package_status FROM doc_submission_packages WHERE project_id = ?', [submission.project_id]);
+        const statuses = pkgs.rows.map(p => p.package_status);
+        let newProjectStatus = 'submitted_agency';
+        if (statuses.every(s => s === 'approved')) newProjectStatus = 'approved';
+        else if (statuses.some(s => s === 'submitted_agency')) newProjectStatus = 'submitted_agency';
+        else if (statuses.some(s => s === 'agency_revision')) newProjectStatus = 'agency_revision';
+        else if (statuses.some(s => s === 'customer_revision')) newProjectStatus = 'customer_revision';
+        else if (statuses.some(s => s === 'ready_to_submit')) newProjectStatus = 'ready_to_submit';
 
         await tx.query(
           'UPDATE doc_review_projects SET project_status = ?, updated_at = datetime("now") WHERE id = ?',
@@ -156,7 +195,7 @@ router.get('/submissions', authenticateToken, async (req, res) => {
       `SELECT s.*, p.project_code, p.project_name, pk.package_name
        FROM doc_agency_submissions s
        LEFT JOIN doc_review_projects p ON s.project_id = p.id
-       LEFT JOIN doc_submission_packages pk ON s.project_id = pk.project_id AND s.agency_name = pk.agency
+       LEFT JOIN doc_submission_packages pk ON s.package_id = pk.id
        ORDER BY s.submitted_date DESC`
     );
     res.json(result.rows);
@@ -196,6 +235,42 @@ router.delete('/submissions/:id', authenticateToken, async (req, res) => {
     const submission = existing.rows[0];
 
     await pool.query('DELETE FROM doc_agency_submissions WHERE id = ?', [req.params.id]);
+
+    // Sync package_status และ project_status หลังลบ
+    if (submission.package_id) {
+      // ดูว่ายังมี submission อื่นใน package นี้ไหม
+      const remaining = await pool.query(
+        'SELECT agency_status FROM doc_agency_submissions WHERE package_id = ? ORDER BY submission_round DESC LIMIT 1',
+        [submission.package_id]
+      );
+      let newPkgStatus = 'ready_to_submit'; // ถ้าไม่มี submission เหลือ
+      if (remaining.rows.length > 0) {
+        const lastStatus = remaining.rows[0].agency_status;
+        if (lastStatus === 'approved') newPkgStatus = 'approved';
+        else if (lastStatus === 'revision_requested') newPkgStatus = 'agency_revision';
+        else newPkgStatus = 'submitted_agency';
+      }
+      await pool.query(
+        'UPDATE doc_submission_packages SET package_status = ?, updated_at = datetime("now") WHERE id = ?',
+        [newPkgStatus, submission.package_id]
+      );
+    }
+
+    // Sync project_status
+    const pkgs = await pool.query('SELECT package_status FROM doc_submission_packages WHERE project_id = ?', [submission.project_id]);
+    if (pkgs.rows.length > 0) {
+      const statuses = pkgs.rows.map(p => p.package_status);
+      let newProjectStatus = 'ready_to_submit';
+      if (statuses.every(s => s === 'approved')) newProjectStatus = 'approved';
+      else if (statuses.some(s => s === 'submitted_agency')) newProjectStatus = 'submitted_agency';
+      else if (statuses.some(s => s === 'agency_revision')) newProjectStatus = 'agency_revision';
+      else if (statuses.some(s => s === 'customer_revision')) newProjectStatus = 'customer_revision';
+      else if (statuses.some(s => s === 'ready_to_submit')) newProjectStatus = 'ready_to_submit';
+      await pool.query(
+        'UPDATE doc_review_projects SET project_status = ?, updated_at = datetime("now") WHERE id = ?',
+        [newProjectStatus, submission.project_id]
+      );
+    }
 
     logActivity(req.user.id, 'delete', 'doc_agency_submission', req.params.id, {
       agency_name: submission.agency_name,

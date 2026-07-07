@@ -22,7 +22,7 @@ async function recalculatePackageStatus(packageId) {
         COUNT(*) as total,
         SUM(CASE WHEN is_required = 1 THEN 1 ELSE 0 END) as required_total,
         SUM(CASE WHEN is_required = 1 AND status = 'passed' THEN 1 ELSE 0 END) as required_passed,
-        SUM(CASE WHEN is_required = 1 AND status = 'not_received' THEN 1 ELSE 0 END) as not_received_count,
+        SUM(CASE WHEN is_required = 1 AND status IN ('not_received', 'pending') THEN 1 ELSE 0 END) as not_received_count,
         SUM(CASE WHEN is_required = 1 AND status IN ('received', 'checking') THEN 1 ELSE 0 END) as review_count,
         SUM(CASE WHEN is_required = 1 AND status IN ('needs_revision', 'customer_revision', 'failed') THEN 1 ELSE 0 END) as revision_count
       FROM doc_review_checklists
@@ -157,7 +157,7 @@ router.get('/projects/:projectId/checklists', authenticateToken, async (req, res
 // ============================================================
 router.post('/projects/:projectId/checklists', authenticateToken, async (req, res) => {
   try {
-    const { document_name, description, is_required, sort_order } = req.body;
+    const { document_name, description, is_required, sort_order, package_id } = req.body;
 
     if (!document_name) {
       return res.status(400).json({ error: 'กรุณาระบุชื่อเอกสาร' });
@@ -168,12 +168,25 @@ router.post('/projects/:projectId/checklists', authenticateToken, async (req, re
       return res.status(404).json({ error: 'ไม่พบโครงการ' });
     }
 
+    // ถ้าส่ง package_id มา ให้ตรวจสอบว่า package มีอยู่จริง
+    if (package_id) {
+      const pkgCheck = await pool.query('SELECT id FROM doc_submission_packages WHERE id = ?', [package_id]);
+      if (pkgCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'ไม่พบชุดเอกสาร' });
+      }
+    }
+
     const id = uuidv4();
     await pool.query(
-      `INSERT INTO doc_review_checklists (id, project_id, document_name, description, is_required, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, req.params.projectId, document_name, description || null, is_required !== 0 ? 1 : 0, sort_order || 0]
+      `INSERT INTO doc_review_checklists (id, project_id, package_id, document_name, description, is_required, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.params.projectId, package_id || null, document_name, description || null, is_required !== 0 ? 1 : 0, sort_order || 0]
     );
+
+    // Recalculate package status ถ้ามี package_id
+    if (package_id) {
+      await recalculatePackageStatus(package_id);
+    }
 
     logActivity(req.user.id, 'create', 'doc_review_checklist', id, { document_name });
 
@@ -253,7 +266,7 @@ router.put('/checklists/:id', authenticateToken, async (req, res) => {
     const setClauses = [];
     const values = [];
 
-    const VALID_CHECKLIST_STATUSES = ['pending', 'checking', 'customer_revision', 'passed', 'failed'];
+    const VALID_CHECKLIST_STATUSES = ['pending', 'received', 'checking', 'customer_revision', 'passed', 'failed'];
 
     if (document_name !== undefined) { setClauses.push('document_name = ?'); values.push(document_name); }
     if (description !== undefined) { setClauses.push('description = ?'); values.push(description); }
@@ -288,6 +301,14 @@ router.put('/checklists/:id', authenticateToken, async (req, res) => {
       await logTimelineEvent(req.params.id, status, eventData, req.user.id, existing.rows[0].package_id);
     }
 
+    // Recalculate package_status เมื่อ status หรือ is_required เปลี่ยน
+    const packageId = existing.rows[0].package_id;
+    const projectId = existing.rows[0].project_id;
+    if (packageId && (status !== undefined || is_required !== undefined)) {
+      await recalculatePackageStatus(packageId);
+      await syncProjectStatus(projectId);
+    }
+
     logActivity(req.user.id, 'update', 'doc_review_checklist', req.params.id, { status });
 
     const result = await pool.query('SELECT * FROM doc_review_checklists WHERE id = ?', [req.params.id]);
@@ -309,6 +330,15 @@ router.delete('/checklists/:id', authenticateToken, async (req, res) => {
     }
 
     await pool.query('DELETE FROM doc_review_checklists WHERE id = ?', [req.params.id]);
+
+    // Recalculate เพราะการลบกระทบ required_total / required_passed
+    const packageId = existing.rows[0].package_id;
+    const projectId = existing.rows[0].project_id;
+    if (packageId) {
+      await recalculatePackageStatus(packageId);
+      await syncProjectStatus(projectId);
+    }
+
     logActivity(req.user.id, 'delete', 'doc_review_checklist', req.params.id, { document_name: existing.rows[0].document_name });
 
     res.json({ message: 'ลบรายการเอกสารสำเร็จ' });
@@ -447,6 +477,55 @@ router.post('/checklists/batch-reject', authenticateToken, async (req, res) => {
 
     logActivity(req.user.id, 'batch_reject', 'doc_review_checklist', null, { count });
     res.json({ message: 'ส่งกลับ ' + count + ' รายการ', count });
+  } catch (error) {
+    console.error('[DOC_REVIEW_CHECKLISTS]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
+// BATCH: ผ่านทุกรายการที่เลือก (ไม่จำกัดสถานะ)
+// ============================================================
+router.post('/checklists/batch-force-pass', authenticateToken, async (req, res) => {
+  try {
+    const { checklist_ids } = req.body;
+    if (!Array.isArray(checklist_ids) || checklist_ids.length === 0) {
+      return res.status(400).json({ error: 'กรุณาระบุรายการ' });
+    }
+
+    const placeholders = checklist_ids.map(() => '?').join(',');
+    const items = await pool.query(
+      'SELECT id, status, project_id, package_id FROM doc_review_checklists WHERE id IN (' + placeholders + ')',
+      checklist_ids
+    );
+
+    const passed = [];
+    const skipped = [];
+    for (const item of items.rows) {
+      if (item.status === 'passed') {
+        skipped.push({ id: item.id, reason: 'ผ่านแล้ว' });
+        continue;
+      }
+      await pool.query(
+        "UPDATE doc_review_checklists SET status = 'passed', updated_at = datetime('now') WHERE id = ?",
+        [item.id]
+      );
+      await logTimelineEvent(item.id, 'passed', { force: true }, req.user.id, item.package_id);
+      passed.push(item.id);
+    }
+
+    // Recalculate package_status และ project_status
+    const affectedPackages = [...new Set(items.rows.filter(i => passed.includes(i.id)).map(i => i.package_id).filter(Boolean))];
+    for (const pkgId of affectedPackages) {
+      await recalculatePackageStatus(pkgId);
+      const pkgRow = await pool.query('SELECT project_id FROM doc_submission_packages WHERE id = ?', [pkgId]);
+      if (pkgRow.rows[0]?.project_id) {
+        await syncProjectStatus(pkgRow.rows[0].project_id);
+      }
+    }
+
+    logActivity(req.user.id, 'batch_force_pass', 'doc_review_checklist', null, { passed: passed.length, skipped: skipped.length });
+    res.json({ message: 'ผ่าน ' + passed.length + ', ข้าม ' + skipped.length, passed, skipped });
   } catch (error) {
     console.error('[DOC_REVIEW_CHECKLISTS]', error);
     res.status(500).json({ error: 'เกิดข้อผิดพลาด' });

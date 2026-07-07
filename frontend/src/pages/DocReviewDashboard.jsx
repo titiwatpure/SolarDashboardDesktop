@@ -174,9 +174,9 @@ export default function DocReviewDashboard() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pkg.total_docs > 0 ? Math.round((pkg.passed_docs / pkg.total_docs) * 100) : 0}%` }} />
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pkg.required_total > 0 ? Math.round((pkg.required_passed / pkg.required_total) * 100) : 0}%` }} />
                         </div>
-                        <span className="text-xs text-slate-500">{pkg.passed_docs || 0}/{pkg.total_docs || 0}</span>
+                        <span className="text-xs text-slate-500">{pkg.required_passed || 0}/{pkg.required_total || 0}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-slate-500">{pkg.due_date || '-'}</td>
