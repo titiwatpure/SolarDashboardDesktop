@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { documentReviewAPI, projectsAPI } from '../utils/api';
+import { documentReviewAPI, projectsAPI, usersAPI } from '../utils/api';
 
 const AGENCIES = [
   { value: 'กกพ.', label: 'กกพ. (คณะกรรมการกำกับกิจการพลังงาน)' },
@@ -25,6 +25,8 @@ export default function DocReviewNew() {
   const [existingProjects, setExistingProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [templates, setTemplates] = useState([]);
+  const [users, setUsers] = useState([]);
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const [formData, setFormData] = useState({
     project_code: '',
     project_name: '',
@@ -35,20 +37,23 @@ export default function DocReviewNew() {
     permit_type: 'pck2',
     agency: '',
     due_date: '',
+    owner_user_id: currentUser.id || '',
     notes: '',
   });
 
-  // ดึงรายการโครงการที่มีอยู่แล้ว + templates
+  // ดึงรายการโครงการที่มีอยู่แล้ว + templates + users
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoadingProjects(true);
-        const [projResult, tplResult] = await Promise.all([
+        const [projResult, tplResult, usersResult] = await Promise.all([
           projectsAPI.getAll({}),
-          documentReviewAPI.getTemplateChecklists()
+          documentReviewAPI.getTemplateChecklists(),
+          usersAPI.getAll()
         ]);
         setExistingProjects(Array.isArray(projResult) ? projResult : (projResult.data || []));
         setTemplates(Array.isArray(tplResult) ? tplResult : []);
+        setUsers(Array.isArray(usersResult) ? usersResult : (usersResult.data || []));
       } catch (err) {
         console.error('Failed to fetch data:', err);
       } finally {
@@ -235,6 +240,20 @@ export default function DocReviewNew() {
                 onChange={handleChange}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">ผู้รับผิดชอบโครงการ</label>
+              <select
+                name="owner_user_id"
+                value={formData.owner_user_id}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+              >
+                <option value="">-- ยังไม่ระบุ --</option>
+                {users.map(user => (
+                  <option key={user.id} value={user.id}>{user.full_name || user.username}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
