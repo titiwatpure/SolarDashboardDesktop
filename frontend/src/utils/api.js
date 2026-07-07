@@ -440,6 +440,9 @@ export const documentReviewAPI = {
   createChecklistsFromTemplate: (projectId, templateId) => apiCall('POST', `/doc-review/projects/${projectId}/checklists/from-template`, { template_id: templateId }),
   updateReviewChecklist: (id, data) => apiCall('PUT', `/doc-review/checklists/${id}`, data),
   deleteReviewChecklist: (id) => apiCall('DELETE', `/doc-review/checklists/${id}`),
+  batchReceiveChecklists: (projectId, data) => apiCall('POST', `/doc-review/projects/${projectId}/checklists/batch-receive`, data),
+  batchApproveChecklists: (data) => apiCall('POST', '/doc-review/checklists/batch-approve', data),
+  batchRejectChecklists: (data) => apiCall('POST', '/doc-review/checklists/batch-reject', data),
 
   // Files
   uploadReviewFile: (checklistId, formData) => {

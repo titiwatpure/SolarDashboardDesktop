@@ -191,4 +191,110 @@ router.delete('/checklists/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ============================================================
+// BATCH: บันทึกรับเอกสารที่เลือก
+// ============================================================
+router.post('/projects/:projectId/checklists/batch-receive', authenticateToken, async (req, res) => {
+  try {
+    const { checklist_ids, received_from, received_channel, received_date, file_reference, notes } = req.body;
+    if (!Array.isArray(checklist_ids) || checklist_ids.length === 0) return res.status(400).json({ error: 'กรุณาระบุรายการ' });
+    if (!received_from) return res.status(400).json({ error: 'กรุณาระบุผู้ส่งเอกสาร' });
+
+    const projectCheck = await pool.query('SELECT id FROM doc_review_projects WHERE id = ?', [req.params.projectId]);
+    if (projectCheck.rows.length === 0) return res.status(404).json({ error: 'ไม่พบโครงการ' });
+
+    const placeholders = checklist_ids.map(() => '?').join(',');
+    const items = await pool.query('SELECT id, package_id, status FROM doc_review_checklists WHERE id IN (' + placeholders + ')', checklist_ids);
+
+    const results = { received: [], skipped: [] };
+    for (const item of items.rows) {
+      if (!['not_received', 'pending', 'customer_revision', 'agency_revision', 'failed'].includes(item.status)) {
+        results.skipped.push({ id: item.id, reason: 'สถานะ ' + item.status });
+        continue;
+      }
+      if (!item.package_id) { results.skipped.push({ id: item.id, reason: 'ไม่มี package_id' }); continue; }
+
+      const revResult = await pool.query('SELECT COALESCE(MAX(revision_round), 0) + 1 as next_rev FROM document_receipts WHERE checklist_item_id = ?', [item.id]);
+
+      await pool.query(
+        'INSERT INTO document_receipts (id, checklist_item_id, package_id, received_from, received_channel, received_date, revision_round, file_reference, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [require('uuid').v4(), item.id, item.package_id, received_from, received_channel || 'other', received_date || new Date().toISOString().split('T')[0], revResult.rows[0].next_rev, file_reference || null, notes || null, req.user.id]
+      );
+      await pool.query("UPDATE doc_review_checklists SET status = 'received', updated_at = datetime('now') WHERE id = ?", [item.id]);
+      results.received.push(item.id);
+    }
+
+    logActivity(req.user.id, 'batch_receive', 'doc_review_checklist', req.params.projectId, { received: results.received.length, skipped: results.skipped.length });
+    res.json({ message: 'รับ ' + results.received.length + ' รายการ', ...results });
+  } catch (error) {
+    console.error('[DOC_REVIEW_CHECKLISTS]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
+// BATCH: ตรวจผ่านรายการที่เลือก
+// ============================================================
+router.post('/checklists/batch-approve', authenticateToken, async (req, res) => {
+  try {
+    const { checklist_ids } = req.body;
+    if (!Array.isArray(checklist_ids) || checklist_ids.length === 0) return res.status(400).json({ error: 'กรุณาระบุรายการ' });
+
+    const placeholders = checklist_ids.map(() => '?').join(',');
+    const items = await pool.query('SELECT id, status, project_id FROM doc_review_checklists WHERE id IN (' + placeholders + ')', checklist_ids);
+
+    const results = { passed: [], skipped: [] };
+    for (const item of items.rows) {
+      if (!['received', 'checking'].includes(item.status)) {
+        results.skipped.push({ id: item.id, reason: 'สถานะ ' + item.status });
+        continue;
+      }
+      const openIssues = await pool.query("SELECT COUNT(*) as c FROM document_issues WHERE checklist_item_id = ? AND status = 'open'", [item.id]);
+      if (openIssues.rows[0].c > 0) {
+        results.skipped.push({ id: item.id, reason: 'มี Issue เปิดอยู่' });
+        continue;
+      }
+      await pool.query("UPDATE doc_review_checklists SET status = 'passed', updated_at = datetime('now') WHERE id = ?", [item.id]);
+      results.passed.push(item.id);
+    }
+    logActivity(req.user.id, 'batch_approve', 'doc_review_checklist', null, { passed: results.passed.length, skipped: results.skipped.length });
+    res.json({ message: 'ผ่าน ' + results.passed.length + ', ข้าม ' + results.skipped.length, ...results });
+  } catch (error) {
+    console.error('[DOC_REVIEW_CHECKLISTS]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
+// BATCH: ส่งกลับแก้รายการที่เลือก
+// ============================================================
+router.post('/checklists/batch-reject', authenticateToken, async (req, res) => {
+  try {
+    const { checklist_ids, reason } = req.body;
+    if (!Array.isArray(checklist_ids) || checklist_ids.length === 0) return res.status(400).json({ error: 'กรุณาระบุรายการ' });
+    if (!reason) return res.status(400).json({ error: 'กรุณาระบุเหตุผล' });
+
+    const placeholders = checklist_ids.map(() => '?').join(',');
+    const items = await pool.query('SELECT id, status, project_id, package_id FROM doc_review_checklists WHERE id IN (' + placeholders + ')', checklist_ids);
+
+    let count = 0;
+    for (const item of items.rows) {
+      if (['passed', 'customer_revision', 'not_received', 'pending'].includes(item.status)) continue;
+      await pool.query("UPDATE doc_review_checklists SET status = 'customer_revision', updated_at = datetime('now') WHERE id = ?", [item.id]);
+      if (item.package_id) {
+        await pool.query(
+          "INSERT INTO document_issues (id, checklist_item_id, package_id, issue_source, description, status, created_by) VALUES (?, ?, ?, 'internal', ?, 'open', ?)",
+          [require('uuid').v4(), item.id, item.package_id, reason, req.user.id]
+        );
+      }
+      count++;
+    }
+    logActivity(req.user.id, 'batch_reject', 'doc_review_checklist', null, { count });
+    res.json({ message: 'ส่งกลับ ' + count + ' รายการ', count });
+  } catch (error) {
+    console.error('[DOC_REVIEW_CHECKLISTS]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
 module.exports = router;

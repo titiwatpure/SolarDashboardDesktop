@@ -258,6 +258,10 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
   const [selectedChecklist, setSelectedChecklist] = useState(null);
   const [receipts, setReceipts] = useState([]);
   const [receiptsLoading, setReceiptsLoading] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState([]);
+  const [showBulkReceive, setShowBulkReceive] = useState(false);
+  const [showBulkApprove, setShowBulkApprove] = useState(false);
+  const [showBulkReject, setShowBulkReject] = useState(false);
 
   const loadCommentsForChecklists = async (items) => {
     const newCommentsMap = {};
@@ -432,7 +436,12 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'checklist' && (
+      {activeTab === 'checklist' && (() => {
+        const receivable = ['not_received', 'pending', 'customer_revision', 'agency_revision', 'failed'];
+        const approvable = ['received', 'checking'];
+        const selectableIds = checklists.filter(c => receivable.includes(c.status) || approvable.includes(c.status)).map(c => c.id);
+        const allChecked = selectableIds.length > 0 && selectableIds.every(id => bulkSelected.includes(id));
+        return (
         <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-lg font-bold text-slate-900">รายการเอกสาร ({checklists.length})</h3>
@@ -440,10 +449,38 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
               + เพิ่มหัวข้อ
             </button>
           </div>
+
+          {/* Bulk Action Bar - แสดงเฉพาะเมื่อเลือก */}
+          {bulkSelected.length > 0 && (
+            <div className="px-6 py-3 bg-violet-50 border-b border-violet-200 flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-medium text-violet-700">เลือกแล้ว {bulkSelected.length} รายการ</span>
+              <div className="flex-1"></div>
+              {bulkSelected.some(id => checklists.find(c => c.id === id && receivable.includes(c.status))) && (
+                <button onClick={() => setShowBulkReceive(true)} className="px-4 py-2 rounded-xl bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700">
+                  บันทึกรับเอกสารที่เลือก
+                </button>
+              )}
+              {bulkSelected.some(id => checklists.find(c => c.id === id && approvable.includes(c.status))) && (
+                <button onClick={() => setShowBulkApprove(true)} className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700">
+                  ตรวจผ่านรายการที่เลือก
+                </button>
+              )}
+              <button onClick={() => setShowBulkReject(true)} className="px-4 py-2 rounded-xl bg-orange-500 text-xs font-semibold text-white hover:bg-orange-600">
+                ส่งกลับแก้รายการที่เลือก
+              </button>
+              <button onClick={() => setBulkSelected([])} className="px-3 py-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100">
+                ยกเลิกเลือก
+              </button>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-slate-50 text-sm text-slate-500">
                 <tr>
+                  <th className="px-3 py-3 text-center w-10">
+                    <input type="checkbox" checked={allChecked} onChange={(e) => setBulkSelected(e.target.checked ? selectableIds : [])} className="rounded border-slate-300" title="เลือกทั้งหมดที่ทำได้" />
+                  </th>
                   <th className="px-6 py-3 text-left font-semibold">ลำดับ</th>
                   <th className="px-6 py-3 text-left font-semibold">เอกสาร</th>
                   <th className="px-6 py-3 text-center font-semibold">จำเป็น</th>
@@ -452,23 +489,22 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {checklists.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
+                {checklists.map((item, index) => {
+                  const canCheck = receivable.includes(item.status) || approvable.includes(item.status);
+                  return (
+                  <tr key={item.id} className={bulkSelected.includes(item.id) ? 'bg-violet-50' : 'hover:bg-slate-50'}>
+                    <td className="px-3 py-4 text-center">
+                      {canCheck && (
+                        <input type="checkbox" checked={bulkSelected.includes(item.id)} onChange={(e) => setBulkSelected(e.target.checked ? [...bulkSelected, item.id] : bulkSelected.filter(id => id !== item.id))} className="rounded border-slate-300" />
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-slate-500">{index + 1}</td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-slate-900">{item.document_name}</p>
                       {item.description && <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => handleToggleRequired(item)}
-                        className={`text-xs px-2 py-1 rounded cursor-pointer transition font-semibold ${
-                          item.is_required
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                        }`}
-                        title="คลิกเพื่อสลับสถานะ จำเป็น / ไม่บังคับ"
-                      >
+                      <button onClick={() => handleToggleRequired(item)} className={`text-xs px-2 py-1 rounded cursor-pointer transition font-semibold ${item.is_required ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`} title="คลิกเพื่อสลับสถานะ จำเป็น / ไม่บังคับ">
                         {item.is_required ? 'จำเป็น' : 'ไม่บังคับ'}
                       </button>
                     </td>
@@ -498,12 +534,14 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </section>
-      )}
+        );
+      })()}
 
       {activeTab === 'issues' && (
         <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -754,6 +792,34 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
           packageData={pkg}
           onClose={() => setShowAgencySubmitModal(false)}
           onCreated={() => { setShowAgencySubmitModal(false); onRefresh(); }}
+        />
+      )}
+
+      {/* Bulk Receive Modal */}
+      {showBulkReceive && (
+        <BulkReceiveModal
+          projectId={pkg.project_id}
+          checklistIds={bulkSelected.filter(id => checklists.find(c => c.id === id && ['not_received', 'pending', 'customer_revision', 'agency_revision', 'failed'].includes(c.status)))}
+          onClose={() => setShowBulkReceive(false)}
+          onDone={() => { setShowBulkReceive(false); setBulkSelected([]); onRefresh(); }}
+        />
+      )}
+
+      {/* Bulk Approve Modal */}
+      {showBulkApprove && (
+        <BulkApproveModal
+          checklistIds={bulkSelected.filter(id => checklists.find(c => c.id === id && ['received', 'checking'].includes(c.status)))}
+          onClose={() => setShowBulkApprove(false)}
+          onDone={() => { setShowBulkApprove(false); setBulkSelected([]); onRefresh(); }}
+        />
+      )}
+
+      {/* Bulk Reject Modal */}
+      {showBulkReject && (
+        <BulkRejectModal
+          checklistIds={bulkSelected}
+          onClose={() => setShowBulkReject(false)}
+          onDone={() => { setShowBulkReject(false); setBulkSelected([]); onRefresh(); }}
         />
       )}
     </>
@@ -1177,6 +1243,172 @@ function CommentModal({ checklist, onClose, onCommented, openIssuesCount = 0 }) 
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// BulkReceiveModal - บันทึกรับเอกสารที่เลือก
+// ============================================================
+function BulkReceiveModal({ projectId, checklistIds, onClose, onDone }) {
+  const [formData, setFormData] = useState({ received_from: '', received_channel: 'line', received_date: new Date().toISOString().split('T')[0], file_reference: '', notes: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      await documentReviewAPI.batchReceiveChecklists(projectId, { checklist_ids: checklistIds, ...formData });
+      onDone();
+    } catch (error) {
+      alert('บันทึกไม่สำเร็จ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg m-4">
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h2 className="text-lg font-bold text-slate-900">บันทึกรับเอกสารที่เลือก ({checklistIds.length} รายการ)</h2>
+        </div>
+        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">รับจาก *</label>
+            <select value={formData.received_from} onChange={(e) => setFormData({...formData, received_from: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm" required>
+              <option value="">-- เลือก --</option>
+              <option value="ลูกค้า">ลูกค้า</option>
+              <option value="ทีม内部">ทีม内部</option>
+              <option value="หน่วยงาน">หน่วยงาน</option>
+              <option value="ผู้รับเหมา">ผู้รับเหมา</option>
+              <option value="อื่นๆ">อื่นๆ</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">ช่องทางรับเอกสาร</label>
+            <select value={formData.received_channel} onChange={(e) => setFormData({...formData, received_channel: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
+              <option value="line">LINE</option>
+              <option value="email">Email</option>
+              <option value="drive">Google Drive</option>
+              <option value="paper">เอกสารกระดาษ</option>
+              <option value="other">อื่นๆ</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">วันที่รับ</label>
+            <input type="date" value={formData.received_date} onChange={(e) => setFormData({...formData, received_date: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">เลขอ้างอิง / ไฟล์อ้างอิง</label>
+            <input type="text" value={formData.file_reference} onChange={(e) => setFormData({...formData, file_reference: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="เลขที่หนังสือ, ชื่อไฟล์" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">หมายเหตุ</label>
+            <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm resize-none" />
+          </div>
+          <div className="flex items-center justify-end gap-3 pt-4">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600">ยกเลิก</button>
+            <button type="submit" disabled={submitting || !formData.received_from} className="px-6 py-2.5 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+              {submitting ? 'กำลังบันทึก...' : 'บันทึกรับ ' + checklistIds.length + ' รายการ'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// BulkApproveModal - ตรวจผ่านรายการที่เลือก
+// ============================================================
+function BulkApproveModal({ checklistIds, onClose, onDone }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleConfirm = async () => {
+    try {
+      setSubmitting(true);
+      const res = await documentReviewAPI.batchApproveChecklists({ checklist_ids: checklistIds });
+      setResult(res);
+      if (res.passed && res.passed.length > 0) setTimeout(() => onDone(), 1500);
+    } catch (error) {
+      alert('ไม่สำเร็จ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (result) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 p-6">
+          <h2 className="text-lg font-bold text-slate-900 mb-3">ผลการตรวจ</h2>
+          <p className="text-sm text-emerald-600 font-medium">ผ่าน {result.passed.length} รายการ</p>
+          {result.skipped && result.skipped.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm text-orange-600 font-medium">ข้าม {result.skipped.length} รายการ:</p>
+              {result.skipped.map((s, i) => <p key={i} className="text-xs text-slate-500 ml-4">- {s.reason}</p>)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 p-6">
+        <h2 className="text-lg font-bold text-slate-900 mb-2">ยืนยันตรวจผ่าน</h2>
+        <p className="text-sm text-slate-600 mb-1">ตรวจผ่าน {checklistIds.length} รายการที่เลือก?</p>
+        <p className="text-xs text-slate-400 mb-4">รายการที่มี Issue เปิดอยู่จะถูกข้าม</p>
+        <div className="flex items-center justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600">ยกเลิก</button>
+          <button onClick={handleConfirm} disabled={submitting} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+            {submitting ? 'กำลังดำเนินการ...' : 'ยืนยัน'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// BulkRejectModal - ส่งกลับแก้รายการที่เลือก
+// ============================================================
+function BulkRejectModal({ checklistIds, onClose, onDone }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) return alert('กรุณาระบุเหตุผล');
+    try {
+      setSubmitting(true);
+      await documentReviewAPI.batchRejectChecklists({ checklist_ids: checklistIds, reason });
+      onDone();
+    } catch (error) {
+      alert('ไม่สำเร็จ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 p-6">
+        <h2 className="text-lg font-bold text-slate-900 mb-2">ส่งกลับแก้ไข</h2>
+        <p className="text-sm text-slate-500 mb-4">ส่งกลับ {checklistIds.length} รายการที่เลือก</p>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-slate-700 mb-1">เหตุผลที่ส่งกลับ *</label>
+          <textarea rows="3" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm resize-none" placeholder="กรอกเหตุผลที่ต้องแก้ไข..." />
+        </div>
+        <div className="flex items-center justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600">ยกเลิก</button>
+          <button onClick={handleSubmit} disabled={submitting || !reason.trim()} className="px-6 py-2.5 rounded-xl bg-orange-600 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50">
+            {submitting ? 'กำลังดำเนินการ...' : 'ส่งกลับแก้ไข'}
+          </button>
+        </div>
       </div>
     </div>
   );
