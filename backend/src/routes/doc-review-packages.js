@@ -20,7 +20,9 @@ router.get('/projects/:projectId/packages', authenticateToken, async (req, res) 
     const result = await pool.query(
       `SELECT p.*,
         (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id) as total_docs,
-        (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id AND status = 'passed') as passed_docs
+        (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id AND status = 'passed') as passed_docs,
+        (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id AND is_required = 1) as required_total,
+        (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id AND is_required = 1 AND status = 'passed') as required_passed
        FROM doc_submission_packages p
        WHERE p.project_id = ?
        ORDER BY p.sort_order, p.created_at`,
@@ -29,7 +31,8 @@ router.get('/projects/:projectId/packages', authenticateToken, async (req, res) 
 
     const packages = result.rows.map(pkg => ({
       ...pkg,
-      progress: pkg.total_docs > 0 ? Math.round((pkg.passed_docs / pkg.total_docs) * 100) : 0
+      // progress คำนวณจากเฉพาะ required docs (ให้ตรงกับ PackageDetail)
+      progress: pkg.required_total > 0 ? Math.round((pkg.required_passed / pkg.required_total) * 100) : 0
     }));
 
     res.json(packages);
@@ -123,6 +126,10 @@ router.post('/packages/:packageId/generate-checklist', authenticateToken, async 
       count: created.length
     });
 
+    // Recalculate package_status หลังสร้าง checklist
+    const { recalculatePackageStatus } = require('./doc-review-checklists');
+    await recalculatePackageStatus(req.params.packageId);
+
     res.status(201).json({ message: `สร้าง ${created.length} รายการจาก template "${template.name}"`, count: created.length });
   } catch (error) {
     console.error('[DOC_PACKAGES]', error);
@@ -138,7 +145,9 @@ router.get('/packages/:packageId', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `SELECT p.*,
         (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id) as total_docs,
-        (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id AND status = 'passed') as passed_docs
+        (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id AND status = 'passed') as passed_docs,
+        (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id AND is_required = 1) as required_total,
+        (SELECT COUNT(*) FROM doc_review_checklists WHERE package_id = p.id AND is_required = 1 AND status = 'passed') as required_passed
        FROM doc_submission_packages p
        WHERE p.id = ?`,
       [req.params.packageId]
@@ -149,7 +158,8 @@ router.get('/packages/:packageId', authenticateToken, async (req, res) => {
     }
 
     const pkg = result.rows[0];
-    pkg.progress = pkg.total_docs > 0 ? Math.round((pkg.passed_docs / pkg.total_docs) * 100) : 0;
+    // progress คำนวณจากเฉพาะ required docs เพื่อให้ตรงกับ PackageDetail
+    pkg.progress = pkg.required_total > 0 ? Math.round((pkg.required_passed / pkg.required_total) * 100) : 0;
 
     // Get checklists
     const checklists = await pool.query(
@@ -168,10 +178,21 @@ router.get('/packages/:packageId', authenticateToken, async (req, res) => {
       [req.params.packageId]
     );
 
+    // Get latest approval (Bug fix: was missing — caused approve/submit buttons to malfunction)
+    const approvals = await pool.query(
+      `SELECT a.*, u.full_name as approver_name
+       FROM doc_review_approvals a
+       LEFT JOIN users u ON a.approver_id = u.id
+       WHERE a.package_id = ?
+       ORDER BY a.approved_at DESC LIMIT 1`,
+      [req.params.packageId]
+    );
+
     res.json({
       ...pkg,
       checklists: checklists.rows,
-      latest_submission: submissions.rows[0] || null
+      latest_submission: submissions.rows[0] || null,
+      latest_approval: approvals.rows[0] || null,
     });
   } catch (error) {
     console.error('[DOC_PACKAGES]', error);
