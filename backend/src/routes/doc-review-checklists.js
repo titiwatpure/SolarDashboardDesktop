@@ -456,3 +456,4 @@ router.post('/checklists/batch-reject', authenticateToken, async (req, res) => {
 module.exports = router;
 module.exports.recalculatePackageStatus = recalculatePackageStatus;
 module.exports.syncProjectStatus = syncProjectStatus;
+module.exports.logTimelineEvent = logTimelineEvent;
