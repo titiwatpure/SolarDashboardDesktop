@@ -33,6 +33,8 @@ router.get('/', authenticateToken, async (req, res) => {
       SELECT p.*,
         (SELECT COUNT(*) FROM doc_review_checklists WHERE project_id = p.id) as total_docs,
         (SELECT COUNT(*) FROM doc_review_checklists WHERE project_id = p.id AND status = 'passed') as passed_docs,
+        (SELECT COUNT(*) FROM doc_review_checklists WHERE project_id = p.id AND is_required = 1) as required_total,
+        (SELECT COUNT(*) FROM doc_review_checklists WHERE project_id = p.id AND is_required = 1 AND status = 'passed') as required_passed,
         u.full_name as owner_name
       FROM doc_review_projects p
       LEFT JOIN users u ON p.owner_id = u.id
