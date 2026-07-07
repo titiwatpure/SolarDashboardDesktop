@@ -44,13 +44,21 @@ router.post('/checklists/:checklistId/comments', authenticateToken, async (req, 
       [newStatus, req.params.checklistId]
     );
 
-    // Auto-update project status
+    // Auto-update package_status และ project_status
     const projectCheck = await pool.query(
-      'SELECT project_id FROM doc_review_checklists WHERE id = ?',
+      'SELECT project_id, package_id FROM doc_review_checklists WHERE id = ?',
       [req.params.checklistId]
     );
     if (projectCheck.rows.length > 0) {
-      await updateProjectStatus(projectCheck.rows[0].project_id);
+      const { project_id, package_id } = projectCheck.rows[0];
+      if (package_id) {
+        // เรียก recalculatePackageStatus จาก checklists route
+        const { recalculatePackageStatus, syncProjectStatus } = require('./doc-review-checklists');
+        await recalculatePackageStatus(package_id);
+        await syncProjectStatus(project_id);
+      } else {
+        await updateProjectStatus(project_id);
+      }
     }
 
     logActivity(req.user.id, 'create', 'doc_review_comment', id, { 

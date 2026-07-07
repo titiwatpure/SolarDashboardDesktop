@@ -159,6 +159,7 @@ graph TB
         Settings_R["/settings<br/>company key-value"]
         Backup_R["/backup<br/>create, restore, vacuum"]
         Health_R["/health<br/>DB connectivity"]
+        DocReview_R["/doc-review<br/>projects, packages, checklists,<br/>comments, approvals, submissions,<br/>files, issues, receipts,<br/>template-checklists"]
     end
 
     subgraph Services["Business Logic Services"]
@@ -447,6 +448,144 @@ erDiagram
         TEXT created_by FK
     }
 
+    doc_review_projects {
+        TEXT id PK
+        TEXT project_code UK
+        TEXT project_name
+        TEXT customer_name
+        TEXT customer_phone
+        TEXT customer_email
+        TEXT customer_line
+        TEXT permit_type
+        TEXT agency
+        TEXT project_status "waiting_documents|internal_review|customer_revision|ready_to_submit|submitted_agency|agency_revision|approved"
+        DATE due_date
+        TEXT owner_id FK
+    }
+
+    doc_submission_packages {
+        TEXT id PK
+        TEXT project_id FK
+        TEXT package_name
+        TEXT permit_type
+        TEXT agency
+        TEXT package_status
+        DATE due_date
+        INTEGER sort_order
+    }
+
+    doc_review_checklists {
+        TEXT id PK
+        TEXT project_id FK
+        TEXT package_id FK
+        TEXT checklist_template_id
+        TEXT document_name
+        TEXT description
+        INTEGER is_required
+        TEXT status "pending|checking|customer_revision|passed|failed (manual update) | not_received|received (batch only)"
+        TEXT assigned_to FK
+        DATE due_date
+        INTEGER alert_sent
+        INTEGER sort_order
+    }
+
+    doc_review_files {
+        TEXT id PK
+        TEXT checklist_id FK
+        INTEGER version
+        TEXT file_name
+        TEXT file_path
+        INTEGER file_size
+        TEXT received_from
+        TEXT received_channel
+        DATE received_date
+        TEXT uploaded_by FK
+    }
+
+    doc_review_comments {
+        TEXT id PK
+        TEXT checklist_id FK
+        TEXT file_id FK
+        TEXT comment_type
+        TEXT reviewer_id FK
+        TEXT review_status
+        TEXT comment
+    }
+
+    doc_review_approvals {
+        TEXT id PK
+        TEXT project_id FK
+        TEXT approver_id FK
+        TEXT approval_status
+        TEXT comment
+        DATETIME approved_at
+    }
+
+    doc_agency_submissions {
+        TEXT id PK
+        TEXT project_id FK
+        TEXT package_id FK
+        TEXT agency_name
+        INTEGER submission_round
+        DATE submitted_date
+        TEXT agency_status "pending|approved|revision_requested|resubmitted"
+        TEXT agency_comment
+        DATE response_date
+        TEXT next_action
+    }
+
+    document_receipts {
+        TEXT id PK
+        TEXT checklist_item_id FK
+        TEXT package_id FK
+        TEXT received_from
+        TEXT received_channel
+        DATE received_date
+        INTEGER revision_round
+        TEXT file_reference
+        TEXT notes
+        TEXT created_by FK
+    }
+
+    document_issues {
+        TEXT id PK
+        TEXT checklist_item_id FK
+        TEXT package_id FK
+        TEXT issue_source "internal|agency"
+        TEXT description
+        TEXT required_action
+        TEXT status "open|resolved"
+        INTEGER revision_round
+        TEXT created_by FK
+        DATETIME resolved_at
+    }
+
+    doc_review_template_checklists {
+        TEXT id PK
+        TEXT name
+        TEXT permit_type
+        TEXT agency
+        INTEGER is_active
+    }
+
+    doc_review_template_items {
+        TEXT id PK
+        TEXT template_id FK
+        TEXT document_name
+        TEXT description
+        INTEGER is_required
+        INTEGER sort_order
+    }
+
+    correction_reports {
+        TEXT id PK
+        TEXT package_id FK
+        TEXT issues "JSON array of issue IDs"
+        TEXT exported_format "pdf|excel"
+        DATETIME exported_at
+        TEXT created_by FK
+    }
+
     users ||--o{ projects : "responsible_user"
     users ||--o{ customers : "user_id"
     users ||--o{ documents : "upload_by"
@@ -485,6 +624,20 @@ erDiagram
     quotations ||--o{ quotation_items : "quotation_id"
     contracts ||--o{ payment_installments : "contract_id"
     accounting_categories ||--o{ transactions : "category_id"
+
+    doc_review_projects ||--o{ doc_submission_packages : "project_id"
+    doc_review_projects ||--o{ doc_review_checklists : "project_id"
+    doc_review_projects ||--o{ doc_review_approvals : "project_id"
+    doc_review_projects ||--o{ doc_agency_submissions : "project_id"
+    doc_submission_packages ||--o{ doc_review_checklists : "package_id"
+    doc_submission_packages ||--o{ doc_agency_submissions : "package_id"
+    doc_submission_packages ||--o{ document_receipts : "package_id"
+    doc_submission_packages ||--o{ document_issues : "package_id"
+    doc_submission_packages ||--o{ correction_reports : "package_id"
+    doc_review_checklists ||--o{ doc_review_files : "checklist_id"
+    doc_review_checklists ||--o{ doc_review_comments : "checklist_id"
+    doc_review_checklists ||--o{ document_receipts : "checklist_item_id"
+    doc_review_checklists ||--o{ document_issues : "checklist_item_id"
 ```
 
 ## 5. Project Workflow Pipeline
@@ -535,7 +688,98 @@ stateDiagram-v2
     end note
 ```
 
-## 6. Authentication & Authorization Flow
+## 6. Document Review & Agency Submission Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> waiting_documents: สร้างโครงการ + Checklist
+    
+    waiting_documents --> internal_review: บันทึกรับเอกสาร
+    internal_review --> customer_revision: ตรวจไม่ผ่าน
+    internal_review --> ready_to_submit: required checklist ผ่านครบ
+    
+    customer_revision --> internal_review: ลูกค้าแก้ไขแล้ว
+    
+    ready_to_submit --> submitted_agency: ยื่นหน่วยงาน
+    
+    submitted_agency --> agency_revision: หน่วยงานให้แก้
+    submitted_agency --> approved: หน่วยงานอนุมัติ
+    
+    agency_revision --> internal_review: แก้ไขแล้ว
+```
+
+### Status Flow Details
+
+```mermaid
+flowchart TD
+    subgraph ChecklistStatus["Checklist Status"]
+        CS1["not_received"] -->|บันทึกรับเอกสาร| CS2["received"]
+        CS2 -->|เริ่มตรวจ| CS3["checking"]
+        CS3 -->|ตรวจผ่าน| CS4["passed"]
+        CS3 -->|ตรวจไม่ผ่าน| CS5["customer_revision"]
+        CS5 -->|ลูกค้าแก้แล้ว| CS2
+    end
+
+    subgraph PackageStatus["Package Status (auto-calculate)"]
+        PS1["waiting_documents"] 
+        PS2["internal_review"]
+        PS3["customer_revision"]
+        PS4["ready_to_submit"]
+        PS5["submitted_agency"]
+        PS6["approved"]
+    end
+
+    CS1 -->|มี not_received| PS1
+    CS2 -->|มี received/checking| PS2
+    CS5 -->|มี revision หรือ open issues| PS3
+    CS4 -->|required ผ่านครบ| PS4
+    PS4 -->|ยื่นหน่วยงาน| PS5
+    PS5 -->|อนุมัติ| PS6
+```
+
+### Batch Actions
+| Action | Backend Endpoint | Effect |
+|--------|------------------|--------|
+| บันทึกรับเอกสารที่เลือก | `POST /checklists/batch-receive` | สร้าง receipt records + เปลี่ยน status เป็น received |
+| ตรวจผ่านรายการที่เลือก | `POST /checklists/batch-approve` | เปลี่ยน status เป็น passed (ข้าม items ที่มี issue open) |
+| ส่งกลับแก้รายการที่เลือก | `POST /checklists/batch-reject` | เปลี่ยน status เป็น customer_revision + สร้าง issue records |
+
+### API Endpoints
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/doc-review/projects` | GET/POST | CRUD โครงการ |
+| `/api/doc-review/projects/:id` | GET/PUT/DELETE | รายละเอียดโครงการ |
+| `/api/doc-review/dashboard/summary` | GET | สรุปสถานะทั้งหมด |
+| `/api/doc-review/packages` | GET/POST | CRUD ชุดเอกสาร |
+| `/api/doc-review/packages/:id` | GET/PUT/DELETE | รายละเอียดชุดเอกสาร |
+| `/api/doc-review/packages/:id/generate-checklist` | POST | สร้าง checklist จาก template |
+| `/api/doc-review/checklists` | GET/POST/PUT/DELETE | CRUD รายการตรวจสอบ |
+| `/api/doc-review/checklists/batch-receive` | POST | บันทึกรับเอกสารที่เลือก |
+| `/api/doc-review/checklists/batch-approve` | POST | ตรวจผ่านรายการที่เลือก |
+| `/api/doc-review/checklists/batch-reject` | POST | ส่งกลับแก้รายการที่เลือก |
+| `/api/doc-review/comments` | GET/POST | คอมเมนต์ตรวจสอบ |
+| `/api/doc-review/approvals` | GET/POST | อนุมัติภายใน |
+| `/api/doc-review/submissions` | GET/POST/PUT/DELETE | ยื่นหน่วยงาน |
+| `/api/doc-review/files` | GET/POST/DELETE | จัดการไฟล์ |
+| `/api/doc-review/issues` | GET/POST/PUT | ปัญหาที่ต้องแก้ไข |
+| `/api/doc-review/receipts` | GET/POST | บันทึกการรับเอกสาร |
+| `/api/doc-review/correction-reports` | GET/POST | รายงานแก้ไขเอกสาร |
+| `/api/doc-review/template-checklists` | GET/POST/PUT/DELETE | Template Checklist |
+| `/api/doc-review/template-checklists/:id/copy` | POST | คัดลอก template |
+
+### Frontend Pages
+| Page | Route | Description |
+|------|-------|-------------|
+| DocReviewDashboard | `/doc-review` | แดชบอร์ดสรุปสถานะ |
+| DocReviewNew | `/doc-review/new` | สร้างโครงการใหม่ |
+| DocReviewDetail | `/doc-review/:id` | รายละเอียดโครงการ + ชุดเอกสาร |
+| DocReviewTemplateChecklists | `/doc-review/templates` | จัดการ Template |
+| DocReviewAgencyTracking | `/doc-review/agency-tracking` | ติดตามการยื่นหน่วยงาน |
+| DocReviewCorrectionReport | `/doc-review/correction-report/:id` | รายงานแก้ไขเอกสาร |
+
+---
+
+## 7. Authentication & Authorization Flow
 
 ```mermaid
 sequenceDiagram
@@ -569,7 +813,7 @@ sequenceDiagram
     Frontend->>Frontend: Update localStorage
 ```
 
-## 7. Electron Architecture
+## 8. Electron Architecture
 
 ```mermaid
 graph TB
@@ -612,7 +856,7 @@ graph TB
     Bridge -->|exposes| React
 ```
 
-## 8. Risk Detection Algorithm
+## 9. Risk Detection Algorithm
 
 ```mermaid
 flowchart TD
@@ -639,7 +883,7 @@ flowchart TD
     Critical --> Update
 ```
 
-## 9. Deployment Architecture
+## 10. Deployment Architecture
 
 ```mermaid
 graph TB

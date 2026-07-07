@@ -13,6 +13,82 @@ const { checklistTemplates } = require('../seed-checklist-templates.cjs');
 const router = express.Router();
 
 // ============================================================
+// Helper: คำนวณ package_status ใหม่ตาม checklist
+// ============================================================
+async function recalculatePackageStatus(packageId) {
+  try {
+    const summary = await pool.query(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN is_required = 1 THEN 1 ELSE 0 END) as required_total,
+        SUM(CASE WHEN is_required = 1 AND status = 'passed' THEN 1 ELSE 0 END) as required_passed,
+        SUM(CASE WHEN is_required = 1 AND status = 'not_received' THEN 1 ELSE 0 END) as not_received_count,
+        SUM(CASE WHEN is_required = 1 AND status IN ('received', 'checking') THEN 1 ELSE 0 END) as review_count,
+        SUM(CASE WHEN is_required = 1 AND status IN ('needs_revision', 'customer_revision', 'failed') THEN 1 ELSE 0 END) as revision_count
+      FROM doc_review_checklists
+      WHERE package_id = ?
+    `, [packageId]);
+
+    const issues = await pool.query(`
+      SELECT COUNT(*) as open_issues
+      FROM document_issues
+      WHERE package_id = ? AND status = 'open'
+    `, [packageId]);
+
+    const currentPkg = await pool.query('SELECT package_status FROM doc_submission_packages WHERE id = ?', [packageId]);
+    if (currentPkg.rows.length === 0) return;
+    const currentStatus = currentPkg.rows[0].package_status;
+
+    // ไม่ overwrite สถานะที่ถูกล็อก
+    if (['submitted_agency', 'approved'].includes(currentStatus)) return;
+
+    const s = summary.rows[0];
+    const openIssues = issues.rows[0].open_issues;
+    let nextStatus = 'waiting_documents';
+
+    if (s.revision_count > 0 || openIssues > 0) {
+      nextStatus = 'customer_revision';
+    } else if (s.required_total > 0 && s.required_passed === s.required_total) {
+      nextStatus = 'ready_to_submit';
+    } else if (s.not_received_count > 0) {
+      nextStatus = 'waiting_documents';
+    } else if (s.review_count > 0) {
+      nextStatus = 'internal_review';
+    }
+
+    if (nextStatus !== currentStatus) {
+      await pool.query('UPDATE doc_submission_packages SET package_status = ?, updated_at = datetime("now") WHERE id = ?', [nextStatus, packageId]);
+    }
+  } catch (error) {
+    console.error('[RECALCULATE_PACKAGE_STATUS]', error);
+  }
+}
+
+// ============================================================
+// Helper: sync project_status จาก package_status ทั้งหมด
+// ============================================================
+async function syncProjectStatus(projectId) {
+  try {
+    const pkgs = await pool.query('SELECT package_status FROM doc_submission_packages WHERE project_id = ?', [projectId]);
+    if (pkgs.rows.length === 0) return;
+
+    const statuses = pkgs.rows.map(p => p.package_status);
+    let projectStatus = 'waiting_documents';
+
+    if (statuses.every(s => s === 'approved')) projectStatus = 'approved';
+    else if (statuses.some(s => s === 'submitted_agency')) projectStatus = 'submitted_agency';
+    else if (statuses.some(s => s === 'agency_revision')) projectStatus = 'agency_revision';
+    else if (statuses.some(s => s === 'customer_revision')) projectStatus = 'customer_revision';
+    else if (statuses.some(s => s === 'ready_to_submit')) projectStatus = 'ready_to_submit';
+    else if (statuses.some(s => s === 'internal_review')) projectStatus = 'internal_review';
+
+    await pool.query('UPDATE doc_review_projects SET project_status = ?, updated_at = datetime("now") WHERE id = ?', [projectStatus, projectId]);
+  } catch (error) {
+    console.error('[SYNC_PROJECT_STATUS]', error);
+  }
+}
+
+// ============================================================
 // GET /api/doc-review/projects/:projectId/checklists
 // ============================================================
 router.get('/projects/:projectId/checklists', authenticateToken, async (req, res) => {
@@ -224,6 +300,13 @@ router.post('/projects/:projectId/checklists/batch-receive', authenticateToken, 
       results.received.push(item.id);
     }
 
+    // Recalculate package_status สำหรับแต่ละ package ที่ได้รับผลกระทบ
+    const affectedPackages = [...new Set(items.rows.filter(i => results.received.includes(i.id)).map(i => i.package_id).filter(Boolean))];
+    for (const pkgId of affectedPackages) {
+      await recalculatePackageStatus(pkgId);
+      await syncProjectStatus((await pool.query('SELECT project_id FROM doc_submission_packages WHERE id = ?', [pkgId])).rows[0]?.project_id);
+    }
+
     logActivity(req.user.id, 'batch_receive', 'doc_review_checklist', req.params.projectId, { received: results.received.length, skipped: results.skipped.length });
     res.json({ message: 'รับ ' + results.received.length + ' รายการ', ...results });
   } catch (error) {
@@ -257,6 +340,17 @@ router.post('/checklists/batch-approve', authenticateToken, async (req, res) => 
       await pool.query("UPDATE doc_review_checklists SET status = 'passed', updated_at = datetime('now') WHERE id = ?", [item.id]);
       results.passed.push(item.id);
     }
+
+    // Recalculate package_status สำหรับแต่ละ package ที่ได้รับผลกระทบ
+    const affectedPackages = [...new Set(items.rows.filter(i => results.passed.includes(i.id)).map(i => i.project_id).filter(Boolean))];
+    for (const projId of affectedPackages) {
+      const pkgRows = await pool.query('SELECT id FROM doc_submission_packages WHERE project_id = ?', [projId]);
+      for (const pkg of pkgRows.rows) {
+        await recalculatePackageStatus(pkg.id);
+      }
+      await syncProjectStatus(projId);
+    }
+
     logActivity(req.user.id, 'batch_approve', 'doc_review_checklist', null, { passed: results.passed.length, skipped: results.skipped.length });
     res.json({ message: 'ผ่าน ' + results.passed.length + ', ข้าม ' + results.skipped.length, ...results });
   } catch (error) {
@@ -289,6 +383,14 @@ router.post('/checklists/batch-reject', authenticateToken, async (req, res) => {
       }
       count++;
     }
+
+    // Recalculate package_status สำหรับแต่ละ package ที่ได้รับผลกระทบ
+    const affectedPackages = [...new Set(items.rows.filter(i => ['passed', 'customer_revision', 'not_received', 'pending'].includes(i.status) === false).map(i => i.package_id).filter(Boolean))];
+    for (const pkgId of affectedPackages) {
+      await recalculatePackageStatus(pkgId);
+      await syncProjectStatus((await pool.query('SELECT project_id FROM doc_submission_packages WHERE id = ?', [pkgId])).rows[0]?.project_id);
+    }
+
     logActivity(req.user.id, 'batch_reject', 'doc_review_checklist', null, { count });
     res.json({ message: 'ส่งกลับ ' + count + ' รายการ', count });
   } catch (error) {
@@ -298,3 +400,5 @@ router.post('/checklists/batch-reject', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.recalculatePackageStatus = recalculatePackageStatus;
+module.exports.syncProjectStatus = syncProjectStatus;
