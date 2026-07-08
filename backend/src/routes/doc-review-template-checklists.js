@@ -130,7 +130,7 @@ router.post('/', authenticateToken, authorizeRole(['admin', 'engineer']), async 
       await tx.query(
         `INSERT INTO document_checklists (id, name, permit_type, document_type, agency, source, is_template, created_by)
          VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
-        [id, name, permit_type, document_type || null, agency || null, source || null, req.user.id]
+        [id, name, permit_type, document_type || '', agency || null, source || null, req.user.id]
       );
 
       const itemIds = [];
@@ -152,8 +152,8 @@ router.post('/', authenticateToken, authorizeRole(['admin', 'engineer']), async 
     const template = await pool.query('SELECT * FROM document_checklists WHERE id = ?', [id]);
     res.status(201).json({ ...template.rows[0], items: items.map((item, i) => ({ id: createdItems[i], ...item })) });
   } catch (error) {
-    console.error('[DOC_REVIEW_TEMPLATE_CHECKLISTS]', error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    console.error('[DOC_REVIEW_TEMPLATE_CHECKLISTS] POST / error:', error.message);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด', detail: error.message });
   }
 });
 
