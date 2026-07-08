@@ -93,14 +93,14 @@ router.post('/projects/:projectId/submit', authenticateToken, async (req, res) =
       submitted_date
     });
 
-    // บันทึก timeline สำหรับ checklist items ที่เกี่ยวข้อง
+    // บันทึก timeline 1 ครั้งต่อ 1 submission (ไม่ใช่ทุก checklist)
     const { logTimelineEvent } = require('./doc-review-checklists');
-    const checklists = await pool.query(
-      'SELECT id, package_id FROM doc_review_checklists WHERE project_id = ? AND package_id IS NOT NULL',
+    const firstChecklist = await pool.query(
+      'SELECT id, package_id FROM doc_review_checklists WHERE project_id = ? AND package_id IS NOT NULL LIMIT 1',
       [req.params.projectId]
     );
-    for (const cl of checklists.rows) {
-      await logTimelineEvent(cl.id, 'submitted', { agency_name, round: result.nextRound }, req.user.id, cl.package_id);
+    if (firstChecklist.rows.length > 0) {
+      await logTimelineEvent(firstChecklist.rows[0].id, 'submitted', { agency_name, round: result.nextRound }, req.user.id, firstChecklist.rows[0].package_id);
     }
 
     res.status(201).json(result.submission);
@@ -196,6 +196,13 @@ router.get('/submissions', authenticateToken, async (req, res) => {
        FROM doc_agency_submissions s
        LEFT JOIN doc_review_projects p ON s.project_id = p.id
        LEFT JOIN doc_submission_packages pk ON s.package_id = pk.id
+       WHERE s.id IN (
+         SELECT id FROM (
+           SELECT id, package_id, agency_name,
+             ROW_NUMBER() OVER (PARTITION BY package_id, agency_name ORDER BY submission_round DESC) as rn
+           FROM doc_agency_submissions
+         ) WHERE rn = 1
+       )
        ORDER BY s.submitted_date DESC`
     );
     res.json(result.rows);
