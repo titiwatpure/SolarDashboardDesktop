@@ -484,7 +484,9 @@ export const documentReviewAPI = {
   getTemplateChecklist: (id) => apiCall('GET', `/doc-review/template-checklists/${id}`),
   createTemplateChecklist: (data) => apiCall('POST', '/doc-review/template-checklists', data),
   updateTemplateChecklist: (id, data) => apiCall('PUT', `/doc-review/template-checklists/${id}`, data),
-  deleteTemplateChecklist: (id) => apiCall('DELETE', `/doc-review/template-checklists/${id}`),
+  deleteTemplateChecklist: (id) => { invalidateCache('GET:/doc-review'); return apiCall('DELETE', `/doc-review/template-checklists/${id}`); },
+  getTemplateAgencies: () => apiCall('GET', '/doc-review/template-checklists/agencies'),
+  getTemplatePermitTypes: (agency) => apiCall('GET', `/doc-review/template-checklists/permit-types${agency ? '?agency=' + encodeURIComponent(agency) : ''}`),
   copyTemplateChecklist: (id, data) => apiCall('POST', `/doc-review/template-checklists/${id}/copy`, data),
 
   // Document Receipts - บันทึกการรับเอกสารจากลูกค้า

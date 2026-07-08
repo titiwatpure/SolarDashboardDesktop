@@ -7,16 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { documentReviewAPI } from '../utils/api';
 import { useToast } from '../components/Toast';
 
-const PERMIT_TYPES = [
-  { value: 'construction_permit', label: 'ขออนุญาตก่อสร้าง (อ.1)' },
-  { value: 'factory_exemption', label: 'แจ้งประกอบกิจการ (รง.4)' },
-  { value: 'controlled_energy', label: 'ใบอนุญาตผลิตพลังงานควบคุม (พค.2)' },
-  { value: 'cop', label: 'COP ประมวลหลักการปฏิบัติ' },
-  { value: 'erc_license', label: 'ขอรับใบอนุญาตผลิตไฟฟ้า (กกพ.)' },
-  { value: 'grid_connection_pea', label: 'ต่อสาย PEA' },
-  { value: 'grid_connection_mea', label: 'ต่อสาย MEA' },
-  { value: 'renewal', label: 'ขอต่ออายุใบอนุญาต' },
-];
+const PERMIT_TYPES = [];
 
 export default function DocReviewTemplateChecklists() {
   const navigate = useNavigate();
@@ -29,9 +20,13 @@ export default function DocReviewTemplateChecklists() {
   const [filterPermitType, setFilterPermitType] = useState('');
   const [showDetail, setShowDetail] = useState(false);
   const [detailTemplate, setDetailTemplate] = useState(null);
+  const [permitTypes, setPermitTypes] = useState([]);
+  const [agencies, setAgencies] = useState([]);
 
   useEffect(() => {
     loadTemplates();
+    loadPermitTypes();
+    loadAgencies();
   }, [search, filterPermitType]);
 
   const loadTemplates = async () => {
@@ -48,6 +43,20 @@ export default function DocReviewTemplateChecklists() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadPermitTypes = async () => {
+    try {
+      const result = await documentReviewAPI.getTemplatePermitTypes();
+      setPermitTypes(Array.isArray(result) ? result : []);
+    } catch (e) { console.error(e); }
+  };
+
+  const loadAgencies = async () => {
+    try {
+      const result = await documentReviewAPI.getTemplateAgencies();
+      setAgencies(Array.isArray(result) ? result : []);
+    } catch (e) { console.error(e); }
   };
 
   const handleDelete = async (id, name) => {
@@ -113,8 +122,8 @@ export default function DocReviewTemplateChecklists() {
             className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
           >
             <option value="">ทุกประเภทใบอนุญาต</option>
-            {PERMIT_TYPES.map(pt => (
-              <option key={pt.value} value={pt.value}>{pt.label}</option>
+            {permitTypes.map(pt => (
+              <option key={pt.permit_type} value={pt.permit_type}>{pt.name}</option>
             ))}
           </select>
         </div>
@@ -148,7 +157,7 @@ export default function DocReviewTemplateChecklists() {
                   <tr key={template.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 font-medium text-slate-900">{template.name}</td>
                     <td className="px-6 py-4 text-slate-600">
-                      {PERMIT_TYPES.find(pt => pt.value === template.permit_type)?.label || template.permit_type}
+                      {permitTypes.find(pt => pt.permit_type === template.permit_type)?.name || template.permit_type}
                     </td>
                     <td className="px-6 py-4 text-slate-600">{template.agency || '-'}</td>
                     <td className="px-6 py-4 text-slate-600">{template.item_count || 0} รายการ</td>
@@ -209,17 +218,21 @@ export default function DocReviewTemplateChecklists() {
       {showForm && (
         <TemplateForm
           template={editingTemplate}
+          agencies={agencies}
+          permitTypes={permitTypes}
           onClose={() => { setShowForm(false); setEditingTemplate(null); }}
-          onSaved={() => { setShowForm(false); setEditingTemplate(null); loadTemplates(); }}
+          onSaved={() => { setShowForm(false); setEditingTemplate(null); loadTemplates(); loadPermitTypes(); loadAgencies(); }}
         />
       )}
     </div>
   );
 }
 
-function TemplateForm({ template, onClose, onSaved }) {
+function TemplateForm({ template, agencies, permitTypes, onClose, onSaved }) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [newAgency, setNewAgency] = useState('');
+  const [showNewAgency, setShowNewAgency] = useState(false);
   const [formData, setFormData] = useState({
     name: template?.name || '',
     permit_type: template?.permit_type || 'controlled_energy',
@@ -324,20 +337,46 @@ function TemplateForm({ template, onClose, onSaved }) {
                   onChange={(e) => setFormData({ ...formData, permit_type: e.target.value })}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
                 >
-                  {PERMIT_TYPES.map(pt => (
-                    <option key={pt.value} value={pt.value}>{pt.label}</option>
+                  {permitTypes.map(pt => (
+                    <option key={pt.permit_type} value={pt.permit_type}>{pt.name}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">หน่วยงาน</label>
-                <input
-                  type="text"
-                  value={formData.agency}
-                  onChange={(e) => setFormData({ ...formData, agency: e.target.value })}
-                  placeholder="เช่น กกพ., พพ., PEA"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
-                />
+                {showNewAgency ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newAgency}
+                      onChange={(e) => setNewAgency(e.target.value)}
+                      placeholder="พิมพ์ชื่อหน่วยงานใหม่"
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+                    />
+                    <button type="button" onClick={() => {
+                      if (newAgency.trim()) {
+                        setFormData({ ...formData, agency: newAgency.trim() });
+                        setShowNewAgency(false);
+                        setNewAgency('');
+                      }
+                    }} className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg">เพิ่ม</button>
+                    <button type="button" onClick={() => setShowNewAgency(false)} className="px-3 py-1 text-xs bg-slate-200 text-slate-600 rounded-lg">ยกเลิก</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <select
+                      value={formData.agency}
+                      onChange={(e) => setFormData({ ...formData, agency: e.target.value })}
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+                    >
+                      <option value="">-- เลือกหน่วยงาน --</option>
+                      {agencies.map(a => (
+                        <option key={a} value={a}>{a}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => setShowNewAgency(true)} className="px-3 py-1 text-xs bg-emerald-600 text-white rounded-lg whitespace-nowrap">+ ใหม่</button>
+                  </div>
+                )}
               </div>
             </div>
 

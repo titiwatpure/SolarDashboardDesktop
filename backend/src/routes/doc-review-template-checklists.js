@@ -12,6 +12,42 @@ const { logActivity } = require('./activity_logs');
 const router = express.Router();
 
 // ============================================================
+// GET /api/doc-review/template-checklists/agencies - รายชื่อหน่วยงานที่มี template
+// ============================================================
+router.get('/agencies', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT agency FROM document_checklists WHERE is_template = 1 AND agency IS NOT NULL ORDER BY agency`
+    );
+    res.json(result.rows.map(r => r.agency));
+  } catch (error) {
+    console.error('[DOC_REVIEW_AGENCIES]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
+// GET /api/doc-review/template-checklists/permit-types - ประเภทใบอนุญาตที่มี template
+// ============================================================
+router.get('/permit-types', authenticateToken, async (req, res) => {
+  try {
+    const { agency } = req.query;
+    let query = `SELECT DISTINCT permit_type, name FROM document_checklists WHERE is_template = 1`;
+    const params = [];
+    if (agency) {
+      query += ' AND agency = ?';
+      params.push(agency);
+    }
+    query += ' ORDER BY permit_type';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('[DOC_REVIEW_PERMIT_TYPES]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
 // GET /api/doc-review/template-checklists - ดูรายการ Template ทั้งหมด
 // ============================================================
 router.get('/', authenticateToken, async (req, res) => {

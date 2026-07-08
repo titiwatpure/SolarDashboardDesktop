@@ -36,25 +36,6 @@ const CHECKLIST_STATUS = {
   failed: { label: 'ไม่ผ่าน', color: 'bg-red-100 text-red-700' }
 };
 
-const PERMIT_TYPES = {
-  pck2: 'พค.2 ใบอนุญาตผลิตพลังงานควบคุม',
-  a1: 'อ.1 ขออนุญาตก่อสร้าง',
-  rong4: 'รง.4 แจ้งประกอบกิจการ',
-  erc: 'อนุมัติ กกพ.',
-  sld: 'SLD ผังระบบไฟฟ้า'
-};
-
-const TEMPLATE_OPTIONS = [
-  { id: 'tpl-permit-pck2', name: 'พค.2 ใบอนุญาตผลิตพลังงานควบคุม', count: 12 },
-  { id: 'tpl-permit-a1', name: 'อ.1 ขออนุญาตก่อสร้าง', count: 10 },
-  { id: 'tpl-permit-rong4', name: 'รง.4 แจ้งประกอบกิจการ', count: 7 },
-  { id: 'tpl-permit-erc', name: 'อนุมัติ กกพ.', count: 10 },
-  { id: 'tpl-permit-sld-pea', name: 'SLD ผังระบบไฟฟ้า (PEA)', count: 7 },
-  { id: 'tpl-permit-sld-mea', name: 'SLD ผังระบบไฟฟ้า (MEA)', count: 8 },
-  { id: 'tpl-permit-cop', name: 'COP ประมวลหลักการปฏิบัติ', count: 6 },
-  { id: 'tpl-renewal', name: 'ขอต่ออายุใบอนุญาต', count: 5 },
-];
-
 export default function DocReviewDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -888,13 +869,17 @@ function PackageDetail({ pkg, onBack, onComment, onRefresh, onDeletePackage }) {
 // AddPackageModal Component
 // ============================================================
 function AddPackageModal({ projectId, onClose, onCreated }) {
-  const [formData, setFormData] = useState({ package_name: '', permit_type: 'pck2', agency: '', due_date: '' });
+  const [formData, setFormData] = useState({ package_name: '', permit_type: 'controlled_energy', agency: '', due_date: '' });
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [permitTypes, setPermitTypes] = useState([]);
+  const [agencies, setAgencies] = useState([]);
 
   useEffect(() => {
     loadTemplates();
+    loadPermitTypes();
+    loadAgencies();
   }, []);
 
   const loadTemplates = async () => {
@@ -907,6 +892,20 @@ function AddPackageModal({ projectId, onClose, onCreated }) {
     } finally {
       setTemplatesLoading(false);
     }
+  };
+
+  const loadPermitTypes = async () => {
+    try {
+      const result = await documentReviewAPI.getTemplatePermitTypes();
+      setPermitTypes(Array.isArray(result) ? result : []);
+    } catch (e) { console.error(e); }
+  };
+
+  const loadAgencies = async () => {
+    try {
+      const result = await documentReviewAPI.getTemplateAgencies();
+      setAgencies(Array.isArray(result) ? result : []);
+    } catch (e) { console.error(e); }
   };
 
   const handleSubmit = async (e) => {
@@ -984,12 +983,15 @@ function AddPackageModal({ projectId, onClose, onCreated }) {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">ประเภทใบอนุญาต</label>
             <select value={formData.permit_type} onChange={(e) => setFormData({...formData, permit_type: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
-              {Object.entries(PERMIT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              {permitTypes.map(pt => <option key={pt.permit_type} value={pt.permit_type}>{pt.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">หน่วยงาน</label>
-            <input type="text" value={formData.agency} onChange={(e) => setFormData({...formData, agency: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="เช่น กกพ./พพ." />
+            <select value={formData.agency} onChange={(e) => setFormData({...formData, agency: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
+              <option value="">-- เลือกหน่วยงาน --</option>
+              {agencies.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">กำหนดส่ง</label>
