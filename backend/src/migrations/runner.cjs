@@ -16,6 +16,13 @@ async function runMigrations(db) {
     });
   });
 
+  const execSql = (sql) => new Promise((resolve, reject) => {
+    db.exec(sql, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+
   const allSql = (sql, params = []) => new Promise((resolve, reject) => {
     db.all(sql, params, (err, rows) => {
       if (err) reject(err);
@@ -58,7 +65,7 @@ async function runMigrations(db) {
       if (typeof migration.up === 'function') {
         await migration.up(runSql);
       } else if (typeof migration.up === 'string') {
-        await runSql(migration.up);
+        await execSql(migration.up);
       } else {
         throw new Error(`Migration ${file} ไม่มี up() function หรือ SQL string`);
       }
