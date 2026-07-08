@@ -178,14 +178,63 @@ let mainWindow;
 
 async function initializeDatabase() {
   const isFirstRun = !fs.existsSync(dbPath);
+
   if (isFirstRun) {
     console.log('First run: initializing database...');
-  } else {
-    console.log('Existing database found: running migrations...');
+    const { initDB } = require('../backend/src/init-db.cjs');
+    await initDB();
+    console.log('Database ready.');
+    return;
   }
-  const { initDB } = require('../backend/src/init-db.cjs');
-  await initDB();
-  console.log('Database ready.');
+
+  // Fast path: แค่รัน migrations ที่ยังไม่ได้ run (ไม่ CREATE TABLE ซ้ำ)
+  const sqlite3 = require('sqlite3').verbose();
+  return new Promise((resolve) => {
+    const db = new sqlite3.Database(dbPath);
+    const runSql = (sql, params = []) => new Promise((ok, no) => {
+      db.run(sql, params, (err) => err ? no(err) : ok());
+    });
+    const allSql = (sql, params = []) => new Promise((ok, no) => {
+      db.all(sql, params, (err, rows) => err ? no(err) : ok(rows));
+    });
+
+    allSql('SELECT name FROM schema_migrations ORDER BY name').then(async (rows) => {
+      const applied = new Set((rows || []).map(r => r.name));
+      const fs = require('fs');
+      const pathMod = require('path');
+      const migDir = pathMod.join(__dirname, '..', 'backend', 'src', 'migrations');
+      const files = fs.readdirSync(migDir).filter(f => f.match(/^\d{3}_.*\.cjs$/)).sort();
+      let ran = 0;
+
+      for (const file of files) {
+        const name = file.replace('.cjs', '');
+        if (applied.has(name)) continue;
+        console.log(`  Running migration: ${name}`);
+        const migration = require(pathMod.join(migDir, file));
+        if (typeof migration.up === 'function') {
+          await migration.up(runSql);
+        } else if (typeof migration.up === 'string') {
+          await new Promise((ok, no) => db.exec(migration.up, (err) => err ? no(err) : ok()));
+        }
+        await runSql('INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)', [name]);
+        ran++;
+      }
+
+      if (ran > 0) {
+        console.log(`Applied ${ran} migrations.`);
+      } else {
+        console.log('All migrations up to date.');
+      }
+      db.close(resolve);
+    }).catch((err) => {
+      console.error('Migration check failed, running full init:', err.message);
+      db.close(async () => {
+        const { initDB } = require('../backend/src/init-db.cjs');
+        await initDB();
+        resolve();
+      });
+    });
+  });
 }
 
 // ──────────────────────────────────────────────
