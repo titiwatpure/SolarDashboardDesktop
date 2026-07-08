@@ -228,11 +228,15 @@ export default function DocReviewTemplateChecklists() {
   );
 }
 
-function TemplateForm({ template, agencies, permitTypes, onClose, onSaved }) {
+function TemplateForm({ template, agencies: agenciesProp, permitTypes: permitTypesProp, onClose, onSaved }) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [newAgency, setNewAgency] = useState('');
   const [showNewAgency, setShowNewAgency] = useState(false);
+  const [newPermitType, setNewPermitType] = useState('');
+  const [showNewPermitType, setShowNewPermitType] = useState(false);
+  const [localPermitTypes, setLocalPermitTypes] = useState(permitTypesProp || []);
+  const [localAgencies, setLocalAgencies] = useState(agenciesProp || []);
   const [formData, setFormData] = useState({
     name: template?.name || '',
     permit_type: template?.permit_type || 'controlled_energy',
@@ -332,15 +336,42 @@ function TemplateForm({ template, agencies, permitTypes, onClose, onSaved }) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">ประเภทใบอนุญาต</label>
-                <select
-                  value={formData.permit_type}
-                  onChange={(e) => setFormData({ ...formData, permit_type: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
-                >
-                  {permitTypes.map(pt => (
-                    <option key={pt.permit_type} value={pt.permit_type}>{pt.name}</option>
-                  ))}
-                </select>
+                {showNewPermitType ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newPermitType}
+                      onChange={(e) => setNewPermitType(e.target.value)}
+                      placeholder="พิมพ์ชื่อประเภทใหม่"
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+                      autoFocus
+                    />
+                    <button type="button" onClick={() => {
+                      if (newPermitType.trim()) {
+                        const slug = newPermitType.trim().toLowerCase().replace(/\s+/g, '_');
+                        const name = newPermitType.trim();
+                        setFormData({ ...formData, permit_type: slug });
+                        setLocalPermitTypes(prev => [...prev, { permit_type: slug, name }]);
+                        setShowNewPermitType(false);
+                        setNewPermitType('');
+                      }
+                    }} className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg">เพิ่ม</button>
+                    <button type="button" onClick={() => setShowNewPermitType(false)} className="px-3 py-1 text-xs bg-slate-200 text-slate-600 rounded-lg">ยกเลิก</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <select
+                      value={formData.permit_type}
+                      onChange={(e) => setFormData({ ...formData, permit_type: e.target.value })}
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+                    >
+                      {localPermitTypes.map(pt => (
+                        <option key={pt.permit_type} value={pt.permit_type}>{pt.name}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => setShowNewPermitType(true)} className="px-3 py-1 text-xs bg-emerald-600 text-white rounded-lg whitespace-nowrap">+ ใหม่</button>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">หน่วยงาน</label>
@@ -355,7 +386,9 @@ function TemplateForm({ template, agencies, permitTypes, onClose, onSaved }) {
                     />
                     <button type="button" onClick={() => {
                       if (newAgency.trim()) {
-                        setFormData({ ...formData, agency: newAgency.trim() });
+                        const val = newAgency.trim();
+                        setFormData({ ...formData, agency: val });
+                        setLocalAgencies(prev => prev.includes(val) ? prev : [...prev, val]);
                         setShowNewAgency(false);
                         setNewAgency('');
                       }
@@ -370,7 +403,7 @@ function TemplateForm({ template, agencies, permitTypes, onClose, onSaved }) {
                       className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
                     >
                       <option value="">-- เลือกหน่วยงาน --</option>
-                      {agencies.map(a => (
+                      {localAgencies.map(a => (
                         <option key={a} value={a}>{a}</option>
                       ))}
                     </select>

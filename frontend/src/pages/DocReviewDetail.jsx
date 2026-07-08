@@ -875,6 +875,12 @@ function AddPackageModal({ projectId, onClose, onCreated }) {
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [permitTypes, setPermitTypes] = useState([]);
   const [agencies, setAgencies] = useState([]);
+  const [localPermitTypes, setLocalPermitTypes] = useState([]);
+  const [localAgencies, setLocalAgencies] = useState([]);
+  const [newAgency, setNewAgency] = useState('');
+  const [showNewAgency, setShowNewAgency] = useState(false);
+  const [newPermitType, setNewPermitType] = useState('');
+  const [showNewPermitType, setShowNewPermitType] = useState(false);
 
   useEffect(() => {
     loadTemplates();
@@ -897,14 +903,18 @@ function AddPackageModal({ projectId, onClose, onCreated }) {
   const loadPermitTypes = async () => {
     try {
       const result = await documentReviewAPI.getTemplatePermitTypes();
-      setPermitTypes(Array.isArray(result) ? result : []);
+      const arr = Array.isArray(result) ? result : [];
+      setPermitTypes(arr);
+      setLocalPermitTypes(arr);
     } catch (e) { console.error(e); }
   };
 
   const loadAgencies = async () => {
     try {
       const result = await documentReviewAPI.getTemplateAgencies();
-      setAgencies(Array.isArray(result) ? result : []);
+      const arr = Array.isArray(result) ? result : [];
+      setAgencies(arr);
+      setLocalAgencies(arr);
     } catch (e) { console.error(e); }
   };
 
@@ -982,16 +992,44 @@ function AddPackageModal({ projectId, onClose, onCreated }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">ประเภทใบอนุญาต</label>
-            <select value={formData.permit_type} onChange={(e) => setFormData({...formData, permit_type: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
-              {permitTypes.map(pt => <option key={pt.permit_type} value={pt.permit_type}>{pt.name}</option>)}
-            </select>
+            {showNewPermitType ? (
+              <div className="flex gap-2">
+                <input type="text" value={newPermitType} onChange={(e) => setNewPermitType(e.target.value)} placeholder="พิมพ์ชื่อประเภทใบอนุญาตใหม่"
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400" autoFocus />
+                <button type="button" onClick={() => { if (newPermitType.trim()) { const slug = newPermitType.trim().toLowerCase().replace(/\s+/g, '_'); const name = newPermitType.trim(); setFormData({...formData, permit_type: slug}); setLocalPermitTypes(prev => [...prev, { permit_type: slug, name }]); setShowNewPermitType(false); setNewPermitType(''); } }}
+                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg">เพิ่ม</button>
+                <button type="button" onClick={() => setShowNewPermitType(false)}
+                  className="px-3 py-1 text-xs bg-slate-200 text-slate-600 rounded-lg">ยกเลิก</button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select value={formData.permit_type} onChange={(e) => setFormData({...formData, permit_type: e.target.value})} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
+                  {localPermitTypes.map(pt => <option key={pt.permit_type} value={pt.permit_type}>{pt.name}</option>)}
+                </select>
+                <button type="button" onClick={() => setShowNewPermitType(true)} className="px-3 py-1 text-xs bg-emerald-600 text-white rounded-lg whitespace-nowrap">+ ใหม่</button>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">หน่วยงาน</label>
-            <select value={formData.agency} onChange={(e) => setFormData({...formData, agency: e.target.value})} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
-              <option value="">-- เลือกหน่วยงาน --</option>
-              {agencies.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
+            {showNewAgency ? (
+              <div className="flex gap-2">
+                <input type="text" value={newAgency} onChange={(e) => setNewAgency(e.target.value)} placeholder="พิมพ์ชื่อหน่วยงานใหม่"
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400" autoFocus />
+                <button type="button" onClick={() => { if (newAgency.trim()) { const val = newAgency.trim(); setFormData({...formData, agency: val}); setLocalAgencies(prev => prev.includes(val) ? prev : [...prev, val]); setShowNewAgency(false); setNewAgency(''); } }}
+                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg">เพิ่ม</button>
+                <button type="button" onClick={() => setShowNewAgency(false)}
+                  className="px-3 py-1 text-xs bg-slate-200 text-slate-600 rounded-lg">ยกเลิก</button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select value={formData.agency} onChange={(e) => setFormData({...formData, agency: e.target.value})} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
+                  <option value="">-- เลือกหน่วยงาน --</option>
+                  {localAgencies.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                <button type="button" onClick={() => setShowNewAgency(true)} className="px-3 py-1 text-xs bg-emerald-600 text-white rounded-lg whitespace-nowrap">+ ใหม่</button>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">กำหนดส่ง</label>
