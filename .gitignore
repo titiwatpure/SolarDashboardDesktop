@@ -23,6 +23,7 @@ coverage/
 
 # Uploads
 backend/uploads/
+uploads/
 
 # OS
 Thumbs.db
