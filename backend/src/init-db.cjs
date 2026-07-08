@@ -562,6 +562,14 @@ const initDB = async () => {
     console.error('❌ Error seeding data:', err);
   }
 
+  // Seed template checklists
+  try {
+    const { seedTemplates } = require('./scripts/seed-template-checklists');
+    await seedTemplates();
+  } catch (err) {
+    console.error('❌ Error seeding template checklists:', err);
+  }
+
   // ปิด database หลังจากสร้างเสร็จ
   db.close(() => {
     console.log('✅ ฐานข้อมูล SQLite สร้างสำเร็จ!');
