@@ -1537,10 +1537,11 @@ function TimelineTab({ packageId }) {
   const loadTimeline = async () => {
     try {
       setLoading(true);
-      const checklistsRes = await documentReviewAPI.getReviewChecklists(packageId);
+      const pkgDetail = await documentReviewAPI.getPackage(packageId);
+      const checklists = pkgDetail?.checklists || [];
       const allTimeline = [];
 
-      for (const cl of (Array.isArray(checklistsRes) ? checklistsRes : [])) {
+      for (const cl of checklists) {
         try {
           const tl = await documentReviewAPI.getChecklistTimeline(cl.id);
           if (Array.isArray(tl)) {
