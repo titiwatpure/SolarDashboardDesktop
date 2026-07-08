@@ -67,11 +67,29 @@
 
 ระบบอนุมัติหน่วยงาน: pending -> approved / rejected (พร้อมเหตุผล)
 
-### จัดการเอกสาร
-- **Upload ไฟล์จริง** รองรับ PDF, Word, Excel, PowerPoint, รูปภาพ, ZIP/RAR (สูงสุด 50MB)
-- Drag-and-drop file upload
-- ดาวน์โหลดไฟล์จากในระบบ
-- ตรวจสอบและติดตามสถานะเอกสาร
+### ระบบตรวจสอบเอกสาร (Doc Review)
+- **Checklist Management** -- สร้าง/แก้ไข/ลบ checklist items จาก template หรือสร้างเอง
+- **Template Checklists** -- template เช็คลิสต์สำหรับ COP, ใบอนุญาต, เอกสารแต่ละประเภท
+- **Package Management** -- จัดกลุ่มเอกสารเป็นชุด (package) ต่อโครงการ
+- **Status Flow** -- waiting_documents → ready_to_submit → submitted_agency → approved
+- **Checklist Status** -- pending → received → checking → passed / failed / customer_revision
+- **Dashboard API** -- แสดง required_total / required_passed / % progress ต่อ package
+- **Recalculate Status** -- `recalculatePackageStatus()` อัปเดตสถานะอัตโนมัติจาก checklist items
+
+### ระบบติดตามการยื่นหน่วยงาน (Agency Tracking)
+- **Submit to Agency** -- ยื่นเอกสารให้หน่วยงาน (กกพ., PEA, MEA, ฯลฯ)
+- **Submission Rounds** -- ติดตามรอบการยื่น (round 1, 2, 3...) ต่อ package/agency
+- **Status Tabs** -- ทั้งหมด / รอตรวจสอบ / อนุมัติแล้ว / ให้แก้ไข / ยื่นใหม่แล้ว
+- **Latest Round Display** -- แสดงเฉพาะรอบล่าสุดต่อ package/agency (ลดข้อมูลซ้ำ)
+- **Expand History** -- กดดูประวัติย้อนหลังทั้งหมด (ทุกรอบการยื่น)
+- **Record Response** -- บันทึกผลจากหน่วยงาน: อนุมัติ / ให้แก้ไข / ยื่นใหม่
+
+### ระบบ Timeline (ประวัติการดำเนินงาน)
+- **Vertical Timeline** -- แสดงผลแบบ Thailand Post style (green checkmarks, dashed lines)
+- **Event Types** -- received, passed, failed, revision, issue, issue_resolved, submitted
+- **Backend INSERT** -- บันทึก timeline 1 ครั้งต่อ 1 action (ไม่ใช่ N ครั้งต่อ N checklists)
+- **Per-checklist Display** -- TimelineTab โหลด timeline จาก `getPackage()` → `.checklists` → loop `getChecklistTimeline()`
+- **Backfill Script** -- `backend/src/scripts/backfill-timeline.js` สำหรับข้อมูลเดิม
 
 ### รายงาน (9 ประเภท)
 1. **สรุปตามสถานะ** -- Pie Chart สัดส่วนสถานะโครงการ
@@ -274,6 +292,16 @@ Dashboard/
 │   │   │   ├── contracts.js     # Contracts CRUD
 │   │   │   ├── quotations.js    # Quotations CRUD + Items
 │   │   │   ├── accounting.js    # Categories + Transactions + Installments
+│   │   │   ├── doc-review-projects.js   # Doc Review CRUD
+│   │   │   ├── doc-review-packages.js   # Package management + generate-checklist
+│   │   │   ├── doc-review-checklists.js # Checklist CRUD + batch ops + timeline + logTimelineEvent
+│   │   │   ├── doc-review-submissions.js # Agency submissions + history
+│   │   │   ├── doc-review-comments.js   # Checklist comments + status updates
+│   │   │   ├── doc-review-issues.js     # Issue tracking + resolution
+│   │   │   ├── doc-review-receipts.js   # Document receipt recording
+│   │   │   ├── doc-review-approvals.js  # Internal approvals
+│   │   │   ├── doc-review-template-checklists.js # Template management
+│   │   │   ├── doc-review-correction-reports.js  # Correction reports
 │   │   │   ├── portal.js        # Customer portal (read-only)
 │   │   │   └── settings.js      # Company settings
 │   │   ├── services/
@@ -286,6 +314,8 @@ Dashboard/
 │   │   ├── database.js          # SQLite connection (pool interface)
 │   │   ├── init-db.cjs          # Database init + seed (22 tables)
 │   │   └── index.js             # Express server
+│   │   └── scripts/
+│   │       └── backfill-timeline.js  # Backfill timeline from receipts/issues/submissions
 │   ├── uploads/                 # Uploaded files
 │   ├── __tests__/               # Jest + Supertest tests
 │   ├── Dockerfile
@@ -327,6 +357,10 @@ Dashboard/
 │   │   │   ├── Contracts.jsx    # /contracts (contract management)
 │   │   │   ├── Accounting.jsx   # /accounting (finance + installments)
 │   │   │   ├── CustomerPortal.jsx # /portal (customer self-service)
+│   │   │   ├── DocReviewDashboard.jsx  # /doc-review (Doc Review main)
+│   │   │   ├── DocReviewDetail.jsx     # /doc-review/:id (project detail + packages + timeline)
+│   │   │   ├── DocReviewAgencyTracking.jsx # /doc-review/agency-tracking
+│   │   │   ├── DocReviewTemplateChecklists.jsx # /doc-review/template-checklists
 │   │   │   └── NetworkMap.jsx   # /map (project locations)
 │   │   ├── utils/
 │   │   │   ├── api.js           # API client + auto token refresh
@@ -523,6 +557,40 @@ Dashboard/
 ### Settings
 - `GET /api/settings/company` - ข้อมูลบริษัท
 - `PUT /api/settings/company` - อัปเดตข้อมูลบริษัท
+
+### Doc Review - Projects
+- `GET /api/doc-review` - รายการโครงการ Doc Review
+- `POST /api/doc-review` - สร้างโครงการ
+- `GET /api/doc-review/:id` - รายละเอียดโครงการ
+- `PUT /api/doc-review/:id` - อัปเดตโครงการ
+- `DELETE /api/doc-review/:id` - ลบโครงการ
+
+### Doc Review - Packages
+- `GET /api/doc-review/projects/:id/packages` - ชุดเอกสารของโครงการ
+- `POST /api/doc-review/projects/:id/packages` - สร้างชุดเอกสาร
+- `GET /api/doc-review/packages/:id` - รายละเอียดชุดเอกสาร (พร้อม checklists)
+- `POST /api/doc-review/packages/:id/generate-checklist` - สร้าง checklist จาก template
+
+### Doc Review - Checklists
+- `GET /api/doc-review/projects/:projectId/checklists` - รายการ checklist ของโครงการ
+- `PUT /api/doc-review/checklists/:id` - อัปเดตสถานะ checklist
+- `POST /api/doc-review/checklists/batch-receive` - บันทึกรับเอกสารหลายคน
+- `POST /api/doc-review/checklists/batch-approve` - อนุมัติหลายคน
+- `POST /api/doc-review/checklists/batch-reject` - ปฏิเสธหลายคน
+- `POST /api/doc-review/checklists/batch-force-pass` - บังคับผ่านหลายคน
+- `GET /api/doc-review/checklists/:id/timeline` - Timeline ของ checklist item
+
+### Doc Review - Agency Submissions
+- `GET /api/doc-review/submissions` - รายการยื่นหน่วยงานทั้งหมด (round ล่าสุด)
+- `GET /api/doc-review/submissions/history?package_id=&agency_name=` - ประวัติย้อนหลัง
+- `POST /api/doc-review/projects/:id/submit` - ยื่นหน่วยงาน
+- `PUT /api/doc-review/submissions/:id` - บันทึกผลจากหน่วยงาน
+- `DELETE /api/doc-review/submissions/:id` - ลบรายการยื่น
+
+### Doc Review - Issues
+- `GET /api/doc-review/issues` - รายการปัญหาทั้งหมด
+- `POST /api/doc-review/checklists/:checklistId/issues` - สร้างปัญหา
+- `PUT /api/doc-review/issues/:id` - อัปเดตสถานะปัญหา
 
 ### Backup (Admin)
 - `POST /api/backup` - สำรองฐานข้อมูล
