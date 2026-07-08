@@ -28,6 +28,9 @@ export default function DocReviewAgencyTracking() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('');
   const [editSub, setEditSub] = useState(null);
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -67,6 +70,26 @@ export default function DocReviewAgencyTracking() {
   };
 
   const filtered = filterStatus ? submissions.filter(s => s.agency_status === filterStatus) : submissions;
+
+  const toggleExpand = async (sub) => {
+    const key = sub.package_id + '|' + sub.agency_name;
+    if (expandedRow === key) {
+      setExpandedRow(null);
+      setHistoryData([]);
+      return;
+    }
+    setExpandedRow(key);
+    setHistoryLoading(true);
+    try {
+      const data = await documentReviewAPI.getSubmissionHistory(sub.package_id, sub.agency_name);
+      setHistoryData(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+      setHistoryData([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   if (loading) return <div className="flex items-center justify-center py-20"><p className="text-slate-400">กำลังโหลด...</p></div>;
 
@@ -113,10 +136,14 @@ export default function DocReviewAgencyTracking() {
             <tbody className="divide-y divide-slate-100 text-sm">
               {filtered.length === 0 ? (
                 <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-400">ยังไม่มีประวัติการยื่นหน่วยงาน</td></tr>
-              ) : filtered.map(sub => (
-                <tr key={sub.id} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 cursor-pointer" onClick={() => navigate(`/doc-review/${sub.project_id}`)}>
-                    <p className="font-medium text-blue-600">{sub.project_code}</p>
+              ) : filtered.map(sub => {
+                const expandKey = sub.package_id + '|' + sub.agency_name;
+                const isExpanded = expandedRow === expandKey;
+                const hasHistory = sub.submission_round > 1;
+                return [
+                <tr key={sub.id} className={`hover:bg-slate-50 ${hasHistory ? 'cursor-pointer' : ''}`} onClick={() => hasHistory && toggleExpand(sub)}>
+                  <td className="px-6 py-4" onClick={(e) => { e.stopPropagation(); navigate(`/doc-review/${sub.project_id}`); }}>
+                    <p className="font-medium text-blue-600 hover:underline">{sub.project_code}</p>
                     <p className="text-xs text-slate-500">{sub.project_name}</p>
                   </td>
                   <td className="px-6 py-4 text-slate-700">{sub.package_name || '-'}</td>
@@ -133,6 +160,11 @@ export default function DocReviewAgencyTracking() {
                   <td className="px-6 py-4 text-slate-600 text-xs max-w-[200px] truncate">{sub.agency_comment || '-'}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
+                      {hasHistory && (
+                        <button onClick={(e) => { e.stopPropagation(); toggleExpand(sub); }} className={`px-2 py-1 rounded text-xs font-medium transition ${isExpanded ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} title="ดูประวัติย้อนหลัง">
+                          {isExpanded ? 'ซ่อน' : `${sub.submission_round - 1} รายการ`}
+                        </button>
+                      )}
                       {sub.agency_status === 'pending' && (
                         <button onClick={() => setEditSub(sub)} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-xs font-medium text-white hover:bg-indigo-700">
                           บันทึกผล
@@ -151,8 +183,35 @@ export default function DocReviewAgencyTracking() {
                        </button>
                      </div>
                    </td>
-                </tr>
-              ))}
+                </tr>,
+                isExpanded && (
+                  <tr key={expandKey + '-history'}>
+                    <td colSpan={8} className="px-6 py-3 bg-slate-50">
+                      {historyLoading ? (
+                        <div className="text-center py-3 text-sm text-slate-400">กำลังโหลดประวัติ...</div>
+                      ) : historyData.length <= 1 ? (
+                        <div className="text-center py-3 text-sm text-slate-400">ไม่มีประวัติย้อนหลัง</div>
+                      ) : (
+                        <div className="space-y-2 ml-4">
+                          <p className="text-xs font-semibold text-slate-500 mb-2">ประวัติการยื่นทั้งหมด ({historyData.length} ครั้ง)</p>
+                          {historyData.map((h, i) => (
+                            <div key={h.id} className={`flex items-center gap-4 p-2 rounded-lg text-xs ${i === 0 ? 'bg-indigo-50 border border-indigo-200' : 'bg-white border border-slate-200'}`}>
+                              <span className="font-semibold text-slate-600">รอบ {h.submission_round}</span>
+                              <span>{h.submitted_date || '-'}</span>
+                              <span className={`px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[h.agency_status] || 'bg-slate-100 text-slate-600'}`}>
+                                {STATUS_LABELS[h.agency_status] || h.agency_status}
+                              </span>
+                              {h.agency_comment && <span className="text-slate-500 truncate max-w-[300px]">{h.agency_comment}</span>}
+                              {i === 0 && <span className="ml-auto text-indigo-600 font-semibold">ล่าสุด</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+                ];
+              })}
             </tbody>
           </table>
         </div>

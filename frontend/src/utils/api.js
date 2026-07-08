@@ -477,6 +477,7 @@ export const documentReviewAPI = {
   deleteSubmission: (submissionId) => { invalidateCache('GET:/doc-review'); return apiCall('DELETE', `/doc-review/submissions/${submissionId}`); },
   getProjectSubmissions: (projectId) => apiCall('GET', `/doc-review/projects/${projectId}/submissions`),
   getAllSubmissions: () => cachedGET('/doc-review/submissions', 30_000),
+  getSubmissionHistory: (packageId, agencyName) => apiCall('GET', `/doc-review/submissions/history?package_id=${packageId}&agency_name=${encodeURIComponent(agencyName)}`),
 
   // Template Checklists
   getTemplateChecklists: (params) => apiCall('GET', `/doc-review/template-checklists?${new URLSearchParams(params || {})}`),

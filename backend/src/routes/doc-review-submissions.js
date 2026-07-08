@@ -213,6 +213,31 @@ router.get('/submissions', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
+// GET /api/doc-review/submissions/history?package_id=&agency_name=
+// ============================================================
+router.get('/submissions/history', authenticateToken, async (req, res) => {
+  try {
+    const { package_id, agency_name } = req.query;
+    if (!package_id || !agency_name) {
+      return res.status(400).json({ error: 'ต้องระบุ package_id และ agency_name' });
+    }
+    const result = await pool.query(
+      `SELECT s.*, p.project_code, p.project_name, pk.package_name
+       FROM doc_agency_submissions s
+       LEFT JOIN doc_review_projects p ON s.project_id = p.id
+       LEFT JOIN doc_submission_packages pk ON s.package_id = pk.id
+       WHERE s.package_id = ? AND s.agency_name = ?
+       ORDER BY s.submission_round DESC`,
+      [package_id, agency_name]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('[DOC_REVIEW_SUBMISSIONS_HISTORY]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
 // GET /api/doc-review/projects/:projectId/submissions
 // ============================================================
 router.get('/projects/:projectId/submissions', authenticateToken, async (req, res) => {
