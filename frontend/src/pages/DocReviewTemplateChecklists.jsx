@@ -311,14 +311,14 @@ function TemplateForm({ template, agencies: agenciesProp, permitTypes: permitTyp
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200">
+      <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+        <div className="px-8 py-5 border-b border-slate-200">
           <h2 className="text-xl font-bold text-slate-900">
             {template ? 'แก้ไข Template' : 'สร้าง Template ใหม่'}
           </h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[60vh]">
+        <form onSubmit={handleSubmit} className="p-8 overflow-y-auto max-h-[65vh]">
           <div className="space-y-4">
             {/* Template Info */}
             <div>
@@ -333,7 +333,7 @@ function TemplateForm({ template, agencies: agenciesProp, permitTypes: permitTyp
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">ประเภทใบอนุญาต</label>
                 {showNewPermitType ? (
@@ -343,7 +343,7 @@ function TemplateForm({ template, agencies: agenciesProp, permitTypes: permitTyp
                       value={newPermitType}
                       onChange={(e) => setNewPermitType(e.target.value)}
                       placeholder="พิมพ์ชื่อประเภทใหม่"
-                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none focus:border-blue-400 focus:bg-white"
                       autoFocus
                     />
                     <button type="button" onClick={() => {
@@ -363,7 +363,7 @@ function TemplateForm({ template, agencies: agenciesProp, permitTypes: permitTyp
                     <select
                       value={formData.permit_type}
                       onChange={(e) => setFormData({ ...formData, permit_type: e.target.value })}
-                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none focus:border-blue-400 focus:bg-white"
                     >
                       {localPermitTypes.map(pt => (
                         <option key={pt.permit_type} value={pt.permit_type}>{pt.name}</option>
@@ -382,7 +382,7 @@ function TemplateForm({ template, agencies: agenciesProp, permitTypes: permitTyp
                       value={newAgency}
                       onChange={(e) => setNewAgency(e.target.value)}
                       placeholder="พิมพ์ชื่อหน่วยงานใหม่"
-                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none focus:border-blue-400 focus:bg-white"
                     />
                     <button type="button" onClick={() => {
                       if (newAgency.trim()) {
@@ -400,7 +400,7 @@ function TemplateForm({ template, agencies: agenciesProp, permitTypes: permitTyp
                     <select
                       value={formData.agency}
                       onChange={(e) => setFormData({ ...formData, agency: e.target.value })}
-                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none focus:border-blue-400 focus:bg-white"
                     >
                       <option value="">-- เลือกหน่วยงาน --</option>
                       {localAgencies.map(a => (
@@ -492,7 +492,7 @@ function TemplateForm({ template, agencies: agenciesProp, permitTypes: permitTyp
           </div>
         </form>
 
-        <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
+        <div className="px-8 py-5 border-t border-slate-200 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
