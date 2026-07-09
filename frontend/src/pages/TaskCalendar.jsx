@@ -26,6 +26,12 @@ const QUICK_FILTERS = [
   { key: 'thisWeek', label: 'สัปดาห์นี้' }, { key: 'urgent', label: 'เร่งด่วน' }, { key: 'myTasks', label: 'งานของฉัน' },
 ];
 
+// Month work-range bar sizing (larger UI)
+const MONTH_BAR_ROW_PX = 30;
+const MONTH_BAR_HEIGHT_PX = 24;
+const MONTH_OVERFLOW_ROW_PX = 28;
+const MONTH_DAY_HEADER_PX = 56;
+
 // ===== Helpers =====
 function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDayOfMonth(y, m) { return new Date(y, m, 1).getDay(); }
@@ -92,11 +98,11 @@ function TaskChip({ task, onClick, isOverdueFn, isMyTaskFn, users }) {
   const a = users.find(u => u.id === task.assigned_to);
   return (
     <button onClick={onClick} title={a ? `${task.title} — ${a.full_name}` : task.title}
-      className={`w-full text-left rounded border px-2 py-1.5 text-[11px] leading-tight transition-all hover:shadow-sm ${getEventStyle(task, isOverdueFn)}`}>
-      <div className="flex items-center gap-1">
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_COLORS[task.priority] || 'bg-slate-300'}`} />
+      className={`w-full text-left rounded-md border px-2.5 py-2 text-[12px] leading-tight transition-all hover:shadow-sm ${getEventStyle(task, isOverdueFn)}`}>
+      <div className="flex items-center gap-1.5">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_COLORS[task.priority] || 'bg-slate-300'}`} />
         <span className="truncate font-medium">{task.title}</span>
-        {a && <UserAvatar name={a.full_name} userId={a.id} size="w-4 h-4 text-[7px]" />}
+        {a && <UserAvatar name={a.full_name} userId={a.id} size="w-5 h-5 text-[8px]" />}
       </div>
     </button>
   );
@@ -243,11 +249,69 @@ export default function TaskCalendar() {
   }, [filteredTasks, todayKey]);
 
   const workload = useMemo(() => {
+    const priorityWeight = { urgent: 5, high: 3, medium: 2, low: 1 };
+    const statusWeight = { pending: 0.9, in_progress: 1.0, completed: 0, cancelled: 0 };
+    const roleCapacity = { admin: 16, engineer: 14, staff: 12 };
+
     const m = {};
-    users.filter(u => u.role !== 'client').forEach(u => { m[u.id] = { user: u, total: 0, active: 0, overdue: 0 }; });
-    filteredTasks.forEach(t => { if (t.assigned_to && m[t.assigned_to]) { m[t.assigned_to].total++; if (t.status !== 'completed' && t.status !== 'cancelled') m[t.assigned_to].active++; if (isOverdue(t.due_date, t.status)) m[t.assigned_to].overdue++; } });
-    return Object.values(m).filter(w => w.total > 0).sort((a, b) => b.active - a.active);
-  }, [filteredTasks, users, isOverdue]);
+    users.filter(u => u.role !== 'client').forEach(u => {
+      m[u.id] = {
+        user: u,
+        total: 0,
+        active: 0,
+        overdue: 0,
+        urgent: 0,
+        loadScore: 0,
+        capacity: roleCapacity[u.role] || 12,
+      };
+    });
+
+    const today0 = new Date();
+    today0.setHours(0, 0, 0, 0);
+
+    filteredTasks.forEach(t => {
+      if (!t.assigned_to || !m[t.assigned_to]) return;
+
+      const row = m[t.assigned_to];
+      row.total++;
+
+      const isClosed = t.status === 'completed' || t.status === 'cancelled';
+      if (isClosed) return;
+
+      row.active++;
+      if (t.priority === 'urgent' || t.priority === 'high') row.urgent++;
+
+      const p = priorityWeight[t.priority] || 1;
+      const s = statusWeight[t.status] ?? 1;
+
+      let dueFactor = 1;
+      if (t.due_date) {
+        const due = new Date(t.due_date);
+        due.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((due - today0) / 86400000);
+
+        if (diffDays < 0) {
+          dueFactor = 1.5;
+          row.overdue++;
+        } else if (diffDays <= 2) {
+          dueFactor = 1.3;
+        } else if (diffDays <= 7) {
+          dueFactor = 1.1;
+        }
+      }
+
+      row.loadScore += (p * s * dueFactor);
+    });
+
+    return Object.values(m)
+      .filter(w => w.total > 0)
+      .map(w => {
+        const utilization = Math.round((w.loadScore / w.capacity) * 100);
+        const level = utilization >= 130 ? 'overload' : utilization > 100 ? 'high' : utilization >= 70 ? 'normal' : 'light';
+        return { ...w, utilization, level };
+      })
+      .sort((a, b) => b.utilization - a.utilization || b.loadScore - a.loadScore);
+  }, [filteredTasks, users]);
 
   const selectedDayTasks = useMemo(() => {
     if (!selectedDate) return [];
@@ -337,20 +401,20 @@ export default function TaskCalendar() {
         {/* Day headers */}
         <div className="grid grid-cols-7 border-b border-slate-200">
           {days.map((d, i) => { const tf = isToday(d); return (
-            <div key={i} className={`py-2.5 text-center border-r border-slate-100 last:border-r-0 ${tf ? 'bg-blue-50' : 'bg-slate-50'}`}>
-              <p className={`text-[10px] font-medium ${tf ? 'text-blue-600' : 'text-slate-400'}`}>{DAYS_TH[d.getDay()]}</p>
-              <p className={`inline-flex items-center justify-center w-7 h-7 mt-0.5 text-sm font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-700'}`}>{d.getDate()}</p>
+              <div key={i} className={`py-3.5 text-center border-r border-slate-100 last:border-r-0 ${tf ? 'bg-blue-50' : 'bg-slate-50'}`}>
+                <p className={`text-[11px] font-medium ${tf ? 'text-blue-600' : 'text-slate-400'}`}>{DAYS_TH[d.getDay()]}</p>
+                <p className={`inline-flex items-center justify-center w-9 h-9 mt-1 text-base font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-700'}`}>{d.getDate()}</p>
             </div>
           );})}
         </div>
 
         {/* Chip rows — dueDate mode */}
         {displayMode === 'dueDate' && (
-          <div className="grid grid-cols-7 min-h-[200px]">
+          <div className="grid grid-cols-7 min-h-[280px]">
             {days.map((d, i) => { const dt = getTasksForDay(d); return (
-              <div key={i} className="border-r border-slate-100 last:border-r-0 p-1 space-y-1">
+              <div key={i} className="border-r border-slate-100 last:border-r-0 p-1.5 space-y-1.5">
                 {dt.slice(0, 4).map(t => <TaskChip key={t.id} task={t} onClick={() => setSelectedTask(t)} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
-                {dt.length > 4 && <p className="text-[9px] text-slate-400 text-center">+{dt.length - 4}</p>}
+                {dt.length > 4 && <p className="text-[10px] text-slate-400 text-center">+{dt.length - 4}</p>}
               </div>
             );})}
           </div>
@@ -358,11 +422,11 @@ export default function TaskCalendar() {
 
         {/* Bar rows — workRange mode */}
         {displayMode === 'workRange' && (
-          <div className="min-h-[200px] bg-slate-50/50 p-1">
+          <div className="min-h-[260px] bg-slate-50/50 p-2">
             {Array.from({ length: displayLaneCount }, (_, lane) => {
               const laneSegs = displaySegments.filter(s => s.lane === lane);
               return (
-                <div key={lane} className="grid grid-cols-7 gap-0 h-[28px] mb-1">
+                <div key={lane} className="grid grid-cols-7 gap-0 h-[36px] mb-1.5">
                   {Array.from({ length: 7 }, (_, col) => {
                     const seg = laneSegs.find(s => col >= s.startCol && col <= s.endCol);
                     if (!seg) return <div key={col} />;
@@ -376,10 +440,10 @@ export default function TaskCalendar() {
                       <div key={col} className="flex items-center">
                         <button onClick={() => setSelectedTask(seg.task)}
                           title={`${seg.task.title}${a ? ` — ${a.full_name}` : ''} (${formatLocalDate(seg.start)} → ${formatLocalDate(seg.end)})`}
-                          className={`w-full h-[24px] flex items-center gap-1 px-1.5 border ${barBg} ${roundedLeft} ${roundedRight} text-[10px] font-medium truncate transition-all hover:shadow-sm cursor-pointer`}>
-                          {isStart && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_COLORS[seg.task.priority] || 'bg-slate-300'}`} />}
+                          className={`w-full h-[30px] flex items-center gap-1.5 px-2 border ${barBg} ${roundedLeft} ${roundedRight} text-[11px] font-medium truncate transition-all hover:shadow-sm cursor-pointer`}>
+                          {isStart && <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_COLORS[seg.task.priority] || 'bg-slate-300'}`} />}
                           {(isStart || (!isStart && !isEnd)) && <span className="truncate">{seg.task.title}</span>}
-                          {a && <UserAvatar name={a.full_name} userId={a.id} size="w-3 h-3 text-[6px]" />}
+                          {a && <UserAvatar name={a.full_name} userId={a.id} size="w-4 h-4 text-[7px]" />}
                         </button>
                       </div>
                     );
@@ -389,13 +453,13 @@ export default function TaskCalendar() {
             })}
             {overflow > 0 && !weekExpanded && (
               <button onClick={() => setExpandedWeeks(p => ({ ...p, [weekKey]: true }))}
-                className="w-full text-center text-[9px] text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium mt-1 py-1">
+                className="w-full text-center text-[11px] text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium mt-1 py-1.5">
                 +{overflow} งานอื่นๆ
               </button>
             )}
             {weekExpanded && overflow > 0 && (
               <button onClick={() => setExpandedWeeks(p => { const n = { ...p }; delete n[weekKey]; return n; })}
-                className="w-full text-center text-[9px] text-slate-500 hover:text-slate-700 hover:underline cursor-pointer font-medium mt-1 py-1">
+                className="w-full text-center text-[11px] text-slate-500 hover:text-slate-700 hover:underline cursor-pointer font-medium mt-1 py-1.5">
                 ย่อกลับ
               </button>
             )}
@@ -451,10 +515,32 @@ export default function TaskCalendar() {
         ? assignLanes(filteredTasks, weekStart, weekEnd)
         : { segments: [], laneCount: 0 };
 
+      // Determine visible lane area first, so day cells can size themselves to contain bars.
+      const weekExpanded = expandedWeeks[`week-${weekIdx}`];
+      const displayLaneCount = displayMode === 'workRange'
+        ? (weekExpanded ? Math.min(laneCount, 8) : Math.min(laneCount, MAX_LANES))
+        : 0;
+      const overflow = displayMode === 'workRange' ? (laneCount - MAX_LANES) : 0;
+      const laneAreaHeight = displayMode === 'workRange'
+        ? ((displayLaneCount * MONTH_BAR_ROW_PX) + (overflow > 0 ? MONTH_OVERFLOW_ROW_PX : 0))
+        : 0;
+      const dayCellMinHeight = displayMode === 'workRange'
+        ? (MONTH_DAY_HEADER_PX + laneAreaHeight + 8)
+        : 56;
+
       const weekDays = [];
       for (let col = 0; col < 7; col++) {
         const dayNum = dayOffset + col;
-        if (dayNum > daysInMo) { weekDays.push(<div key={`empty-${weekIdx}-${col}`} className="bg-slate-50/40 border border-slate-100" />); continue; }
+        if (dayNum > daysInMo) {
+          weekDays.push(
+            <div
+              key={`empty-${weekIdx}-${col}`}
+              className="bg-slate-50/40 border border-slate-100"
+              style={{ minHeight: `${dayCellMinHeight}px` }}
+            />
+          );
+          continue;
+        }
         const date = new Date(year, month, dayNum);
         const dk = toKey(year, month, dayNum);
         const dt = displayMode === 'dueDate' ? (tasksByDate[dk] || []) : [];
@@ -465,22 +551,22 @@ export default function TaskCalendar() {
 
         weekDays.push(
           <div key={dayNum} onClick={() => setSelectedDate(date)}
-            className={`border border-slate-100 p-1.5 transition-colors cursor-pointer min-h-[90px] ${tf ? 'bg-blue-50/50 ring-1 ring-inset ring-blue-200' : isSelected ? 'bg-slate-50 ring-1 ring-inset ring-slate-200' : 'bg-white hover:bg-slate-50/60'}`}>
-            <div className="flex items-center justify-between mb-1">
-              <span className={`inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{dayNum}</span>
-              {dt.length > 0 && <span className="text-[9px] bg-slate-200 text-slate-500 rounded-full px-1 py-0.5">{dt.length}</span>}
+            className={`border border-slate-100 p-1.5 transition-colors cursor-pointer ${tf ? 'bg-blue-50/50 ring-1 ring-inset ring-blue-200' : isSelected ? 'bg-slate-50 ring-1 ring-inset ring-slate-200' : 'bg-white hover:bg-slate-50/60'}`}
+            style={{ minHeight: `${dayCellMinHeight}px` }}>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className={`inline-flex items-center justify-center w-7 h-7 text-xs font-bold rounded-full ${tf ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{dayNum}</span>
+              {dt.length > 0 && <span className="text-[10px] bg-slate-200 text-slate-500 rounded-full px-1.5 py-0.5">{dt.length}</span>}
             </div>
             {visibleChips.map(t => <TaskChip key={t.id} task={t} onClick={(e) => { e.stopPropagation(); setSelectedTask(t); }} isOverdueFn={isOverdue} isMyTaskFn={isMyTask} users={users} />)}
-            {hiddenChips > 0 && <button onClick={(e) => { e.stopPropagation(); toggleExpandDay(dk); }} className="w-full text-[9px] text-blue-600 hover:text-blue-800 text-center py-0.5 font-medium">+{hiddenChips}</button>}
+            {hiddenChips > 0 && <button onClick={(e) => { e.stopPropagation(); toggleExpandDay(dk); }} className="w-full text-[10px] text-blue-600 hover:text-blue-800 text-center py-0.5 font-medium">+{hiddenChips}</button>}
           </div>
         );
       }
 
-      // Bar elements — 1 segment = 1 bar, gridColumn span
-      const barElements = [];
+      // Bar overlay — 1 segment = 1 bar
+      // ใช้ barElements เดิม แต่เปลี่ยน gridRow เป็น lane + 1 (overlay)
+      const barOverlay = [];
       if (displayMode === 'workRange' && segments.length > 0) {
-        const weekExpanded = expandedWeeks[`week-${weekIdx}`];
-        const displayLaneCount = weekExpanded ? Math.min(laneCount, 8) : Math.min(laneCount, MAX_LANES);
         const displaySegments = segments.filter(s => s.lane < displayLaneCount);
 
         for (let lane = 0; lane < displayLaneCount; lane++) {
@@ -490,14 +576,15 @@ export default function TaskCalendar() {
             const a = users.find(u => u.id === seg.task.assigned_to);
             const barBg = getBarBgStyle(seg.task, isOverdue);
             const label = getBarLabel(seg.task, formatLocalDate(seg.start));
-            barElements.push(
-              <div key={`bar-${lane}-${seg.task.id}`} style={{ gridColumn: `${seg.startCol + 1} / span ${span}`, gridRow: lane + 2 }} className="px-[2px] pt-0 pb-[1px]">
+            barOverlay.push(
+              <div key={`bar-${lane}-${seg.task.id}`} style={{ gridColumn: `${seg.startCol + 1} / span ${span}`, gridRow: '1', marginTop: `${lane * MONTH_BAR_ROW_PX}px` }} className="px-[3px] pointer-events-auto">
                 <button onClick={(e) => { e.stopPropagation(); setSelectedTask(seg.task); }}
                   title={`${seg.task.title}${a ? ` — ${a.full_name}` : ''} | ${formatLocalDate(seg.start)} → ${formatLocalDate(seg.end)}${label ? ` [${label}]` : ''}`}
-                  className={`w-full h-[24px] flex items-center gap-1 px-2 border ${barBg} rounded-md text-[11px] font-semibold truncate transition-all hover:shadow-md cursor-pointer`}>
+                  className={`w-full flex items-center gap-2 px-3 border ${barBg} rounded-lg text-[12px] font-semibold truncate transition-all hover:shadow-md cursor-pointer`}
+                  style={{ height: `${MONTH_BAR_HEIGHT_PX}px` }}>
                   <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_COLORS[seg.task.priority] || 'bg-slate-300'}`} />
                   <span className="truncate">{seg.task.title}</span>
-                  {span >= 3 && <span className="shrink-0 text-[8px] text-slate-500 ml-1">{label}</span>}
+                  {span >= 3 && <span className="shrink-0 text-[10px] text-slate-500 ml-1">{label}</span>}
                   {a && <UserAvatar name={a.full_name} userId={a.id} size="w-4 h-4 text-[7px]" className="shrink-0 ml-auto" />}
                 </button>
               </div>
@@ -505,29 +592,42 @@ export default function TaskCalendar() {
           });
         }
         // Overflow
-        const overflow = laneCount - MAX_LANES;
         if (overflow > 0 && !weekExpanded) {
-          barElements.push(<div key="overflow" style={{ gridColumn: '1 / -1', gridRow: displayLaneCount + 2 }} className="px-1 py-[1px]"><button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => ({ ...p, [`week-${weekIdx}`]: true })); }} className="w-full h-[22px] flex items-center justify-center rounded-md border border-dashed border-blue-200 bg-blue-50 text-[10px] text-blue-600 font-medium cursor-pointer transition-all hover:bg-blue-100 hover:border-blue-300">+{overflow} งานอื่นๆ</button></div>);
+          barOverlay.push(<div key="overflow" style={{ gridColumn: '1 / -1', gridRow: '1', marginTop: `${displayLaneCount * MONTH_BAR_ROW_PX}px`, pointerEvents: 'auto' }} className="px-1 py-[2px]"><button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => ({ ...p, [`week-${weekIdx}`]: true })); }} className="w-full h-[22px] flex items-center justify-center rounded-md border border-dashed border-blue-200 bg-blue-50 text-[12px] text-blue-600 font-medium cursor-pointer transition-all hover:bg-blue-100 hover:border-blue-300">+{overflow} งานอื่นๆ</button></div>);
         }
         if (weekExpanded && overflow > 0) {
-          barElements.push(<div key="collapse" style={{ gridColumn: '1 / -1', gridRow: displayLaneCount + 2 }} className="px-1 py-[1px]"><button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => { const n = { ...p }; delete n[`week-${weekIdx}`]; return n; }); }} className="w-full h-[22px] flex items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50 text-[10px] text-slate-500 font-medium cursor-pointer transition-all hover:bg-slate-100 hover:border-slate-300">ย่อกลับ</button></div>);
+          barOverlay.push(<div key="collapse" style={{ gridColumn: '1 / -1', gridRow: '1', marginTop: `${displayLaneCount * MONTH_BAR_ROW_PX}px`, pointerEvents: 'auto' }} className="px-1 py-[2px]"><button onClick={(e) => { e.stopPropagation(); setExpandedWeeks(p => { const n = { ...p }; delete n[`week-${weekIdx}`]; return n; }); }} className="w-full h-[22px] flex items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50 text-[12px] text-slate-500 font-medium cursor-pointer transition-all hover:bg-slate-100 hover:border-slate-300">ย่อกลับ</button></div>);
         }
       }
 
-      // ONE grid: date cells at row 1, bars at row 2+
+      // โครงสร้าง: relative wrapper → date grid + bar overlay ซ้อนกัน
       rows.push(
-        <div key={`week-${weekIdx}`} className="border-b border-slate-100 last:border-b-0">
+        <div key={`week-${weekIdx}`} className="border-b border-slate-100 last:border-b-0 relative">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridAutoRows: 'auto' }}>
             {weekDays}
-            {barElements}
           </div>
+          {/* Bar overlay — drawn inside day cells */}
+          {barOverlay.length > 0 && (
+            <div
+              className="absolute left-0 right-0 grid"
+              style={{
+                top: `${MONTH_DAY_HEADER_PX}px`,
+                height: `${laneAreaHeight}px`,
+                gridTemplateColumns: 'repeat(7, 1fr)',
+                gridAutoRows: 'auto',
+                pointerEvents: 'none',
+              }}
+            >
+              {barOverlay}
+            </div>
+          )}
         </div>
       );
       dayOffset += 7;
     }
 
     return (<div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-slate-200">{DAYS_TH.map(d => <div key={d} className="py-2 text-center text-xs font-semibold text-slate-500 bg-slate-50">{d}</div>)}</div>
+      <div className="grid grid-cols-7 border-b border-slate-200">{DAYS_TH.map(d => <div key={d} className="py-3 text-center text-sm font-semibold text-slate-500 bg-slate-50">{d}</div>)}</div>
       {rows}
     </div>);
   };
@@ -554,58 +654,58 @@ export default function TaskCalendar() {
   const renderView = () => { if (viewMode === 'day') return renderDayView(); if (viewMode === 'week') return renderWeekView(); if (viewMode === 'year') return renderYearView(); return renderMonthView(); };
 
   return (
-    <div className="flex gap-5 min-h-[calc(100vh-8rem)]">
+    <div className="flex gap-6 min-h-[calc(100vh-8rem)]">
       {/* Main Calendar */}
-      <div className="flex-1 min-w-0 space-y-4">
+      <div className="flex-1 min-w-0 space-y-5">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">ปฏิทินงาน</h1>
-          <p className="mt-1 text-sm text-slate-500">ติดตามงาน กำหนดส่ง และภาพรวมทีม</p>
+          <h1 className="text-4xl font-bold tracking-tight text-slate-900">ปฏิทินงาน</h1>
+          <p className="mt-1.5 text-base text-slate-500">ติดตามงาน กำหนดส่ง และภาพรวมทีม</p>
         </div>
 
         {/* Quick Filters */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           {QUICK_FILTERS.map(f => (
             <button key={f.key} onClick={() => setQuickFilter(quickFilter === f.key ? '' : f.key)}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${quickFilter === f.key ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all ${quickFilter === f.key ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
               {f.key === 'urgent' && <span className="w-2 h-2 rounded-full bg-red-500" />}
-              {f.key === 'overdue' && <AlertTriangle size={12} />}
-              {f.key === 'myTasks' && <Star size={12} />}
+              {f.key === 'overdue' && <AlertTriangle size={14} />}
+              {f.key === 'myTasks' && <Star size={14} />}
               {f.label}
             </button>
           ))}
         </div>
 
         {/* Filters */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <Filter size={14} className="text-slate-400" />
-            <span className="text-xs font-medium text-slate-500">ตัวกรอง</span>
-            {hasActiveFilter && <button onClick={clearFilters} className="ml-auto text-[11px] text-blue-600 hover:text-blue-800 font-medium">ล้างตัวกรอง</button>}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter size={16} className="text-slate-400" />
+            <span className="text-sm font-medium text-slate-500">ตัวกรอง</span>
+            {hasActiveFilter && <button onClick={clearFilters} className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium">ล้างตัวกรอง</button>}
           </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-            <div className="relative"><Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="ค้นหางาน..." className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-xs text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition" /></div>
-            <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"><option value="">ทุกโครงการ</option>{projects.map(p => <option key={p.id} value={p.id}>{p.project_name || p.project_code}</option>)}</select>
-            <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"><option value="">ทุกคน</option>{users.filter(u => u.role !== 'client').map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}</select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"><option value="">ทุกสถานะ</option>{Object.entries(TASK_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="ค้นหางาน..." className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition" /></div>
+            <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"><option value="">ทุกโครงการ</option>{projects.map(p => <option key={p.id} value={p.id}>{p.project_name || p.project_code}</option>)}</select>
+            <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"><option value="">ทุกคน</option>{users.filter(u => u.role !== 'client').map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}</select>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"><option value="">ทุกสถานะ</option>{Object.entries(TASK_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             <div className="flex items-center gap-2">
-              <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-blue-400"><option value="">ทุก priority</option>{Object.entries(PRIORITY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-              <label className="flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer select-none whitespace-nowrap"><input type="checkbox" checked={showCompleted} onChange={e => setShowCompleted(e.target.checked)} className="w-3 h-3 rounded border-slate-300" />เสร็จ</label>
+              <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-400"><option value="">ทุก priority</option>{Object.entries(PRIORITY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+              <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none whitespace-nowrap"><input type="checkbox" checked={showCompleted} onChange={e => setShowCompleted(e.target.checked)} className="w-4 h-4 rounded border-slate-300" />เสร็จ</label>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-          <button onClick={navPrev} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 transition"><ChevronLeft size={20} /></button>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">{VIEW_MODES.map(v => <button key={v.key} onClick={() => setViewMode(v.key)} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${viewMode === v.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>{v.label}</button>)}</div>
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
+          <button onClick={navPrev} className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 transition"><ChevronLeft size={22} /></button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">{VIEW_MODES.map(v => <button key={v.key} onClick={() => setViewMode(v.key)} className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${viewMode === v.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>{v.label}</button>)}</div>
             <div className="w-px h-5 bg-slate-200" />
-            <div className="flex items-center gap-1">{DISPLAY_MODES.map(d => <button key={d.key} onClick={() => setDisplayMode(d.key)} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${displayMode === d.key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>{d.label}</button>)}</div>
-            <span className="text-sm font-bold text-slate-800">{getNavLabel()}</span>
-            <button onClick={goToToday} className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-600 hover:bg-blue-100 transition">วันนี้</button>
+            <div className="flex items-center gap-1.5">{DISPLAY_MODES.map(d => <button key={d.key} onClick={() => setDisplayMode(d.key)} className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${displayMode === d.key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>{d.label}</button>)}</div>
+            <span className="text-base font-bold text-slate-800">{getNavLabel()}</span>
+            <button onClick={goToToday} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100 transition">วันนี้</button>
           </div>
-          <button onClick={navNext} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 transition"><ChevronRight size={20} /></button>
+          <button onClick={navNext} className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 transition"><ChevronRight size={22} /></button>
         </div>
 
         {loading ? <div className="flex items-center justify-center h-64"><div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" /></div> : (
@@ -682,15 +782,27 @@ export default function TaskCalendar() {
           <h3 className="text-sm font-semibold text-slate-700 mb-3">ภาระงานรายคน</h3>
           {workload.length === 0 ? <p className="text-[11px] text-slate-400">ไม่มีงานมอบหมาย</p> : (
             <div className="space-y-2.5 max-h-48 overflow-y-auto">{workload.map(w => {
-              const maxW = Math.max(...workload.map(x => x.active), 1); const pct = Math.round((w.active / maxW) * 100);
+              const pct = Math.max(0, Math.min(w.utilization, 100));
+              const levelStyle = w.level === 'overload'
+                ? 'bg-red-100 text-red-700'
+                : w.level === 'high'
+                  ? 'bg-orange-100 text-orange-700'
+                  : w.level === 'normal'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-emerald-100 text-emerald-700';
               return (<div key={w.user.id}>
                 <div className="flex items-center gap-2 mb-1">
                   <UserAvatar name={w.user.full_name} userId={w.user.id} size="w-5 h-5 text-[9px]" />
                   <span className="text-[11px] font-medium text-slate-700 truncate">{w.user.full_name}</span>
-                  <span className="ml-auto text-[10px] text-slate-500">{w.active} งาน</span>
+                  <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${levelStyle}`}>{w.utilization}%</span>
                 </div>
-                <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: getUserColor(w.user.id) }} /></div>
-                {w.overdue > 0 && <p className="text-[9px] text-red-500 mt-0.5">{w.overdue} เกินกำหนด</p>}
+                <div className="w-full bg-slate-100 rounded-full h-2"><div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: getUserColor(w.user.id) }} /></div>
+                <div className="mt-1 flex items-center gap-2 text-[9px] text-slate-500">
+                  <span>active {w.active}</span>
+                  <span>urgent {w.urgent}</span>
+                  <span className={w.overdue > 0 ? 'text-red-500 font-medium' : ''}>overdue {w.overdue}</span>
+                  <span className="ml-auto">score {w.loadScore.toFixed(1)}</span>
+                </div>
               </div>);})}</div>
           )}
         </div>

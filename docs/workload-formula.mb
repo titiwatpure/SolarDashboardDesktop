@@ -1,0 +1,62 @@
+WORKLOAD FORMULA (REFERENCE ONLY)
+
+Purpose:
+- Keep current workload behavior in the app unchanged.
+- Store formula and data lineage for explanation when asked: "ตัวเลขมาจากไหน".
+
+Runtime status:
+- NOT active runtime logic.
+- Active UI in calendar currently uses simple count-based workload.
+
+Formula model (reference):
+- priority_weight:
+  urgent = 5
+  high = 3
+  medium = 2
+  low = 1
+
+- status_weight:
+  pending = 0.9
+  in_progress = 1.0
+  completed = 0
+  cancelled = 0
+
+- due_factor:
+  overdue (< 0 days) = 1.5
+  due in 0-2 days = 1.3
+  due in 3-7 days = 1.1
+  otherwise = 1.0
+
+- role_capacity:
+  admin = 16
+  engineer = 14
+  staff = 12
+  default = 12
+
+Calculation:
+- task_score = priority_weight * status_weight * due_factor
+- load_score(user) = sum(task_score of open tasks assigned to that user)
+- utilization_percent = round((load_score / role_capacity) * 100)
+
+Interpretation threshold:
+- overload: utilization >= 130
+- high: utilization > 100
+- normal: utilization >= 70
+- light: utilization < 70
+
+Data lineage (where values come from):
+- Task owner: tasks.assigned_to
+- Task status: tasks.status
+- Task priority: tasks.priority
+- Task due date: tasks.due_date
+- User role/capacity source: users.role
+- User identity for grouping/display: users.id, users.full_name
+
+Application data flow (for explanation):
+- Frontend loads task list via tasksAPI.
+- Frontend loads users via usersAPI.
+- Calendar applies filter/search first, then computes workload from filtered tasks.
+
+Notes:
+- Closed tasks (completed/cancelled) should not increase load_score.
+- This document is for communication and audit traceability.
