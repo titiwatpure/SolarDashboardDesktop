@@ -27,6 +27,15 @@ const menuGroups = [
     ],
   },
   {
+    id: 'doc-review', label: 'ตรวจเอกสาร / ยื่นหน่วยงาน', icon: FileCheck,
+    children: [
+      { id: 'doc-review-dashboard', label: 'แดชบอร์ดเอกสาร', path: '/doc-review', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'doc-review-new', label: 'สร้างโครงการตรวจเอกสาร', path: '/doc-review/new', roles: ['admin', 'engineer'] },
+      { id: 'doc-review-templates', label: 'Template Checklist', path: '/doc-review/templates', roles: ['admin', 'engineer'] },
+      { id: 'doc-review-agency-tracking', label: 'ติดตามยื่นหน่วยงาน', path: '/doc-review/agency-tracking', roles: ['admin', 'engineer', 'staff'] },
+    ],
+  },
+  {
     id: 'org-docs', label: 'เอกสารและหน่วยงาน', icon: FileText,
     children: [
       { id: 'documents', label: 'เอกสาร', path: '/documents', roles: ['admin', 'engineer', 'staff'] },
@@ -49,15 +58,6 @@ const menuGroups = [
       { id: 'users', label: 'ผู้ใช้งาน', path: '/users', roles: ['admin'] },
       { id: 'help', label: 'คู่มือ', path: '/help', roles: ['admin', 'engineer', 'staff', 'client'] },
       { id: 'settings', label: 'ตั้งค่า', path: '/settings', roles: ['admin', 'engineer', 'staff', 'client'] },
-    ],
-  },
-  {
-    id: 'doc-review', label: 'ตรวจเอกสาร / ยื่นหน่วยงาน', icon: FileCheck,
-    children: [
-      { id: 'doc-review-dashboard', label: 'แดชบอร์ดเอกสาร', path: '/doc-review', roles: ['admin', 'engineer', 'staff'] },
-      { id: 'doc-review-new', label: 'สร้างโครงการใหม่', path: '/doc-review/new', roles: ['admin', 'engineer'] },
-      { id: 'doc-review-templates', label: 'Template Checklist', path: '/doc-review/templates', roles: ['admin', 'engineer'] },
-      { id: 'doc-review-agency-tracking', label: 'ติดตามยื่นหน่วยงาน', path: '/doc-review/agency-tracking', roles: ['admin', 'engineer', 'staff'] },
     ],
   },
 ];
@@ -154,7 +154,7 @@ export default function Sidebar({ isOpen, onClose }) {
             const active = isGroupActive(group);
 
             if (collapsed) {
-              // Compact mode — show group icon with tooltip
+              // Compact mode — show group icon
               return (
                 <div key={group.id} className="relative group">
                   <button onClick={() => { setCollapsed(false); setOpenGroups(prev => [...prev, group.id]); }}

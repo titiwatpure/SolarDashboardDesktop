@@ -494,12 +494,43 @@ export default function ProjectReport() {
                 <span className="text-red-800">{project.blocked_reason}</span>
               </div>
             )}
-            {project.risk_factors && (
-              <div className="flex gap-3">
-                <span className="w-24 text-red-600 font-medium">ปัจจัย:</span>
-                <span className="text-red-800">{project.risk_factors}</span>
-              </div>
-            )}
+            {project.risk_factors && (() => {
+              let factors;
+              try {
+                factors = typeof project.risk_factors === 'string' 
+                  ? JSON.parse(project.risk_factors) 
+                  : project.risk_factors;
+              } catch { return null; }
+              
+              const factorLabels = {
+                delay_days: { label: 'ล่าช้า', suffix: 'วัน', color: 'text-red-700' },
+                time_overrun_pct: { label: 'เวลาเลยกำหนด', suffix: '%', color: 'text-orange-700' },
+                actual_progress_pct: { label: 'ความคืบหน้าจริง', suffix: '%', color: 'text-blue-700' },
+                failed_checkpoints: { label: 'Checkpoint ไม่ผ่าน', suffix: 'รายการ', color: 'text-red-700' },
+                pending_required_checkpoints: { label: 'รอตรวจ', suffix: 'รายการ', color: 'text-amber-700' },
+                overdue_tasks: { label: 'งานเกินกำหนด', suffix: 'รายการ', color: 'text-red-700' },
+                blocked_days: { label: 'ติดปัญหา', suffix: 'วัน', color: 'text-red-700' },
+              };
+              
+              return (
+                <div className="flex gap-3">
+                  <span className="w-24 text-red-600 font-medium">ปัจจัย:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(factors).map(([key, value]) => {
+                      // Skip zero values and time_overrun if <= 100%
+                      if (value === 0) return null;
+                      if (key === 'time_overrun_pct' && value <= 100) return null;
+                      const info = factorLabels[key] || { label: key, suffix: '', color: 'text-slate-700' };
+                      return (
+                        <span key={key} className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-50 text-xs font-medium ${info.color}`}>
+                          {info.label}: {value} {info.suffix}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             {delayDays > 0 && (
               <div className="flex gap-3">
                 <span className="w-24 text-red-600 font-medium">ล่าช้า:</span>

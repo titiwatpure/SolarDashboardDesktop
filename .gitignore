@@ -32,3 +32,14 @@ Desktop.ini
 # Claude Code
 .claude/
 Claude*
+
+# Temporary / Test files
+*.rar
+*.zip
+test-upload.txt
+*-test.cjs
+test-*.js
+migrate-*.cjs
+seed-*.cjs
+run-migration-*.js
+reset-seed.js

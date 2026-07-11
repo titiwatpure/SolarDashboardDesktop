@@ -19,15 +19,18 @@ const calculateRisk = async (projectId) => {
       const elapsedDays = (now - startDate) / (1000 * 60 * 60 * 24);
 
       if (totalDays > 0) {
-        const progress = elapsedDays / totalDays;
+        const timeProgress = elapsedDays / totalDays;
         factors.delay_days = Math.max(0, Math.round(elapsedDays - totalDays));
-        factors.progress_pct = Math.round(progress * 100);
+        factors.time_overrun_pct = Math.round(timeProgress * 100);
 
+        // Risk scoring based on time overrun
         if (project.status !== 'completed') {
-          if (progress > 1.5) riskScore += 40;
-          else if (progress > 1.2) riskScore += 30;
-          else if (progress > 1.0) riskScore += 20;
-          else if (progress > 0.8) riskScore += 10;
+          if (timeProgress > 2.0) riskScore += 50;
+          else if (timeProgress > 1.5) riskScore += 40;
+          else if (timeProgress > 1.25) riskScore += 35;
+          else if (timeProgress > 1.1) riskScore += 25;
+          else if (timeProgress > 1.0) riskScore += 20;
+          else if (timeProgress > 0.8) riskScore += 10;
         }
       }
     }
@@ -57,6 +60,11 @@ const calculateRisk = async (projectId) => {
     factors.failed_checkpoints = cp.failed;
     factors.pending_required_checkpoints = cp.pending_required;
 
+    // Add actual project progress if available
+    if (project.progress !== undefined && project.progress !== null) {
+      factors.actual_progress_pct = project.progress;
+    }
+
     if (cp.failed > 3) riskScore += 30;
     else if (cp.failed > 1) riskScore += 20;
     else if (cp.failed > 0) riskScore += 10;
@@ -70,9 +78,10 @@ const calculateRisk = async (projectId) => {
     );
     factors.overdue_tasks = taskResult.rows[0].overdue;
 
-    if (factors.overdue_tasks > 5) riskScore += 20;
-    else if (factors.overdue_tasks > 2) riskScore += 15;
-    else if (factors.overdue_tasks > 0) riskScore += 10;
+    if (factors.overdue_tasks >= 5) riskScore += 25;
+    else if (factors.overdue_tasks >= 3) riskScore += 20;
+    else if (factors.overdue_tasks >= 2) riskScore += 15;
+    else if (factors.overdue_tasks >= 1) riskScore += 10;
 
     // 5. Status-based risk
     if (project.status === 'rejected') riskScore += 20;
