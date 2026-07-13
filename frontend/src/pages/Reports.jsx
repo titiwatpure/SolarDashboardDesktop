@@ -47,6 +47,7 @@ export default function Reports() {
   const [timelineData, setTimelineData] = useState([]);
   const [timelineSearch, setTimelineSearch] = useState('');
   const [timelinePage, setTimelinePage] = useState(1);
+  const [timelinePagination, setTimelinePagination] = useState(null);
   const TIMELINE_ROWS = 15;
   const [selectedSections, setSelectedSections] = useState(
     () => new Set(SECTIONS.map((s) => s.id))
@@ -56,6 +57,7 @@ export default function Reports() {
 
   useEffect(() => {
     loadReports();
+    loadTimeline(1, timelineSearch);
     settingsAPI.getCompany().then((data) => {
       setCompanyName(data.company_name || '');
       if (data.logo_url) {
@@ -70,7 +72,7 @@ export default function Reports() {
 
   const loadReports = async () => {
     try {
-      const [status, size, province, step, risk, leadTime, performance, tasks, timeline, byAssignee, details] =
+      const [status, size, province, step, risk, leadTime, performance, tasks, byAssignee, details] =
         await Promise.all([
           reportsAPI.getSummaryByStatus(),
           reportsAPI.getSummaryBySize(),
@@ -80,7 +82,6 @@ export default function Reports() {
           reportsAPI.getSummaryByLeadTime().catch(() => []),
           reportsAPI.getSummaryByPerformance().catch(() => []),
           reportsAPI.getSummaryByTasks().catch(() => []),
-          reportsAPI.getSummaryByTimeline().catch(() => []),
           reportsAPI.getTasksByAssignee().catch(() => []),
           reportsAPI.getTasksDetails().catch(() => []),
         ]);
@@ -93,11 +94,23 @@ export default function Reports() {
       setLeadTimeData(Array.isArray(leadTime) ? leadTime : (leadTime.data || []));
       setPerformanceData(Array.isArray(performance) ? performance : (performance.data || []));
       setTasksData(Array.isArray(tasks) ? tasks : (tasks.data || []));
-      setTimelineData(Array.isArray(timeline) ? timeline : (timeline.data || []));
       setTasksByAssignee(Array.isArray(byAssignee) ? byAssignee : (byAssignee.data || []));
       setTasksDetails(Array.isArray(details) ? details : (details.data || []));
     } catch (error) {
       console.error('Failed to load reports:', error);
+    }
+  };
+
+  const loadTimeline = async (page = 1, search = '') => {
+    try {
+      const params = { page, limit: TIMELINE_ROWS };
+      if (search.trim()) params.search = search.trim();
+      
+      const result = await reportsAPI.getSummaryByTimeline(params);
+      setTimelineData(result.data || []);
+      setTimelinePagination(result.pagination || null);
+    } catch (error) {
+      console.error('Failed to load timeline:', error);
     }
   };
 
@@ -948,13 +961,17 @@ export default function Reports() {
               <input
                 type="text"
                 value={timelineSearch}
-                onChange={(e) => { setTimelineSearch(e.target.value); setTimelinePage(1); }}
+                onChange={(e) => {
+                  setTimelineSearch(e.target.value);
+                  setTimelinePage(1);
+                  loadTimeline(1, e.target.value);
+                }}
                 placeholder="ค้นหาชื่อหรือรหัสโครงการ..."
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-400"
               />
               <p className="mt-1 text-xs text-slate-400">
-                {timelineSearch.trim()
-                  ? `พบ ${filteredTimeline.length} รายการ จากทั้งหมด ${timelineData.length} รายการ`
+                {timelinePagination
+                  ? `แสดง ${(timelinePagination.page - 1) * timelinePagination.limit + 1}–${Math.min(timelinePagination.page * timelinePagination.limit, timelinePagination.total)} จาก ${timelinePagination.total} รายการ`
                   : `ทั้งหมด ${timelineData.length} รายการ`}
               </p>
             </div>
@@ -972,9 +989,7 @@ export default function Reports() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredTimeline
-                  .slice((timelinePage - 1) * TIMELINE_ROWS, timelinePage * TIMELINE_ROWS)
-                  .map((row, idx) => (
+                {timelineData.map((row, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/70">
                       <td className="px-4 py-3 font-medium text-slate-900">{row.project_name}</td>
                       <td className="px-4 py-3">
@@ -992,7 +1007,7 @@ export default function Reports() {
                       </td>
                     </tr>
                   ))}
-                {filteredTimeline.length === 0 && (
+                {timelineData.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
                       {timelineSearch.trim() ? 'ไม่พบโครงการที่ค้นหา' : 'ไม่มีข้อมูล'}
@@ -1002,51 +1017,49 @@ export default function Reports() {
               </tbody>
             </table>
           </div>
-          {filteredTimeline.length > TIMELINE_ROWS && (
+          {timelinePagination && timelinePagination.pages > 1 && (
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-slate-500">
-                แสดง {(timelinePage - 1) * TIMELINE_ROWS + 1}–{Math.min(timelinePage * TIMELINE_ROWS, filteredTimeline.length)} จาก {filteredTimeline.length} รายการ
+                หน้า {timelinePagination.page} / {timelinePagination.pages}
               </p>
               <div className="flex gap-1">
                 <button
-                  onClick={() => setTimelinePage((p) => Math.max(1, p - 1))}
+                  onClick={() => {
+                    const newPage = Math.max(1, timelinePage - 1);
+                    setTimelinePage(newPage);
+                    loadTimeline(newPage, timelineSearch);
+                  }}
                   disabled={timelinePage === 1}
                   className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   ก่อนหน้า
                 </button>
-                {Array.from({ length: Math.ceil(filteredTimeline.length / TIMELINE_ROWS) }, (_, i) => i + 1)
-                  .filter((p) => {
-                    const total = Math.ceil(filteredTimeline.length / TIMELINE_ROWS);
-                    if (total <= 5) return true;
-                    if (p === 1 || p === total) return true;
-                    return Math.abs(p - timelinePage) <= 1;
-                  })
-                  .reduce((acc, p, i, arr) => {
-                    if (i > 0 && p - arr[i - 1] > 1) acc.push('...');
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((item, i) =>
-                    item === '...' ? (
-                      <span key={`dots-${i}`} className="px-2 py-1.5 text-sm text-slate-400">...</span>
-                    ) : (
-                      <button
-                        key={item}
-                        onClick={() => setTimelinePage(item)}
-                        className={`min-w-[36px] rounded-lg px-3 py-1.5 text-sm font-medium ${
-                          timelinePage === item
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    )
-                  )}
+                {Array.from({ length: Math.min(timelinePagination.pages, 5) }, (_, i) => {
+                  const start = Math.max(1, Math.min(timelinePagination.page - 2, timelinePagination.pages - 4));
+                  return start + i;
+                }).filter(p => p <= timelinePagination.pages).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => {
+                      setTimelinePage(p);
+                      loadTimeline(p, timelineSearch);
+                    }}
+                    className={`min-w-[36px] rounded-lg px-3 py-1.5 text-sm font-medium ${
+                      timelinePage === p
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
                 <button
-                  onClick={() => setTimelinePage((p) => Math.min(Math.ceil(filteredTimeline.length / TIMELINE_ROWS), p + 1))}
-                  disabled={timelinePage === Math.ceil(filteredTimeline.length / TIMELINE_ROWS)}
+                  onClick={() => {
+                    const newPage = Math.min(timelinePagination.pages, timelinePage + 1);
+                    setTimelinePage(newPage);
+                    loadTimeline(newPage, timelineSearch);
+                  }}
+                  disabled={timelinePage === timelinePagination.pages}
                   className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   ถัดไป

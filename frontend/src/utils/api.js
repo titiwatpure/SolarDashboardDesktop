@@ -303,18 +303,18 @@ export const organizationsAPI = {
 };
 
 export const reportsAPI = {
-  getSummaryByStatus: () => apiCall('GET', '/reports/summary/status'),
-  getSummaryBySize: () => apiCall('GET', '/reports/summary/size'),
-  getSummaryByProvince: () => apiCall('GET', '/reports/summary/province'),
-  getSummaryByStep: () => apiCall('GET', '/reports/summary/step'),
-  getSummaryByStepStatus: () => apiCall('GET', '/reports/summary/step-status'),
-  getSummaryByTimeline: () => apiCall('GET', '/reports/summary/timeline'),
-  getSummaryByRisk: () => apiCall('GET', '/reports/summary/risk'),
-  getSummaryByLeadTime: () => apiCall('GET', '/reports/summary/lead-time'),
-  getSummaryByPerformance: () => apiCall('GET', '/reports/summary/performance'),
-  getSummaryByTasks: () => apiCall('GET', '/reports/summary/tasks'),
-  getTasksByAssignee: () => apiCall('GET', '/reports/tasks/by-assignee'),
-  getTasksDetails: () => apiCall('GET', '/reports/tasks/details'),
+  getSummaryByStatus: (params) => apiCall('GET', `/reports/summary/status?${new URLSearchParams(params || {})}`),
+  getSummaryBySize: (params) => apiCall('GET', `/reports/summary/size?${new URLSearchParams(params || {})}`),
+  getSummaryByProvince: (params) => apiCall('GET', `/reports/summary/province?${new URLSearchParams(params || {})}`),
+  getSummaryByStep: (params) => apiCall('GET', `/reports/summary/step?${new URLSearchParams(params || {})}`),
+  getSummaryByStepStatus: (params) => apiCall('GET', `/reports/summary/step-status?${new URLSearchParams(params || {})}`),
+  getSummaryByTimeline: (params) => apiCall('GET', `/reports/summary/timeline?${new URLSearchParams(params || {})}`),
+  getSummaryByRisk: (params) => apiCall('GET', `/reports/summary/risk?${new URLSearchParams(params || {})}`),
+  getSummaryByLeadTime: (params) => apiCall('GET', `/reports/summary/lead-time?${new URLSearchParams(params || {})}`),
+  getSummaryByPerformance: (params) => apiCall('GET', `/reports/summary/performance?${new URLSearchParams(params || {})}`),
+  getSummaryByTasks: (params) => apiCall('GET', `/reports/summary/tasks?${new URLSearchParams(params || {})}`),
+  getTasksByAssignee: (params) => apiCall('GET', `/reports/tasks/by-assignee?${new URLSearchParams(params || {})}`),
+  getTasksDetails: (params) => apiCall('GET', `/reports/tasks/details?${new URLSearchParams(params || {})}`),
 };
 
 export const notificationsAPI = {
@@ -353,6 +353,10 @@ export const backupAPI = {
   download: (name) => `${API_BASE_URL}/backup/download/${encodeURIComponent(name)}`,
   delete: (name) => apiCall('DELETE', `/backup/${encodeURIComponent(name)}`),
   restore: (name) => apiCall('POST', `/backup/restore/${encodeURIComponent(name)}`),
+  // Auto backup
+  getSettings: () => apiCall('GET', '/backup/settings'),
+  updateSettings: (data) => apiCall('PUT', '/backup/settings', data),
+  createAutoBackup: () => apiCall('POST', '/backup/auto-now'),
 };
 
 export const settingsAPI = {

@@ -135,6 +135,15 @@ router.get('/summary/timeline', authenticateToken, async (req, res) => {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
     const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    let whereClause = '';
+    let params = [];
+
+    if (search) {
+      whereClause = 'WHERE (p.project_name LIKE ? OR p.project_code LIKE ?)';
+      params = [`%${search}%`, `%${search}%`];
+    }
 
     const result = await pool.query(`
       SELECT
@@ -148,11 +157,15 @@ router.get('/summary/timeline', authenticateToken, async (req, res) => {
       FROM project_timeline t
       JOIN projects p ON p.id = t.project_id
       LEFT JOIN users u ON u.id = t.changed_by
+      ${whereClause}
       ORDER BY t.created_at DESC
       LIMIT ? OFFSET ?
-    `, [limit, offset]);
+    `, [...params, limit, offset]);
 
-    const countResult = await pool.query('SELECT COUNT(*) as count FROM project_timeline');
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as count FROM project_timeline t JOIN projects p ON p.id = t.project_id ${whereClause}`,
+      params
+    );
     const total = parseInt(countResult.rows[0]?.count || '0', 10);
 
     res.json({ data: result.rows, pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) } });

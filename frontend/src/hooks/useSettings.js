@@ -183,6 +183,7 @@ export function useBackupManagement(isAdmin) {
     backups,
     backupLoading,
     backupMessage,
+    setBackupMessage,
     restoringName,
     confirmDelete,
     setConfirmDelete,

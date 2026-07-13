@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { authAPI, usersAPI, backupAPI, settingsAPI } from '../utils/api';
 import { ROLES } from '../utils/constants';
 import { useProfileEdit, useCompanySettings, useBackupManagement } from '../hooks/useSettings';
+import AutoBackupSettings from '../components/AutoBackupSettings';
 
 // Permission matrix (mirror of backend middleware/auth.js)
 const PERMISSION_MATRIX = {
@@ -78,6 +79,9 @@ export default function Settings() {
   const [rolesLoading, setRolesLoading] = useState(false);
   const [rolesMessage, setRolesMessage] = useState({ type: '', text: '' });
   const [showPermissions, setShowPermissions] = useState(false);
+
+  // Backup mode state
+  const [backupMode, setBackupMode] = useState('manual');
 
   const isAdmin = user?.role === 'admin';
 
@@ -897,16 +901,53 @@ export default function Settings() {
             </div>
           )}
 
-          <button
-            onClick={backup.handleCreateBackup}
-            disabled={backup.backupLoading}
-            className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed mb-5"
-          >
-            <HardDrive size={16} />
-            {backup.backupLoading ? 'กำลังสำรอง...' : 'สำรองฐานข้อมูลตอนนี้'}
-          </button>
+          {/* Backup Mode Tabs */}
+          <div className="flex gap-2 mb-6 p-1 bg-slate-100 rounded-xl">
+            <button
+              onClick={() => setBackupMode('manual')}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${
+                backupMode === 'manual' 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <HardDrive size={16} className="inline mr-2" />
+              Manual Backup
+            </button>
+            <button
+              onClick={() => setBackupMode('auto')}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${
+                backupMode === 'auto' 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <RefreshCw size={16} className="inline mr-2" />
+              Auto Backup
+            </button>
+          </div>
 
-          <div className="overflow-x-auto">
+          {/* Manual Backup Mode */}
+          {backupMode === 'manual' && (
+            <>
+              <button
+                onClick={backup.handleCreateBackup}
+                disabled={backup.backupLoading}
+                className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed mb-5"
+              >
+                <HardDrive size={16} />
+                {backup.backupLoading ? 'กำลังสำรอง...' : 'สำรองฐานข้อมูลตอนนี้'}
+              </button>
+            </>
+          )}
+
+          {/* Auto Backup Mode */}
+          {backupMode === 'auto' && (
+            <AutoBackupSettings onMessage={(msg) => backup.setBackupMessage(msg)} />
+          )}
+
+          {/* Backup List Table */}
+          <div className="mt-6 overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-slate-50 text-sm text-slate-500">
                 <tr>

@@ -4,6 +4,7 @@ const fs = require('fs');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { logActivity } = require('./activity_logs');
 const { vacuumDatabase, cleanupOldLogs } = require('../services/maintenance');
+const autoBackupService = require('../services/autoBackup');
 
 const router = express.Router();
 
@@ -14,6 +15,84 @@ const backupDir = process.env.BACKUPS_DIR || path.join(__dirname, '..', '..', 'b
 if (!fs.existsSync(backupDir)) {
   fs.mkdirSync(backupDir, { recursive: true });
 }
+
+// ========================
+// Auto Backup Settings (ต้องอยู่ก่อน /:name)
+// ========================
+
+// GET /api/backup/settings — ดูตั้งค่า auto backup
+router.get('/settings', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  try {
+    const settings = autoBackupService.getSettings();
+    const backups = autoBackupService.listBackups();
+    const lastAutoBackup = backups.find(b => b.type === 'auto');
+
+    res.json({
+      settings,
+      lastBackup: lastAutoBackup || null,
+      nextBackup: calculateNextBackup(settings),
+    });
+  } catch (error) {
+    console.error('Get backup settings error:', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// PUT /api/backup/settings — ตั้งค่า auto backup
+router.put('/settings', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  try {
+    const { enabled, frequency, time, retentionDays } = req.body;
+
+    // Validate time format
+    if (time && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(time)) {
+      return res.status(400).json({ error: 'รูปแบบเวลาไม่ถูกต้อง (HH:MM)' });
+    }
+
+    // Validate frequency
+    if (frequency && !['daily', 'weekly', 'monthly'].includes(frequency)) {
+      return res.status(400).json({ error: 'ความถี่ไม่ถูกต้อง' });
+    }
+
+    // Validate retention
+    if (retentionDays && (retentionDays < 7 || retentionDays > 365)) {
+      return res.status(400).json({ error: 'ระยะเวลาเก็บต้องอยู่ระหว่าง 7-365 วัน' });
+    }
+
+    const newSettings = autoBackupService.updateSettings({
+      enabled,
+      frequency,
+      time,
+      retentionDays: retentionDays ? parseInt(retentionDays) : undefined,
+    });
+
+    logActivity(req.user.id, 'update', 'backup_settings', null, { settings: newSettings });
+
+    res.json({
+      message: 'อัปเดตตั้งค่าสำเร็จ',
+      settings: newSettings,
+      nextBackup: calculateNextBackup(newSettings),
+    });
+  } catch (error) {
+    console.error('Update backup settings error:', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// POST /api/backup/auto-now — สร้าง backup ทันที (for testing)
+router.post('/auto-now', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  try {
+    const backup = autoBackupService.createBackup('auto');
+    logActivity(req.user.id, 'backup', 'database', null, backup);
+    res.json({ message: 'สร้าง backup สำเร็จ', backup });
+  } catch (error) {
+    console.error('Auto backup error:', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ========================
+// Manual Backup Endpoints
+// ========================
 
 // POST /api/backup — สำรองฐานข้อมูล (Admin only)
 router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
@@ -96,30 +175,6 @@ router.get('/download/:name', authenticateToken, authorizeRole(['admin']), async
   }
 });
 
-// DELETE /api/backup/:name — ลบไฟล์ backup (Admin only)
-router.delete('/:name', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-  try {
-    const backupPath = path.join(backupDir, req.params.name);
-
-    if (!path.resolve(backupPath).startsWith(path.resolve(backupDir))) {
-      return res.status(403).json({ error: 'ไม่อนุญาต' });
-    }
-
-    if (!fs.existsSync(backupPath)) {
-      return res.status(404).json({ error: 'ไม่พบไฟล์ backup' });
-    }
-
-    fs.unlinkSync(backupPath);
-
-    logActivity(req.user.id, 'delete', 'backup', null, { backup_name: req.params.name });
-
-    res.json({ message: 'ลบไฟล์ backup สำเร็จ' });
-  } catch (error) {
-    console.error('Backup delete error:', error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
-  }
-});
-
 // POST /api/backup/restore/:name — กู้คืนฐานข้อมูลจาก backup (Admin only)
 router.post('/restore/:name', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
@@ -158,6 +213,31 @@ router.post('/restore/:name', authenticateToken, authorizeRole(['admin']), async
   }
 });
 
+// DELETE /api/backup/:name — ลบไฟล์ backup (Admin only)
+// ต้องอยู่หลัง routes อื่นๆ ที่ใช้ path pattern ชัดเจน
+router.delete('/:name', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+  try {
+    const backupPath = path.join(backupDir, req.params.name);
+
+    if (!path.resolve(backupPath).startsWith(path.resolve(backupDir))) {
+      return res.status(403).json({ error: 'ไม่อนุญาต' });
+    }
+
+    if (!fs.existsSync(backupPath)) {
+      return res.status(404).json({ error: 'ไม่พบไฟล์ backup' });
+    }
+
+    fs.unlinkSync(backupPath);
+
+    logActivity(req.user.id, 'delete', 'backup', null, { backup_name: req.params.name });
+
+    res.json({ message: 'ลบไฟล์ backup สำเร็จ' });
+  } catch (error) {
+    console.error('Backup delete error:', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
 // POST /api/backup/vacuum — VACUUM ฐานข้อมูล (Admin only)
 router.post('/vacuum', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
@@ -181,5 +261,36 @@ router.post('/cleanup', authenticateToken, authorizeRole(['admin']), async (req,
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการ cleanup' });
   }
 });
+
+// Helper: คำนวณเวลา backup ถัดไป
+function calculateNextBackup(settings) {
+  if (!settings.enabled) return null;
+
+  const now = new Date();
+  const [hours, minutes] = settings.time.split(':').map(Number);
+  
+  let next = new Date();
+  next.setHours(hours, minutes, 0, 0);
+
+  // ถ้าเลยเวลาแล้ว ให้เลื่อนไปวันถัดไป
+  if (next <= now) {
+    next.setDate(next.getDate() + 1);
+  }
+
+  // ปรับตาม frequency
+  if (settings.frequency === 'weekly') {
+    // ถ้าไม่ใช่วันอาทิตย์ ให้เลื่อนไปอาทิตย์ถัดไป
+    while (next.getDay() !== 0) {
+      next.setDate(next.getDate() + 1);
+    }
+  } else if (settings.frequency === 'monthly') {
+    // ถ้าไม่ใช่วันที่ 1 ให้เลื่อนไปเดือนถัดไป
+    if (next.getDate() !== 1) {
+      next.setMonth(next.getMonth() + 1, 1);
+    }
+  }
+
+  return next.toISOString();
+}
 
 module.exports = router;

@@ -222,20 +222,75 @@ export default function ProjectsTable({ filters, refreshKey = 0, onEditProject, 
           แสดง {projects.length === 0 ? 0 : (page - 1) * 10 + 1} - {(page - 1) * 10 + projects.length} จาก {totalItems} รายการ
         </span>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          {/* ก่อนหน้า */}
           <button
             onClick={() => setPage(Math.max(1, page - 1))}
             disabled={page === 1}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
             ก่อนหน้า
           </button>
-          <span className="rounded-lg bg-blue-600 px-3 py-1.5 font-semibold text-white">{page}</span>
-          <span>จาก {totalPages}</span>
+
+          {/* สร้างปุ่มเลขหน้า */}
+          {(() => {
+            const pages = [];
+            const maxVisible = 5;
+            let start = Math.max(1, page - Math.floor(maxVisible / 2));
+            let end = Math.min(totalPages, start + maxVisible - 1);
+            
+            if (end - start + 1 < maxVisible) {
+              start = Math.max(1, end - maxVisible + 1);
+            }
+
+            // หน้าแรก
+            if (start > 1) {
+              pages.push(
+                <button key={1} onClick={() => setPage(1)}
+                  className="min-w-[36px] rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-50">
+                  1
+                </button>
+              );
+              if (start > 2) {
+                pages.push(<span key="dots1" className="px-1 text-slate-400">...</span>);
+              }
+            }
+
+            // หน้ากลาง
+            for (let i = start; i <= end; i++) {
+              pages.push(
+                <button key={i} onClick={() => setPage(i)}
+                  className={`min-w-[36px] rounded-lg px-3 py-1.5 font-medium ${
+                    page === i 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}>
+                  {i}
+                </button>
+              );
+            }
+
+            // หน้าสุดท้าย
+            if (end < totalPages) {
+              if (end < totalPages - 1) {
+                pages.push(<span key="dots2" className="px-1 text-slate-400">...</span>);
+              }
+              pages.push(
+                <button key={totalPages} onClick={() => setPage(totalPages)}
+                  className="min-w-[36px] rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-50">
+                  {totalPages}
+                </button>
+              );
+            }
+
+            return pages;
+          })()}
+
+          {/* ถัดไป */}
           <button
             onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page === totalPages}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
             ถัดไป
           </button>

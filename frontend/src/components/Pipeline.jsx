@@ -1,6 +1,6 @@
 import { CheckCircle2, Circle, Clock3 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, memo } from 'react';
 import { STEP_LABELS, STEP_ORDER, STATUS_LABELS } from '../utils/constants';
 import { reportsAPI } from '../utils/api';
 
@@ -17,9 +17,10 @@ const piePalette = ['#34c759', '#3b82f6', '#94a3b8', '#a855f7', '#ef4444', '#f97
 
 // รับ props:
 // - refreshKey: เมื่อค่าเปลี่ยน (จาก Dashboard) จะดึงข้อมูล Pipeline ใหม่ทันที
-export default function Pipeline({ refreshKey = 0 }) {
+const Pipeline = memo(function Pipeline({ refreshKey = 0 }) {
   const [stepStats, setStepStats] = useState({});
   const [statusSummary, setStatusSummary] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // โหลดใหม่ทุกครั้งที่ refreshKey เปลี่ยน
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function Pipeline({ refreshKey = 0 }) {
   }, [refreshKey]);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const [stepStatusResponse, statusResponse] = await Promise.all([
         reportsAPI.getSummaryByStepStatus(),
@@ -69,6 +71,8 @@ export default function Pipeline({ refreshKey = 0 }) {
       setStatusSummary(statusData);
     } catch (error) {
       console.error('Failed to load pipeline data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -85,6 +89,44 @@ export default function Pipeline({ refreshKey = 0 }) {
     const completedCount = statusSummary.find((item) => item.status === 'completed');
     return Math.round((Number(completedCount?.count || 0) / totalProjects) * 100);
   }, [statusSummary, totalProjects]);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[2.5fr_1fr]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6">
+            <div className="h-6 w-48 bg-slate-100 rounded animate-pulse"></div>
+            <div className="h-4 w-64 bg-slate-100 rounded animate-pulse mt-2"></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="h-8 w-8 bg-slate-200 rounded-full animate-pulse"></div>
+                  <div className="flex-1">
+                    <div className="h-4 w-16 bg-slate-200 rounded animate-pulse"></div>
+                    <div className="h-3 w-12 bg-slate-200 rounded animate-pulse mt-1"></div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {[1, 2, 3].map((j) => (
+                    <div key={j} className="flex justify-between">
+                      <div className="h-3 w-20 bg-slate-200 rounded animate-pulse"></div>
+                      <div className="h-3 w-6 bg-slate-200 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="h-6 w-32 bg-slate-100 rounded animate-pulse mb-6"></div>
+          <div className="h-48 bg-slate-100 rounded animate-pulse"></div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-[2.5fr_1fr]">
@@ -211,4 +253,6 @@ export default function Pipeline({ refreshKey = 0 }) {
       </section>
     </div>
   );
-}
+});
+
+export default Pipeline;

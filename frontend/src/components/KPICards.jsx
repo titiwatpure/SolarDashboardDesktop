@@ -1,5 +1,5 @@
 import { CheckCircle2, AlertTriangle, FolderKanban, FileCheck2, ArrowRight, XCircle, ShieldAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { projectsAPI } from '../utils/api';
 
@@ -63,7 +63,7 @@ const cardConfig = [
 // รับ props:
 // - refreshKey: เมื่อค่านี้เปลี่ยน (จาก Dashboard) จะดึง KPI ใหม่ทันที
 //   ใช้เพื่อ sync ตัวเลขหลังจากอัปเดตสถานะโครงการ
-export default function KPICards({ refreshKey = 0 }) {
+const KPICards = memo(function KPICards({ refreshKey = 0 }) {
   const navigate = useNavigate();
   const [kpis, setKpis] = useState({
     total_projects: 0, // จำนวนโครงการทั้งหมด
@@ -72,6 +72,7 @@ export default function KPICards({ refreshKey = 0 }) {
     completed: 0,      // COD แล้ว
     blocked: 0         // ติดปัญหา
   });
+  const [loading, setLoading] = useState(true);
 
   // โหลด KPI ใหม่ทุกครั้งที่ refreshKey เปลี่ยน
   // (เช่น หลังอัปเดตสถานะโครงการ หรือสร้าง/ลบโครงการ)
@@ -81,11 +82,14 @@ export default function KPICards({ refreshKey = 0 }) {
 
   // ดึงตัวเลข KPI จาก API
   const loadKPIs = async () => {
+    setLoading(true);
     try {
       const data = await projectsAPI.getKPIs();
       setKpis(data); // อัปเดตค่า
     } catch (error) {
       console.error('Failed to load KPIs:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -93,6 +97,22 @@ export default function KPICards({ refreshKey = 0 }) {
     <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
       {cardConfig.map((card) => {
         const Icon = card.icon;
+
+        if (loading) {
+          return (
+            <div key={card.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="h-4 w-24 bg-slate-100 rounded animate-pulse"></div>
+                  <div className="mt-3 h-10 w-16 bg-slate-100 rounded animate-pulse"></div>
+                  <div className="mt-2 h-4 w-20 bg-slate-100 rounded animate-pulse"></div>
+                </div>
+                <div className="h-14 w-14 bg-slate-100 rounded-2xl animate-pulse"></div>
+              </div>
+              <div className="mt-5 h-4 w-28 bg-slate-100 rounded animate-pulse"></div>
+            </div>
+          );
+        }
 
         return (
           <div
@@ -127,4 +147,6 @@ export default function KPICards({ refreshKey = 0 }) {
       })}
     </div>
   );
-}
+});
+
+export default KPICards;

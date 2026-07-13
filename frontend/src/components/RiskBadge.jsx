@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { RISK_LEVELS } from '../utils/constants';
 
-export default function RiskBadge({ level, showIcon = true }) {
+const RiskBadge = memo(function RiskBadge({ level, showIcon = true }) {
   if (!level || level === 'low') return null;
 
   const config = RISK_LEVELS[level];
@@ -13,4 +13,6 @@ export default function RiskBadge({ level, showIcon = true }) {
       {config.label}
     </span>
   );
-}
+});
+
+export default RiskBadge;

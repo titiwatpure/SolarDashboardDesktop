@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
@@ -6,7 +7,7 @@ import { Navigate } from 'react-router-dom';
  * @param {string[]} roles - roles ที่อนุญาต (ถ้าไม่ส่ง = ต้อง login เท่านั้น)
  * @param {React.ReactNode} children - component ที่ต้องการ protect
  */
-export default function ProtectedRoute({ roles, children }) {
+const ProtectedRoute = memo(function ProtectedRoute({ roles, children }) {
   const { user, loading } = useAuth();
 
   // ยังโหลดอยู่ → แสดง loading
@@ -39,4 +40,6 @@ export default function ProtectedRoute({ roles, children }) {
   }
 
   return children;
-}
+});
+
+export default ProtectedRoute;
