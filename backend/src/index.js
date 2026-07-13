@@ -43,6 +43,13 @@ app.use(helmet({
   contentSecurityPolicy: process.env.ELECTRON_MODE ? false : undefined,
 }));
 
+// CORS: อนุญาตการร้องขอจากโดเมนต่างๆ (ต้องอยู่ก่อน rate limiter)
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  credentials: true,
+  maxAge: 86400
+}));
+
 // Rate limiting - ป้องกัน brute-force
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 นาที
@@ -60,13 +67,6 @@ const loginLimiter = rateLimit({
   message: { error: 'เข้าสู่ระบบล้มเหลวหลายครั้ง กรุณารอ 15 นาที' }
 });
 app.use('/api/auth/login', loginLimiter);
-
-// CORS: อนุญาตการร้องขอจากโดเมนต่างๆ
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true,
-  maxAge: 86400
-}));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
