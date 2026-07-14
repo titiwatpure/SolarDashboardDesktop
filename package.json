@@ -1,6 +1,6 @@
 {
   "name": "solar-dashboard",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Solar Dashboard - ระบบติดตามโครงการ Solar (Desktop App)",
   "main": "electron/main.js",
   "scripts": {
@@ -24,6 +24,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.1.1",
+    "react-router-dom": "^6.30.4",
     "sql.js": "^1.14.1",
     "uuid": "^14.0.0"
   },
