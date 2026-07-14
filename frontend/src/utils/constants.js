@@ -30,6 +30,14 @@ export const STATUS_COLORS = {
   checkpoint_skipped: 'bg-amber-100 text-amber-800',
 };
 
+// ประเภทบริการ
+export const SERVICE_TYPES = {
+  document_only: { label: 'ยื่นเอกสารอย่างเดียว', icon: '📄', color: 'bg-blue-100 text-blue-800' },
+  document_erc: { label: 'ยื่นเอกสาร + ขออนุญาต', icon: '📋', color: 'bg-emerald-100 text-emerald-800' },
+  full: { label: 'ทำทั้งหมดจน COD', icon: '⚡', color: 'bg-violet-100 text-violet-800' },
+  custom: { label: 'กำหนดเอง', icon: '⚙️', color: 'bg-amber-100 text-amber-800' },
+};
+
 // ระดับความเสี่ยง
 export const RISK_LEVELS = {
   low: { label: 'ต่ำ', color: 'bg-green-100 text-green-800', icon: '🟢' },

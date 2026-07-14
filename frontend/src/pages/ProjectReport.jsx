@@ -9,7 +9,8 @@ import autoTable from 'jspdf-autotable';
 import { projectsAPI, tasksAPI, documentsAPI, settingsAPI } from '../utils/api';
 import {
   STATUS_LABELS, STEP_LABELS, RISK_LEVELS, ROLES,
-  PRIORITY_LABELS, CHECKPOINT_STATUSES, APPROVAL_STATUSES, PERMIT_TYPES
+  PRIORITY_LABELS, CHECKPOINT_STATUSES, APPROVAL_STATUSES, PERMIT_TYPES,
+  SERVICE_TYPES
 } from '../utils/constants';
 import { SARABUN_BASE64 } from '../utils/thaiFont';
 
@@ -108,7 +109,15 @@ export default function ProjectReport() {
     y += 10;
     doc.setFontSize(10);
     doc.text(`${project.project_code} | ${project.size_kw} kW | ${project.province}`, titleX, y, { align: titleAlign });
-    y += 10;
+    y += 5;
+    
+    // แสดง service_type ในรายงาน
+    if (project.service_type && SERVICE_TYPES[project.service_type]) {
+      doc.text(`${SERVICE_TYPES[project.service_type].icon} ${SERVICE_TYPES[project.service_type].label}`, titleX, y, { align: titleAlign });
+    } else if (project.permit_type) {
+      doc.text(`ประเภท: ${PERMIT_TYPES[project.permit_type] || project.permit_type}`, titleX, y, { align: titleAlign });
+    }
+    y += 7;
 
     doc.setFontSize(11);
     doc.text(`ความคืบหน้า: ${progress}% | สถานะ: ${STATUS_LABELS[project.status]} | ความเสี่ยง: ${risk.label}`, 14, y);
@@ -271,7 +280,12 @@ export default function ProjectReport() {
                 <span className="flex items-center gap-1"><Zap size={14} /> {project.size_kw} kW / {project.size_kva} kVA</span>
                 <span className="flex items-center gap-1"><MapPin size={14} /> {project.province}</span>
                 <span className="flex items-center gap-1"><User size={14} /> {project.responsible_user_name || '-'}</span>
-                {project.permit_type && (
+                {project.service_type && SERVICE_TYPES[project.service_type] && (
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${SERVICE_TYPES[project.service_type].color}`}>
+                    {SERVICE_TYPES[project.service_type].icon} {SERVICE_TYPES[project.service_type].label}
+                  </span>
+                )}
+                {!project.service_type && project.permit_type && (
                   <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium">{PERMIT_TYPES[project.permit_type]}</span>
                 )}
               </div>

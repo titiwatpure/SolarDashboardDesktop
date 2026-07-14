@@ -13,6 +13,7 @@ const emptyForm = {
   has_power_selling: false,
   scope_start: 'survey',
   scope_end: 'cod',
+  service_type: 'full',
   customer_id: '',
   site_address: '',
   site_lat: '',
@@ -184,6 +185,17 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, projec
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                 <option value="">ไม่ระบุ</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ประเภทบริการ</label>
+              <select name="service_type" value={formData.service_type} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                <option value="document_only">📄 ยื่นเอกสารอย่างเดียว</option>
+                <option value="document_erc">📋 ยื่นเอกสาร + ขออนุญาต</option>
+                <option value="full">⚡ ทำทั้งหมดจน COD</option>
+                <option value="custom">⚙️ กำหนดเอง</option>
               </select>
             </div>
 

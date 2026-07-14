@@ -372,7 +372,7 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
       project_name, project_code, size_kw, size_kva, province,
       responsible_user, description, has_power_selling, start_date,
       scope_start, scope_end, expected_cod_date, actual_cod_date,
-      site_lat, site_lng,
+      site_lat, site_lng, service_type,
     } = req.body;
 
     if (!project_name || !size_kw || !province) {
@@ -432,6 +432,10 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
     const validSteps = Object.keys(STEP_ORDER);
     const scopeStartVal = validSteps.includes(scope_start) ? scope_start : 'survey';
     const scopeEndVal = validSteps.includes(scope_end) ? scope_end : 'cod';
+    
+    // Validate service_type
+    const validServiceTypes = ['document_only', 'document_erc', 'full', 'custom'];
+    const serviceTypeVal = validServiceTypes.includes(service_type) ? service_type : 'full';
 
     await pool.query(
       `INSERT INTO projects (
@@ -439,8 +443,8 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
         responsible_user, description, has_power_selling, requires_permit,
         permit_type, start_date, expected_cod_date, actual_cod_date,
         status, current_step, scope_start, scope_end,
-        risk_level, risk_factors, site_lat, site_lng
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        risk_level, risk_factors, site_lat, site_lng, service_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, project_name, finalCode, Number(size_kw),
         size_kva ? Number(size_kva) : null, province,
@@ -453,6 +457,7 @@ router.post('/', authenticateToken, authorizePermission('project.create'), async
         'low', '{}',
         site_lat ? Number(site_lat) : null,
         site_lng ? Number(site_lng) : null,
+        serviceTypeVal,
       ]
     );
 
@@ -623,7 +628,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       'responsible_user', 'description', 'has_power_selling',
       'blocked_reason', 'blocked_by', 'actual_cod_date', 'expected_cod_date',
       'size_kw', 'size_kva', 'start_date',
-      'scope_start', 'scope_end',
+      'scope_start', 'scope_end', 'service_type',
       'customer_id', 'site_address', 'site_lat', 'site_lng',
       'grid_station', 'grid_voltage',
       'contract_number', 'contract_value', 'contract_date', 'budget',
@@ -671,6 +676,12 @@ router.put('/:id', authenticateToken, async (req, res) => {
         value = Number(rawValue);
         if (isNaN(value) || value < -180 || value > 180) {
           return res.status(400).json({ error: 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180' });
+        }
+      }
+      if (key === 'service_type') {
+        const validServiceTypes = ['document_only', 'document_erc', 'full', 'custom'];
+        if (rawValue && !validServiceTypes.includes(rawValue)) {
+          return res.status(400).json({ error: 'ประเภทบริการไม่ถูกต้อง' });
         }
       }
       setClauses.push(`${key} = ?`);
