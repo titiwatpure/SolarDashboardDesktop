@@ -615,6 +615,34 @@ npm test
 - Navigation drawer สำหรับมือถือ
 - ตารางสามารถเลื่อนได้บนมือถือ
 
+## ประวัติการอัปเดตล่าสุด
+
+### v1.2.0 (2026-07-17)
+
+#### Doc Review - ฟีเจอร์ใหม่
+- **เอกสารต้องแก้** (`/doc-review/pending-revisions`) — รวม checklist ที่ status=customer_revision ทุกโครงการไว้หน้าเดียว
+- **สรุปส่งหน่วยงานวันนี้** (`/doc-review/ready-to-submit`) — checklist ที่ status=passed แต่ยังไม่ได้ยื่นหน่วยงาน
+- **ปัญหาเอกสาร** (`/doc-review/open-issues`) — รวมปัญหาที่ status=open ทุก package
+
+#### Progress Calculation Fix
+- แก้ไขการคำนวณความคืบหน้า: **step position (50%) + checkpoint completion (50%)**
+- ก่อนหน้า: คำนวณจาก step อย่างเดียว → ตอนนี้คิด checkpoint ที่เสร็จแล้วด้วย
+
+#### Rate Limit Fix
+- Dev mode: ข้าม rate limiting ทั้งหมด (เดิม 200 req/min → ตอนนี้ unlimited ใน dev)
+- Login limiter: dev mode ข้าม (เดิม 20 req/15min)
+
+#### Auth Fix
+- AppSettingsContext: ตรวจสอบ token ก่อนเรียก API (ป้องกัน 401 loop)
+- เพิ่ม `getAuthToken()` export ใน api.js
+
+#### Backend
+- Backend ใช้ nodemon auto-restart (`npx nodemon --watch src --ext js,json src/index.js`)
+- แก้ query permit-tracking: LEFT JOIN สำหรับ package_id = NULL
+
+#### Skills
+- เพิ่ม skills: `dashboard-api` (JWT auth + API testing), `dashboard-services` (service lifecycle)
+
 ## License
 
 MIT License
