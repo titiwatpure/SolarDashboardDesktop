@@ -38,7 +38,15 @@ function getUserFromStorage() {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => getUserFromStorage());
+  const [user, setUser] = useState(() => {
+    const stored = getUserFromStorage();
+    // If we have a stored user, verify token is still valid
+    if (stored) {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
+    }
+    return stored;
+  });
   const [loading, setLoading] = useState(true);
   const refreshTimerRef = useRef(null);
 
@@ -65,9 +73,20 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    // Verify token is valid on mount
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    
+    if (!token || !storedUser) {
+      // No credentials — clear everything
+      setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+    } else if (user) {
       startRefreshTimer();
     }
+    
     setLoading(false);
 
     return () => {

@@ -30,6 +30,9 @@ const menuGroups = [
     id: 'doc-review', label: 'ตรวจเอกสาร / ยื่นหน่วยงาน', icon: FileCheck,
     children: [
       { id: 'doc-review-dashboard', label: 'แดชบอร์ดเอกสาร', path: '/doc-review', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'doc-review-pending-revisions', label: 'เอกสารต้องแก้', path: '/doc-review/pending-revisions', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'doc-review-ready-to-submit', label: 'สรุปส่งหน่วยงานวันนี้', path: '/doc-review/ready-to-submit', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'doc-review-open-issues', label: 'ปัญหาเอกสาร', path: '/doc-review/open-issues', roles: ['admin', 'engineer', 'staff'] },
       { id: 'doc-review-new', label: 'สร้างโครงการตรวจเอกสาร', path: '/doc-review/new', roles: ['admin', 'engineer'] },
       { id: 'doc-review-templates', label: 'Template Checklist', path: '/doc-review/templates', roles: ['admin', 'engineer'] },
       { id: 'doc-review-agency-tracking', label: 'ติดตามยื่นหน่วยงาน', path: '/doc-review/agency-tracking', roles: ['admin', 'engineer', 'staff'] },

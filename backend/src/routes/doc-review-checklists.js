@@ -532,6 +532,99 @@ router.post('/checklists/batch-force-pass', authenticateToken, async (req, res) 
   }
 });
 
+// ============================================================
+// GET /api/doc-review/pending-revisions
+// รวม checklist ที่ status = customer_revision ทุกโครงการ
+// ============================================================
+router.get('/pending-revisions', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.id, c.document_name, c.description, c.status, c.is_required,
+        c.updated_at as checklist_updated_at,
+        p.id as project_id, p.project_code, p.project_name, p.project_status,
+        pkg.id as package_id, pkg.permit_type, pkg.package_status,
+        (SELECT event_data FROM doc_review_timeline
+         WHERE checklist_id = c.id AND event_type = 'revision'
+         ORDER BY created_at DESC LIMIT 1) as revision_reason
+      FROM doc_review_checklists c
+      JOIN doc_review_projects p ON c.project_id = p.id
+      LEFT JOIN doc_submission_packages pkg ON c.package_id = pkg.id
+      WHERE c.status = 'customer_revision'
+      ORDER BY c.updated_at DESC
+    `);
+
+    const items = result.rows.map(row => ({
+      ...row,
+      revision_reason: row.revision_reason ? JSON.parse(row.revision_reason) : null
+    }));
+
+    res.json(items);
+  } catch (error) {
+    console.error('[DOC_REVIEW_PENDING_REVISIONS]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
+// GET /api/doc-review/ready-to-submit
+// checklist ที่ status=passed แต่ยังไม่ได้ยื่นหน่วยงาน
+// ============================================================
+router.get('/ready-to-submit', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.id, c.document_name, c.description, c.is_required,
+        c.updated_at as passed_at,
+        p.id as project_id, p.project_code, p.project_name,
+        pkg.id as package_id, pkg.permit_type, pkg.package_status,
+        (SELECT COUNT(*) FROM doc_agency_submissions
+         WHERE project_id = p.id AND agency_name = pkg.permit_type) as submission_count
+      FROM doc_review_checklists c
+      JOIN doc_review_projects p ON c.project_id = p.id
+      LEFT JOIN doc_submission_packages pkg ON c.package_id = pkg.id
+      WHERE c.status = 'passed'
+        AND pkg.package_status NOT IN ('submitted_agency', 'approved')
+      ORDER BY c.updated_at DESC
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('[DOC_REVIEW_READY_TO_SUBMIT]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
+// ============================================================
+// GET /api/doc-review/open-issues
+// รวมปัญหาเอกสารที่ status=open ทุก package
+// ============================================================
+router.get('/open-issues', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        i.id, i.description, i.required_action, i.issue_source,
+        i.revision_round, i.status, i.created_at,
+        c.document_name, c.id as checklist_id,
+        p.id as project_id, p.project_code, p.project_name,
+        pkg.id as package_id, pkg.permit_type,
+        u.full_name as created_by_name
+      FROM document_issues i
+      JOIN doc_review_checklists c ON i.checklist_item_id = c.id
+      JOIN doc_review_projects p ON c.project_id = p.id
+      LEFT JOIN doc_submission_packages pkg ON i.package_id = pkg.id
+      LEFT JOIN users u ON i.created_by = u.id
+      WHERE i.status = 'open'
+      ORDER BY i.created_at DESC
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('[DOC_REVIEW_OPEN_ISSUES]', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
 module.exports = router;
 module.exports.recalculatePackageStatus = recalculatePackageStatus;
 module.exports.syncProjectStatus = syncProjectStatus;

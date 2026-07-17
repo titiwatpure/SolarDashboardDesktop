@@ -51,11 +51,13 @@ app.use(cors({
 }));
 
 // Rate limiting - ป้องกัน brute-force
+const isDev = !isProduction;
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 นาที
-  max: 200, // สูงสุด 200 requests ต่อ IP
+  max: isDev ? 9999 : 200, // dev: unlimited, prod: 200 requests ต่อ IP
   standardHeaders: true,
   legacyHeaders: false,
+  skip: isDev ? () => true : undefined, // dev mode: skip rate limiting entirely
   message: { error: 'มีคำขอมากเกินไป กรุณารอสักครู่' }
 });
 app.use('/api/', limiter);
@@ -63,7 +65,8 @@ app.use('/api/', limiter);
 // Rate limit เข้มงวดสำหรับ login
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: isDev ? 9999 : 20,
+  skip: isDev ? () => true : undefined, // dev mode: skip rate limiting entirely
   message: { error: 'เข้าสู่ระบบล้มเหลวหลายครั้ง กรุณารอ 15 นาที' }
 });
 app.use('/api/auth/login', loginLimiter);
@@ -96,6 +99,7 @@ app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api', require('./routes/checkpoints'));
 app.use('/api/backup', require('./routes/backup'));
+app.use('/api/permit-tracking', require('./routes/permit-tracking'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/quotations', require('./routes/quotations'));

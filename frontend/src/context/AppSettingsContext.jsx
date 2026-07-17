@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { settingsAPI } from '../utils/api';
+import { settingsAPI, getAuthToken } from '../utils/api';
 
 const AppSettingsContext = createContext(null);
 
@@ -8,6 +8,11 @@ export function AppSettingsProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const loadSettings = useCallback(async () => {
+    // Skip if not logged in
+    if (!getAuthToken()) {
+      setLoading(false);
+      return;
+    }
     try {
       const data = await settingsAPI.getCompany();
       setSettings(data);

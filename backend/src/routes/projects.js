@@ -13,15 +13,42 @@ const STEP_ORDER = { survey: 0, design: 1, erc: 2, grid: 3, construction: 4, tes
 const STEP_LABELS = { survey: 'สำรวจ', design: 'ออกแบบ', erc: 'ERC', grid: 'Grid', construction: 'ก่อสร้าง', testing: 'ทดสอบ', cod: 'COD' };
 const STATUS_LABELS = { not_started: 'ยังไม่เริ่ม', in_progress: 'กำลังดำเนินการ', waiting: 'รอข้อมูล', blocked: 'ติดปัญหา', rejected: 'ถูกปฏิเสธ', completed: 'เสร็จสิ้น' };
 
-function calcProgress(currentStep, status, scopeStart = 'survey', scopeEnd = 'cod') {
+// คำนวณความคืบหน้า = step position (50%) + checkpoint completion (50%)
+async function calcProgress(projectId, currentStep, status, scopeStart = 'survey', scopeEnd = 'cod') {
   if (status === 'completed') return 100;
-  const start = STEP_ORDER[scopeStart] ?? 0;
-  const end = STEP_ORDER[scopeEnd] ?? 6;
-  const current = STEP_ORDER[currentStep] ?? 0;
-  const scopeSize = end - start;
-  if (scopeSize <= 0) return status === 'completed' ? 100 : 0;
-  const pos = Math.max(0, Math.min(current - start, scopeSize));
-  return Math.round((pos / scopeSize) * 100);
+
+  const startOrder = STEP_ORDER[scopeStart] ?? 0;
+  const endOrder = STEP_ORDER[scopeEnd] ?? 6;
+  const currentOrder = STEP_ORDER[currentStep] ?? 0;
+  const scopeSize = endOrder - startOrder;
+
+  // 1. Step position (50%)
+  let stepPercent = 0;
+  if (scopeSize > 0) {
+    const pos = Math.max(0, Math.min(currentOrder - startOrder, scopeSize));
+    stepPercent = (pos / scopeSize) * 50;
+  }
+
+  // 2. Checkpoint completion (50%)
+  let checkpointPercent = 0;
+  const checkpointsResult = await pool.query(
+    'SELECT step, status FROM checkpoints WHERE project_id = ?',
+    [projectId]
+  );
+  const checkpoints = checkpointsResult.rows || [];
+
+  // กรอง checkpoints ในขอบเขตงาน
+  const scopedCheckpoints = checkpoints.filter(cp => {
+    const cpOrder = STEP_ORDER[cp.step] ?? 0;
+    return cpOrder >= startOrder && cpOrder <= endOrder;
+  });
+
+  if (scopedCheckpoints.length > 0) {
+    const completed = scopedCheckpoints.filter(cp => cp.status === 'completed').length;
+    checkpointPercent = (completed / scopedCheckpoints.length) * 50;
+  }
+
+  return Math.round(stepPercent + checkpointPercent);
 }
 
 // Valid status transitions
@@ -38,7 +65,7 @@ const getProjectById = async (id) => {
   const result = await pool.query('SELECT * FROM projects WHERE id = ?', [id]);
   const row = result.rows[0];
   if (row) {
-    row.progress = calcProgress(row.current_step, row.status, row.scope_start, row.scope_end);
+    row.progress = await calcProgress(row.id, row.current_step, row.status, row.scope_start, row.scope_end);
   }
   return row || null;
 };
@@ -96,6 +123,62 @@ router.get('/stats/kpis', authenticateToken, async (_req, res) => {
   }
 });
 
+// GET /api/projects/stats/permit-summary — สรุปสถานะใบอนุญาตแต่ละโครงการ
+router.get('/stats/permit-summary', authenticateToken, async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        project_code,
+        project_name,
+        service_type,
+        permit_type,
+        requires_permit,
+        status,
+        current_step,
+        scope_start,
+        scope_end,
+        size_kw,
+        province
+      FROM projects
+      ORDER BY created_at DESC
+    `);
+
+    // สรุปตามประเภทใบอนุญาต
+    const permitSummary = {
+      exemption: result.rows.filter(p => p.permit_type === 'exemption').length,
+      permit: result.rows.filter(p => p.permit_type === 'permit').length,
+    };
+
+    // สรุปตามประเภทบริการ
+    const serviceSummary = {
+      document_only: result.rows.filter(p => p.service_type === 'document_only').length,
+      document_erc: result.rows.filter(p => p.service_type === 'document_erc').length,
+      full: result.rows.filter(p => p.service_type === 'full').length,
+      custom: result.rows.filter(p => p.service_type === 'custom').length,
+    };
+
+    // สรุปตามสถานะ
+    const statusSummary = {
+      in_progress: result.rows.filter(p => p.status === 'in_progress').length,
+      completed: result.rows.filter(p => p.status === 'completed').length,
+      waiting: result.rows.filter(p => p.status === 'waiting').length,
+      blocked: result.rows.filter(p => p.status === 'blocked').length,
+      not_started: result.rows.filter(p => p.status === 'not_started').length,
+    };
+
+    res.json({
+      projects: result.rows,
+      permitSummary,
+      serviceSummary,
+      statusSummary,
+      total: result.rows.length,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+  }
+});
+
 const buildFilter = (filters) => {
   const { province, status, current_step, search, risk_level } = filters;
   let clause = '';
@@ -140,10 +223,10 @@ router.get('/', authenticateToken, async (req, res) => {
       ORDER BY p.created_at DESC
       LIMIT ? OFFSET ?`;
     const result = await pool.query(query, [...params, limit, (page - 1) * limit]);
-    result.rows = result.rows.map(r => ({
+    result.rows = await Promise.all(result.rows.map(async r => ({
       ...r,
-      progress: calcProgress(r.current_step, r.status, r.scope_start, r.scope_end),
-    }));
+      progress: await calcProgress(r.id, r.current_step, r.status, r.scope_start, r.scope_end),
+    })));
 
     const countQuery = `SELECT COUNT(*) as count FROM projects WHERE 1=1${clause}`;
     const countResult = await pool.query(countQuery, params);
@@ -334,7 +417,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'ไม่พบโครงการ' });
     const project = result.rows[0];
-    project.progress = calcProgress(project.current_step, project.status, project.scope_start, project.scope_end);
+    project.progress = await calcProgress(project.id, project.current_step, project.status, project.scope_start, project.scope_end);
 
     // Load specs
     const specsResult = await pool.query('SELECT * FROM project_specs WHERE project_id = ?', [req.params.id]);
@@ -632,6 +715,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
       'customer_id', 'site_address', 'site_lat', 'site_lng',
       'grid_station', 'grid_voltage',
       'contract_number', 'contract_value', 'contract_date', 'budget',
+      'panel_brand', 'panel_model', 'panel_count',
+      'inverter_brand', 'inverter_model', 'inverter_count',
+      'mounting_type', 'grid_connection_type',
     ];
 
     const existing = await getProjectById(id);

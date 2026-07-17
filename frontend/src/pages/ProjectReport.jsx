@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Download, Printer, Calendar, MapPin, Zap,
-  AlertTriangle, CheckCircle2, Clock, FileText, Building2, User
+  AlertTriangle, CheckCircle2, Clock, FileText, Building2, User,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -24,6 +25,26 @@ const daysBetween = (a, b) => {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
 };
 
+function CollapsibleSection({ title, icon: Icon, badge, children, defaultOpen = true }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition"
+      >
+        <div className="flex items-center gap-3">
+          {Icon && <Icon size={20} className="text-slate-600" />}
+          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+          {badge && <span className="text-sm text-slate-500">{badge}</span>}
+        </div>
+        {isOpen ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+      </button>
+      {isOpen && <div className="px-6 pb-6">{children}</div>}
+    </section>
+  );
+}
+
 export default function ProjectReport() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -34,6 +55,7 @@ export default function ProjectReport() {
   const [documents, setDocuments] = useState([]);
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [logoBase64, setLogoBase64] = useState(null);
   const [companyName, setCompanyName] = useState('');
 
@@ -54,6 +76,7 @@ export default function ProjectReport() {
   const loadAll = async () => {
     try {
       setLoading(true);
+      setError(null);
       const [proj, tl, cps, taskRes, docRes, orgRes] = await Promise.all([
         projectsAPI.getById(id),
         projectsAPI.getTimeline(id),
@@ -68,8 +91,9 @@ export default function ProjectReport() {
       setTasks(Array.isArray(taskRes) ? taskRes : (taskRes.data || []));
       setDocuments(Array.isArray(docRes) ? docRes : (docRes.data || []));
       setOrganizations(Array.isArray(orgRes) ? orgRes : (orgRes.data || []));
-    } catch (error) {
-      console.error('Failed to load report:', error);
+    } catch (err) {
+      console.error('Failed to load report:', err);
+      setError('ไม่สามารถโหลดข้อมูลโครงการได้ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setLoading(false);
     }
@@ -77,7 +101,10 @@ export default function ProjectReport() {
 
   const currentIdx = STEP_ORDER.indexOf(project?.current_step);
   const progress = project?.progress ?? 0;
+  // delayDays > 0 = ล่าช้า, delayDays < 0 = ยังมีเวลา
   const delayDays = daysBetween(project?.expected_cod_date, new Date().toISOString());
+  const daysRemaining = delayDays < 0 ? Math.abs(delayDays) : null;
+  const isLate = delayDays > 0;
   const risk = RISK_LEVELS[project?.risk_level] || RISK_LEVELS.low;
   const overdueTasks = tasks.filter((t) => t.due_date && new Date(t.due_date) < new Date() && !['completed', 'cancelled'].includes(t.status));
 
@@ -124,6 +151,58 @@ export default function ProjectReport() {
     y += 7;
     doc.text(`วันที่เริ่ม: ${formatDate(project.start_date)} | คาดว่าเสร็จ: ${formatDate(project.expected_cod_date)}`, 14, y);
     y += 10;
+
+    // Customer Info
+    if (project.customer_name) {
+      if (y > 240) { doc.addPage(); y = 15; }
+      doc.setFontSize(12);
+      doc.text('ข้อมูลลูกค้า', 14, y);
+      y += 2;
+      autoTable(doc, {
+        startY: y,
+        head: [['รายการ', 'ข้อมูล']],
+        body: [
+          ['ชื่อลูกค้า', project.customer_name || '-'],
+          ['ประเภทลูกค้า', project.customer_type || '-'],
+          ['ผู้ติดต่อ', project.customer_contact_name || '-'],
+          ['เบอร์โทร', project.customer_contact_phone || '-'],
+          ['อีเมล', project.customer_contact_email || '-'],
+          ['ที่อยู่', project.customer_address || '-'],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [37, 99, 235] },
+        styles: { font: 'Sarabun', fontSize: 9 },
+        didParseCell: (data) => { data.cell.styles.font = 'Sarabun'; },
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    }
+
+    // Project Specs
+    if (project.panel_brand || project.inverter_brand || project.mounting_type) {
+      if (y > 240) { doc.addPage(); y = 15; }
+      doc.setFontSize(12);
+      doc.text('ข้อมูลอุปกรณ์', 14, y);
+      y += 2;
+      autoTable(doc, {
+        startY: y,
+        head: [['รายการ', 'ข้อมูล']],
+        body: [
+          ['ยี่ห้อแผง', project.panel_brand || '-'],
+          ['โมเดลแผง', project.panel_model || '-'],
+          ['จำนวนแผง', project.panel_count ? `${project.panel_count} แผ่น` : '-'],
+          ['ยี่ห้ออินเวอร์เตอร์', project.inverter_brand || '-'],
+          ['โมเดลอินเวอร์เตอร์', project.inverter_model || '-'],
+          ['จำนวนอินเวอร์เตอร์', project.inverter_count ? `${project.inverter_count} ตัว` : '-'],
+          ['ประเภทการติดตั้ง', project.mounting_type || '-'],
+          ['ประเภทการเชื่อมต่อ', project.grid_connection_type || '-'],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [37, 99, 235] },
+        styles: { font: 'Sarabun', fontSize: 9 },
+        didParseCell: (data) => { data.cell.styles.font = 'Sarabun'; },
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    }
 
     // Steps
     autoTable(doc, {
@@ -177,9 +256,10 @@ export default function ProjectReport() {
       y += 2;
       autoTable(doc, {
         startY: y,
-        head: [['ชื่องาน', 'ความสำคัญ', 'สถานะ', 'ครบกำหนด']],
+        head: [['ชื่องาน', 'ผู้รับผิดชอบ', 'ความสำคัญ', 'สถานะ', 'ครบกำหนด']],
         body: tasks.map((t) => [
           t.title,
+          t.assigned_to_name || '-',
           PRIORITY_LABELS[t.priority] || t.priority,
           t.status === 'completed' ? 'เสร็จแล้ว' : t.status === 'in_progress' ? 'กำลังทำ' : 'รอดำเนินการ',
           t.due_date ? formatDate(t.due_date) : '-',
@@ -256,7 +336,19 @@ export default function ProjectReport() {
   if (!project) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-slate-500">ไม่พบข้อมูลโครงการ</p>
+        <div className="text-center">
+          {error ? (
+            <>
+              <AlertTriangle size={48} className="mx-auto text-red-400 mb-4" />
+              <p className="text-slate-600 mb-4">{error}</p>
+              <button onClick={loadAll} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
+                ลองใหม่
+              </button>
+            </>
+          ) : (
+            <p className="text-slate-500">ไม่พบข้อมูลโครงการ</p>
+          )}
+        </div>
       </div>
     );
   }
@@ -333,13 +425,64 @@ export default function ProjectReport() {
           </div>
           <div className="rounded-2xl bg-slate-50 px-4 py-3">
             <p className="text-xs text-slate-500">คาดว่าเสร็จ</p>
-            <p className={`mt-1 text-sm font-bold ${delayDays > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+            <p className={`mt-1 text-sm font-bold ${isLate ? 'text-red-600' : 'text-slate-900'}`}>
               {formatDate(project.expected_cod_date)}
-              {delayDays > 0 && <span className="ml-1 text-xs">({delayDays} วัน)</span>}
+              {isLate && <span className="ml-1 text-xs text-red-500">(ล่าช้า {delayDays} วัน)</span>}
+              {daysRemaining !== null && daysRemaining > 0 && (
+                <span className="ml-1 text-xs text-emerald-600">(เหลืออีก {daysRemaining} วัน)</span>
+              )}
             </p>
           </div>
         </div>
       </section>
+
+      {/* Customer Info */}
+      {project.customer_name && (
+        <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Building2 size={20} />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900">ข้อมูลลูกค้า</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-slate-500">ชื่อลูกค้า</p>
+              <p className="mt-1 text-sm font-medium text-slate-900">{project.customer_name}</p>
+            </div>
+            {project.customer_type && (
+              <div>
+                <p className="text-xs text-slate-500">ประเภทลูกค้า</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.customer_type}</p>
+              </div>
+            )}
+            {project.customer_contact_name && (
+              <div>
+                <p className="text-xs text-slate-500">ผู้ติดต่อ</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.customer_contact_name}</p>
+              </div>
+            )}
+            {project.customer_contact_phone && (
+              <div>
+                <p className="text-xs text-slate-500">เบอร์โทร</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.customer_contact_phone}</p>
+              </div>
+            )}
+            {project.customer_contact_email && (
+              <div>
+                <p className="text-xs text-slate-500">อีเมล</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.customer_contact_email}</p>
+              </div>
+            )}
+            {project.customer_address && (
+              <div className="sm:col-span-2">
+                <p className="text-xs text-slate-500">ที่อยู่</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.customer_address}</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Steps */}
       <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
@@ -410,6 +553,68 @@ export default function ProjectReport() {
         </section>
       )}
 
+      {/* Project Specs */}
+      {project.panel_brand || project.inverter_brand || project.mounting_type && (
+        <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <Zap size={20} />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900">ข้อมูลอุปกรณ์</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {project.panel_brand && (
+              <div>
+                <p className="text-xs text-slate-500">ยี่ห้อแผง</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.panel_brand}</p>
+              </div>
+            )}
+            {project.panel_model && (
+              <div>
+                <p className="text-xs text-slate-500">โมเดลแผง</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.panel_model}</p>
+              </div>
+            )}
+            {project.panel_count && (
+              <div>
+                <p className="text-xs text-slate-500">จำนวนแผง</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.panel_count} แผ่น</p>
+              </div>
+            )}
+            {project.inverter_brand && (
+              <div>
+                <p className="text-xs text-slate-500">ยี่ห้ออินเวอร์เตอร์</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.inverter_brand}</p>
+              </div>
+            )}
+            {project.inverter_model && (
+              <div>
+                <p className="text-xs text-slate-500">โมเดลอินเวอร์เตอร์</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.inverter_model}</p>
+              </div>
+            )}
+            {project.inverter_count && (
+              <div>
+                <p className="text-xs text-slate-500">จำนวนอินเวอร์เตอร์</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.inverter_count} ตัว</p>
+              </div>
+            )}
+            {project.mounting_type && (
+              <div>
+                <p className="text-xs text-slate-500">ประเภทการติดตั้ง</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.mounting_type}</p>
+              </div>
+            )}
+            {project.grid_connection_type && (
+              <div>
+                <p className="text-xs text-slate-500">ประเภทการเชื่อมต่อ</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{project.grid_connection_type}</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Tasks */}
       <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
@@ -430,6 +635,11 @@ export default function ProjectReport() {
                 <div key={t.id} className={`flex items-center gap-3 rounded-xl px-4 py-2.5 ${isOverdue ? 'bg-red-50' : 'bg-slate-50'}`}>
                   <div className={`h-2.5 w-2.5 rounded-full ${t.priority === 'urgent' ? 'bg-red-500' : t.priority === 'high' ? 'bg-orange-500' : t.priority === 'medium' ? 'bg-yellow-500' : 'bg-slate-400'}`} />
                   <span className="flex-1 text-sm text-slate-700">{t.title}</span>
+                  {t.assigned_to_name && (
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                      👤 {t.assigned_to_name}
+                    </span>
+                  )}
                   <span className="text-xs text-slate-500">{PRIORITY_LABELS[t.priority]}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : t.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
                     {t.status === 'completed' ? 'เสร็จแล้ว' : t.status === 'in_progress' ? 'กำลังทำ' : 'รอดำเนินการ'}
@@ -448,8 +658,7 @@ export default function ProjectReport() {
       </section>
 
       {/* Documents */}
-      <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
-        <h2 className="text-lg font-bold text-slate-900 mb-4">เอกสาร ({documents.length} รายการ)</h2>
+      <CollapsibleSection title="เอกสาร" icon={FileText} badge={`(${documents.length} รายการ)`} defaultOpen={documents.length > 0}>
         {documents.length === 0 ? (
           <p className="text-sm text-slate-400 py-4 text-center">ยังไม่มีเอกสาร</p>
         ) : (
@@ -464,11 +673,10 @@ export default function ProjectReport() {
             ))}
           </div>
         )}
-      </section>
+      </CollapsibleSection>
 
       {/* Organizations */}
-      <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
-        <h2 className="text-lg font-bold text-slate-900 mb-4">หน่วยงานที่เกี่ยวข้อง ({organizations.length} รายการ)</h2>
+      <CollapsibleSection title="หน่วยงานที่เกี่ยวข้อง" icon={Building2} badge={`(${organizations.length} รายการ)`} defaultOpen={organizations.length > 0}>
         {organizations.length === 0 ? (
           <p className="text-sm text-slate-400 py-4 text-center">ยังไม่มีหน่วยงานที่เกี่ยวข้อง</p>
         ) : (
@@ -488,7 +696,7 @@ export default function ProjectReport() {
             })}
           </div>
         )}
-      </section>
+      </CollapsibleSection>
 
       {/* Risk */}
       {(project.risk_level && project.risk_level !== 'low') && (

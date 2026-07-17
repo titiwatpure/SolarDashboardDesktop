@@ -28,6 +28,8 @@ export const setAuthToken = (token) => {
   }
 };
 
+export const getAuthToken = () => localStorage.getItem('token');
+
 /**
  * ตั้งค่า Refresh Token
  */
@@ -199,6 +201,7 @@ export const projectsAPI = {
   update: (id, data) => apiCall('PUT', `/projects/${id}`, data),
   delete: (id) => apiCall('DELETE', `/projects/${id}`),
   getKPIs: () => apiCall('GET', '/projects/stats/kpis'),
+  getPermitSummary: () => apiCall('GET', '/projects/stats/permit-summary'),
   getTimeline: (id) => apiCall('GET', `/projects/${id}/timeline`),
   deleteTimeline: (projectId, timelineId) => apiCall('DELETE', `/projects/${projectId}/timeline/${timelineId}`),
   getTimelineComments: (projectId, timelineId) => apiCall('GET', `/projects/${projectId}/timeline/${timelineId}/comments`),
@@ -215,6 +218,10 @@ export const projectsAPI = {
   approveCheckpoint: (id, data) => apiCall('POST', `/checkpoints/${id}/approve`, data),
   getCheckpointLogs: (id) => apiCall('GET', `/checkpoints/${id}/logs`),
   deleteCheckpoint: (id) => apiCall('DELETE', `/checkpoints/${id}`),
+};
+
+export const permitTrackingAPI = {
+  getAll: () => apiCall('GET', '/permit-tracking'),
 };
 
 export const usersAPI = {
@@ -505,5 +512,14 @@ export const documentReviewAPI = {
   // Correction Reports - รายงานส่งลูกค้า
   createCorrectionReport: (data) => apiCall('POST', '/doc-review/correction-reports', data),
   getCorrectionReport: (id) => apiCall('GET', `/doc-review/correction-reports/${id}`),
+
+  // Pending Revisions - เอกสารต้องแก้
+  getPendingRevisions: () => apiCall('GET', '/doc-review/pending-revisions'),
+
+  // Ready to Submit - สรุปส่งหน่วยงานวันนี้
+  getReadyToSubmit: () => apiCall('GET', '/doc-review/ready-to-submit'),
+
+  // Open Issues - ปัญหาเอกสาร
+  getOpenIssues: () => apiCall('GET', '/doc-review/open-issues'),
 };
 
