@@ -523,3 +523,70 @@ export const documentReviewAPI = {
   getOpenIssues: () => apiCall('GET', '/doc-review/open-issues'),
 };
 
+// ========================
+// Report Drafts API
+// ========================
+export const reportDraftsAPI = {
+  getAll: () => apiCall('GET', '/report-drafts'),
+  getById: (id) => apiCall('GET', `/report-drafts/${id}`),
+  create: (data) => apiCall('POST', '/report-drafts', data),
+  update: (id, data) => apiCall('PUT', `/report-drafts/${id}`, data),
+  delete: (id) => apiCall('DELETE', `/report-drafts/${id}`),
+};
+
+// ========================
+// Chatbot API
+// ========================
+export const chatbotAPI = {
+  sendMessage: (message) => apiCall('POST', '/chatbot/message', { message }),
+  sendMessageWithFile: async (message, file) => {
+    const formData = new FormData();
+    formData.append('message', message);
+    formData.append('file', file);
+
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/chatbot`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+
+    if (!response.ok) throw new Error('Failed to send message');
+    return response.json();
+  },
+  getSuggestions: () => apiCall('GET', '/chatbot/suggestions'),
+};
+
+// ========================
+// Knowledge Base API
+// ========================
+export const knowledgeBaseAPI = {
+  getAll: (params) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall('GET', `/knowledge-base${query ? '?' + query : ''}`);
+  },
+  getById: (id) => apiCall('GET', `/knowledge-base/${id}`),
+  create: (data) => apiCall('POST', '/knowledge-base', data),
+  update: (id, data) => apiCall('PUT', `/knowledge-base/${id}`, data),
+  delete: (id) => apiCall('DELETE', `/knowledge-base/${id}`),
+  uploadFile: async (file, data) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (data.topic) formData.append('topic', data.topic);
+    if (data.keywords) formData.append('keywords', data.keywords);
+    if (data.category) formData.append('category', data.category);
+
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/knowledge-base/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+
+    if (!response.ok) throw new Error('Failed to upload file');
+    return response.json();
+  },
+  getCategories: () => apiCall('GET', '/knowledge-base/categories/list'),
+  getFolders: () => apiCall('GET', '/knowledge-base/folders/list'),
+};
+

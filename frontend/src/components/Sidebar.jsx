@@ -14,6 +14,8 @@ const menuGroups = [
     id: 'home', label: 'หน้าหลัก', icon: LayoutDashboard,
     children: [
       { id: 'dashboard', label: 'หน้าหลัก', path: '/', roles: ['admin', 'engineer', 'staff'] },
+      { id: 'executive-report', label: 'รายงานผู้บริหาร', path: '/executive-report', roles: ['admin', 'engineer'] },
+      { id: 'knowledge-base', label: 'Knowledge Base', path: '/knowledge-base', roles: ['admin', 'engineer'] },
       { id: 'portal', label: 'แดชบอร์ดลูกค้า', path: '/portal', roles: ['client'] },
       { id: 'projects', label: 'โครงการทั้งหมด', path: '/projects', roles: ['admin', 'engineer', 'staff'] },
       { id: 'steps', label: 'ปฏิบัติงาน', path: '/steps', roles: ['admin', 'engineer', 'staff'] },

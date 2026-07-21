@@ -6,6 +6,7 @@ import { AppSettingsProvider } from './context/AppSettingsContext';
 import { ToastProvider } from './components/Toast';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import ChatWidget from './components/ChatWidget';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Component, Suspense, lazy, useState } from 'react';
@@ -39,6 +40,10 @@ const DocReviewCorrectionReport = lazy(() => import('./pages/DocReviewCorrection
 const DocumentsToRevise = lazy(() => import('./pages/DocumentsToRevise'));
 const ReadyToSubmit = lazy(() => import('./pages/ReadyToSubmit'));
 const OpenIssues = lazy(() => import('./pages/OpenIssues'));
+const ExecutiveReport = lazy(() => import('./pages/ExecutiveReport'));
+const ExecutiveSummaryA4 = lazy(() => import('./pages/ExecutiveSummaryA4'));
+const CustomerReport = lazy(() => import('./pages/CustomerReport'));
+const KnowledgeBase = lazy(() => import('./pages/KnowledgeBase'));
 const PermitTrackingTable = lazy(() => import('./components/PermitTrackingTable'));
 
 class ErrorBoundary extends Component {
@@ -157,11 +162,19 @@ function AppContent() {
             <Route path="/doc-review/correction-report/:id" element={<DocReviewCorrectionReport />} />
             <Route path="/doc-review/permit-tracking" element={<PermitTrackingTable />} />
             <Route path="/doc-review/:id" element={<DocReviewDetail />} />
+            <Route path="/executive-report" element={<ExecutiveReport />} />
+            <Route path="/executive-report/:id" element={<ExecutiveReport />} />
+            <Route path="/executive-summary" element={<ExecutiveSummaryA4 />} />
+            <Route path="/knowledge-base" element={<KnowledgeBase />} />
+            <Route path="/projects/:id/customer-report" element={<CustomerReport />} />
             <Route path="/help" element={<Help />} />
           </Routes>
           </Suspense>
         </main>
       </div>
+
+      {/* Chat Widget */}
+      <ChatWidget />
     </div>
   );
 }

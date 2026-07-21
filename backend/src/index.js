@@ -106,6 +106,9 @@ app.use('/api/quotations', require('./routes/quotations'));
 app.use('/api/contracts', require('./routes/contracts'));
 app.use('/api/portal', require('./routes/portal'));
 app.use('/api/accounting', require('./routes/accounting'));
+app.use('/api/report-drafts', require('./routes/report-drafts'));
+app.use('/api/chatbot', require('./routes/chatbot'));
+app.use('/api/knowledge-base', require('./routes/knowledge-base'));
 
 // Document Review & Agency Submission Tracking
 // Mount template-checklists FIRST to avoid /:id conflict with packages
