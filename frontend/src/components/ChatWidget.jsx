@@ -110,17 +110,17 @@ export default function ChatWidget() {
       {/* Chat Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg hover:scale-110 transition-all duration-300 flex items-center justify-center overflow-hidden"
         style={{ boxShadow: '0 4px 20px rgba(37, 99, 235, 0.4)' }}
       >
         {isOpen ? (
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
+          <div className="w-14 h-14 bg-red-500 flex items-center justify-center">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </div>
         ) : (
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-          </svg>
+          <img src="/chatbot-avatar.svg" alt="Chat" className="w-14 h-14" style={{ imageRendering: 'pixelated' }} />
         )}
       </button>
 
@@ -130,11 +130,7 @@ export default function ChatWidget() {
           {/* Header */}
           <div className="bg-blue-600 text-white px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                </svg>
-              </div>
+              <img src="/chatbot-avatar.svg" alt="Solar Bot" className="w-10 h-10 rounded-lg" style={{ imageRendering: 'pixelated' }} />
               <div>
                 <div className="font-semibold text-sm">Solar Dashboard Bot</div>
                 <div className="text-xs text-blue-200">ออนไลน์</div>
