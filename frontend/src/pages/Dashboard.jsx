@@ -4,6 +4,9 @@ import KPICards from '../components/KPICards';
 import Pipeline from '../components/Pipeline';
 import ProjectsTable from '../components/ProjectsTable';
 import ProjectModal from '../components/ProjectModal';
+import ActionItems from '../components/ActionItems';
+import OverdueProjects from '../components/OverdueProjects';
+import TaskSummary from '../components/TaskSummary';
 import { PROVINCES, STATUS_LABELS, STEP_LABELS } from '../utils/constants';
 import { useAppSettings } from '../context/AppSettingsContext';
 
@@ -92,6 +95,13 @@ export default function Dashboard() {
 
       {/* ส่ง refreshKey เพื่อให้ KPICards และ Pipeline ดึงข้อมูลใหม่หลังอัปเดตสถานะโครงการ */}
       <KPICards refreshKey={refreshKey} />
+
+      <ActionItems />
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <OverdueProjects />
+        <TaskSummary />
+      </div>
 
       <Pipeline refreshKey={refreshKey} />
 
