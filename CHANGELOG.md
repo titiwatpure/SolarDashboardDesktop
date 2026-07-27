@@ -1,5 +1,30 @@
 # Changelog
 
+## [Releases]
+
+| Version | วันที่ | ประเภท | รายละเอียด |
+|---------|--------|--------|------------|
+| [v1.2.0](#v120-2026-07-27) | 2026-07-27 | minor | Executive Report, Permit Tracking, Doc Review ปรับปรุง, Open Issues, Report Drafts |
+| [v1.1.1](#v111) | 2026-07-01 | patch | - |
+| [v1.0.24](#v1024-2026-06-23) | 2026-06-23 | patch | Security, WAL checkpoint |
+| [v1.0.23](#v1023-2026-06-16) | 2026-06-16 | patch | Performance, Security, Calendar |
+| [v1.0.18](#v1018-2026-06-15) | 2026-06-15 | minor | Organization contacts, Calendar views |
+| [v1.0.17](#v1017-2026-05-25) | 2026-05-25 | minor | Timezone fix, Settings, Logo upload |
+
+---
+
+## v1.2.0 (2026-07-27)
+- feat: เพิ่มหน้า Executive Report + Executive Summary A4
+- feat: เพิ่ม Permit Tracking (permit-tracking route + UI)
+- feat: เพิ่ม Report Drafts (บันทึกร่างรายงาน)
+- feat: เพิ่มหน้า Open Issues, Documents To Revise, Ready To Submit
+- feat: เพิ่ม Customer Report page
+- feat: เพิ่ม components: ActionItems, OverdueProjects, PermitTrackingTable, TaskSummary
+- feat: เพิ่ม migration 013 (report_drafts table)
+- chore: bump version 1.1.1 → 1.2.0
+
+---
+
 ## v1.0.24 (2026-06-23)
 - Security: Hash refresh tokens (SHA-256) ก่อนเก็บลง database
 - Security: ไม่ reset admin password ถ้า admin user มีอยู่แล้ว
