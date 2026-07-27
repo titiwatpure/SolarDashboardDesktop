@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Network Map - Improved Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }
+    .filter-btn { transition: all 0.15s ease; }
+    .filter-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+    .filter-btn:not(.active) { background: white; color: #64748b; border-color: #e2e8f0; }
+    .filter-btn:hover:not(.active) { border-color: #94a3b8; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .stat-card { transition: all 0.15s ease; }
+    .stat-card:hover { transform: translateY(-1px); }
+    .leaflet-popup-content-wrapper { border-radius: 12px; }
+    .leaflet-popup-content { margin: 12px 16px; font-size: 13px; }
+    .popup-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .popup-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #64748b; }
+    .popup-row span:last-child { font-weight: 500; color: #334155; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+  
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 px-6 py-4">
+    <div class="max-w-full mx-auto flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-slate-900">แผนที่โครงการ</h1>
+        <p class="text-sm text-slate-500 mt-0.5">แสดงตำแหน่งโครงการทั้งหมดบนแผนที่</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button class="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">
+          📥 Export Map
+        </button>
+        <button class="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+          🔄 รีเฟรช
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex h-[calc(100vh-73px)]">
+    
+    <!-- Map Area -->
+    <div class="flex-1 relative">
+      
+      <!-- Filter Bar (Floating) -->
+      <div class="absolute top-4 left-4 z-[1000] bg-white rounded-xl shadow-lg border border-slate-200 p-3">
+        <p class="text-xs font-semibold text-slate-500 mb-2">แสดงตามสถานะ</p>
+        <div class="flex flex-wrap gap-2">
+          <button class="filter-btn active px-3 py-1.5 text-xs font-medium rounded-lg border" onclick="toggleFilter(this)">
+            ทั้งหมด (20)
+          </button>
+          <button class="filter-btn active px-3 py-1.5 text-xs font-medium rounded-lg border flex items-center gap-1.5" onclick="toggleFilter(this)">
+            <span class="legend-dot bg-emerald-500"></span> เสร็จสิ้น (8)
+          </button>
+          <button class="filter-btn active px-3 py-1.5 text-xs font-medium rounded-lg border flex items-center gap-1.5" onclick="toggleFilter(this)">
+            <span class="legend-dot bg-blue-500"></span> กำลังทำ (6)
+          </button>
+          <button class="filter-btn active px-3 py-1.5 text-xs font-medium rounded-lg border flex items-center gap-1.5" onclick="toggleFilter(this)">
+            <span class="legend-dot bg-amber-500"></span> รอ (3)
+          </button>
+          <button class="filter-btn active px-3 py-1.5 text-xs font-medium rounded-lg border flex items-center gap-1.5" onclick="toggleFilter(this)">
+            <span class="legend-dot bg-red-500"></span> ติดปัญหา (2)
+          </button>
+          <button class="filter-btn active px-3 py-1.5 text-xs font-medium rounded-lg border flex items-center gap-1.5" onclick="toggleFilter(this)">
+            <span class="legend-dot bg-slate-400"></span> ยังไม่เริ่ม (1)
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Box (Floating) -->
+      <div class="absolute top-4 right-4 z-[1000] bg-white rounded-xl shadow-lg border border-slate-200 p-2">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <input type="text" placeholder="ค้นหาโครงการ..." class="w-48 text-sm outline-none">
+        </div>
+      </div>
+
+      <!-- Map Container -->
+      <div id="map" class="w-full h-full"></div>
+
+      <!-- Map Legend (Floating) -->
+      <div class="absolute bottom-4 left-4 z-[1000] bg-white rounded-xl shadow-lg border border-slate-200 p-3">
+        <p class="text-xs font-semibold text-slate-500 mb-2">ขนาด pin ตามโครงการ</p>
+        <div class="flex items-center gap-4 text-xs text-slate-600">
+          <div class="flex items-center gap-1.5">
+            <svg width="12" height="12"><circle cx="6" cy="6" r="4" fill="#94a3b8" fill-opacity="0.5"/></svg>
+            <span>เล็ก (≤1 MW)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <svg width="16" height="16"><circle cx="8" cy="8" r="6" fill="#3b82f6" fill-opacity="0.7"/></svg>
+            <span>กลาง (1-5 MW)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <svg width="20" height="20"><circle cx="10" cy="10" r="8" fill="#2563eb" fill-opacity="0.85"/></svg>
+            <span>ใหญ่ (>5 MW)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="w-80 bg-white border-l border-slate-200 overflow-y-auto">
+      <div class="p-4 space-y-4">
+        
+        <!-- Summary Stats -->
+        <div class="stat-card bg-slate-50 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-slate-700">โครงการทั้งหมด</span>
+            <span class="text-2xl font-bold text-slate-900">20</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-500">
+            <span>覆盖 12 จังหวัด</span>
+            <span>•</span>
+            <span>กำลังการผลิตรวม 31.8 MW</span>
+          </div>
+        </div>
+
+        <!-- Status Legend -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <h3 class="text-sm font-semibold text-slate-700 mb-3">สถานะโครงการ</h3>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="legend-dot bg-emerald-500"></span>
+                <span class="text-sm text-slate-600">เสร็จสิ้น</span>
+              </div>
+              <span class="text-sm font-semibold text-slate-900">8</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="legend-dot bg-blue-500"></span>
+                <span class="text-sm text-slate-600">กำลังดำเนินการ</span>
+              </div>
+              <span class="text-sm font-semibold text-slate-900">6</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="legend-dot bg-amber-500"></span>
+                <span class="text-sm text-slate-600">รอข้อมูล</span>
+              </div>
+              <span class="text-sm font-semibold text-slate-900">3</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="legend-dot bg-red-500"></span>
+                <span class="text-sm text-slate-600">ติดปัญหา</span>
+              </div>
+              <span class="text-sm font-semibold text-slate-900">2</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="legend-dot bg-slate-400"></span>
+                <span class="text-sm text-slate-600">ยังไม่เริ่ม</span>
+              </div>
+              <span class="text-sm font-semibold text-slate-900">1</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Regional Summary -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <h3 class="text-sm font-semibold text-slate-700 mb-3">แยกตามภูมิภาค</h3>
+          <div class="space-y-3">
+            <div>
+              <div class="flex items-center justify-between text-sm mb-1">
+                <span class="text-slate-600">ภาคกลาง</span>
+                <span class="font-medium">12 โครงการ</span>
+              </div>
+              <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500 rounded-full" style="width: 60%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between text-sm mb-1">
+                <span class="text-slate-600">ภาคตะวันออก</span>
+                <span class="font-medium">4 โครงการ</span>
+              </div>
+              <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-emerald-500 rounded-full" style="width: 20%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between text-sm mb-1">
+                <span class="text-slate-600">ภาคเหนือ</span>
+                <span class="font-medium">2 โครงการ</span>
+              </div>
+              <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-amber-500 rounded-full" style="width: 10%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between text-sm mb-1">
+                <span class="text-slate-600">ภาคใต้</span>
+                <span class="font-medium">2 โครงการ</span>
+              </div>
+              <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-purple-500 rounded-full" style="width: 10%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Projects -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <h3 class="text-sm font-semibold text-slate-700 mb-3">โครงการล่าสุด</h3>
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+              <span class="legend-dot bg-blue-500"></span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-900 truncate">Solar Rooftop โรงงาน ABC</p>
+                <p class="text-xs text-slate-500">ชลบุรี • 450 kW</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+              <span class="legend-dot bg-emerald-500"></span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-900 truncate">Solar โรงแรม XYZ</p>
+                <p class="text-xs text-slate-500">ภูเก็ต • 320 kW</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+              <span class="legend-dot bg-red-500"></span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-900 truncate">Solar วิทยาลัยเทคนิค</p>
+                <p class="text-xs text-slate-500">กรุงเทพฯ • 280 kW</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Map
+    const map = L.map('map').setView([13.75, 100.5], 6);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Project Data
+    const projects = [
+      { name: 'Solar Rooftop โรงงาน ABC', province: 'ชลบุรี', lat: 13.36, lng: 100.98, size: 450, status: 'in_progress', risk: 'high' },
+      { name: 'Solar โรงแรม XYZ', province: 'ภูเก็ต', lat: 7.88, lng: 98.39, size: 320, status: 'completed', risk: 'low' },
+      { name: 'Solar วิทยาลัยเทคนิคกรุงเทพ', province: 'กรุงเทพฯ', lat: 13.75, lng: 100.50, size: 280, status: 'blocked', risk: 'high' },
+      { name: 'Solar ฟาร์มโคนม', province: 'นครราชสีมา', lat: 14.98, lng: 102.10, size: 500, status: 'in_progress', risk: 'medium' },
+      { name: 'Solar โรงงานอุตสาหกรรม', province: 'ชลบุรี', lat: 13.18, lng: 101.00, size: 1200, status: 'completed', risk: 'low' },
+      { name: 'Solar ห้างสรรพสินค้า', province: 'กรุงเทพฯ', lat: 13.72, lng: 100.52, size: 800, status: 'in_progress', risk: 'low' },
+      { name: 'Solar คอนโดมิเนียม', province: 'นนทบุรี', lat: 13.86, lng: 100.51, size: 350, status: 'waiting', risk: 'low' },
+      { name: 'Solar โรงเรียน', province: 'เชียงใหม่', lat: 18.79, lng: 98.99, size: 200, status: 'not_started', risk: 'low' },
+      { name: 'Solar โรงพยาบาล', province: 'ขอนแก่น', lat: 16.43, lng: 102.82, size: 600, status: 'in_progress', risk: 'medium' },
+      { name: 'Solar โรงงานอาหาร', province: 'สมุทรปราการ', lat: 13.60, lng: 100.60, size: 450, status: 'completed', risk: 'low' },
+      { name: 'Solar โรงแรมริมทะเล', province: 'ประจวบฯ', lat: 11.81, lng: 99.79, size: 280, status: 'waiting', risk: 'low' },
+      { name: 'Solar คลังสินค้า', province: 'ชลบุรี', lat: 13.45, lng: 100.90, size: 950, status: 'completed', risk: 'low' },
+      { name: 'Solar โกดัง', province: 'ระยอง', lat: 12.68, lng: 101.28, size: 700, status: 'in_progress', risk: 'low' },
+      { name: 'Solar อาคารสำนักงาน', province: 'กรุงเทพฯ', lat: 13.73, lng: 100.53, size: 400, status: 'completed', risk: 'low' },
+      { name: 'Solar โรงงานผลิต', province: 'ปราจีนฯ', lat: 14.05, lng: 101.37, size: 1500, status: 'completed', risk: 'low' },
+      { name: 'Solar โรงแรมบูติก', province: 'เชียงราย', lat: 19.91, lng: 99.83, size: 150, status: 'waiting', risk: 'low' },
+      { name: 'Solar โรงงานมอเตอร์', province: 'สมุทรปราการ', lat: 13.55, lng: 100.58, size: 550, status: 'completed', risk: 'low' },
+      { name: 'Solar หอพักนักศึกษา', province: 'ขอนแก่น', lat: 16.44, lng: 102.83, size: 180, status: 'in_progress', risk: 'low' },
+      { name: 'Solar โรงไฟฟ้า', province: 'ปราจีนฯ', lat: 14.08, lng: 101.40, size: 2000, status: 'blocked', risk: 'critical' },
+      { name: 'Solar โรงงานเหล็ก', province: 'ชลบุรี', lat: 13.25, lng: 100.95, size: 1100, status: 'completed', risk: 'low' },
+    ];
+
+    const statusColors = {
+      completed: '#22c55e',
+      in_progress: '#3b82f6',
+      waiting: '#a855f7',
+      blocked: '#ef4444',
+      rejected: '#f97316',
+      not_started: '#94a3b8'
+    };
+
+    const statusLabels = {
+      completed: 'เสร็จสิ้น',
+      in_progress: 'กำลังดำเนินการ',
+      waiting: 'รอข้อมูล',
+      blocked: 'ติดปัญหา',
+      rejected: 'ถูกปฏิเสธ',
+      not_started: 'ยังไม่เริ่ม'
+    };
+
+    const riskLabels = { low: 'ต่ำ', medium: 'ปานกลาง', high: 'สูง', critical: 'วิกฤต' };
+
+    // Create markers with size based on kW
+    const markers = [];
+    projects.forEach(p => {
+      const sizeRadius = p.size <= 300 ? 6 : (p.size <= 800 ? 9 : 12);
+      const sizeOpacity = p.size <= 300 ? 0.5 : (p.size <= 800 ? 0.7 : 0.9);
+      const hasCoords = p.lat !== 13.75 || p.lng !== 100.5;
+      
+      const marker = L.circleMarker([p.lat, p.lng], {
+        radius: sizeRadius,
+        fillColor: statusColors[p.status],
+        color: '#fff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: sizeOpacity
+      }).addTo(map);
+
+      marker.bindPopup(`
+        <div class="popup-title">${p.name}</div>
+        <div class="popup-row"><span>จังหวัด</span><span>${p.province}</span></div>
+        <div class="popup-row"><span>ขนาด</span><span>${p.size} kW</span></div>
+        <div class="popup-row"><span>สถานะ</span><span style="color:${statusColors[p.status]}">${statusLabels[p.status]}</span></div>
+        <div class="popup-row"><span>ความเสี่ยง</span><span>${riskLabels[p.risk]}</span></div>
+        ${!hasCoords ? '<div class="mt-2 text-xs text-amber-600">⚠️ ตำแหน่งจังหวัด (ไม่มี GPS)</div>' : ''}
+        <div class="mt-2"><a href="#" class="text-blue-600 text-xs font-medium">ดูรายละเอียด →</a></div>
+      `);
+
+      marker.bindTooltip(p.name, { permanent: false, direction: 'top', offset: [0, -sizeRadius] });
+      
+      marker.projectData = p;
+      markers.push(marker);
+    });
+
+    // Filter functionality
+    function toggleFilter(btn) {
+      btn.classList.toggle('active');
+      updateMapMarkers();
+    }
+
+    function updateMapMarkers() {
+      const activeFilters = [];
+      document.querySelectorAll('.filter-btn.active').forEach(btn => {
+        const text = btn.textContent.trim();
+        if (text.includes('ทั้งหมด')) return;
+        Object.entries(statusLabels).forEach(([key, label]) => {
+          if (text.includes(label)) activeFilters.push(key);
+        });
+      });
+
+      markers.forEach(marker => {
+        if (activeFilters.length === 0 || activeFilters.includes(marker.projectData.status)) {
+          marker.addTo(map);
+        } else {
+          map.removeLayer(marker);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Review Print Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'IBM+Plex Sans Thai', system-ui, sans-serif; }
+    @media print {
+      body { background: white; }
+      .no-print { display: none; }
+      .print-page { page-break-after: always; }
+    }
+    .print-page { 
+      width: 210mm; 
+      min-height: 297mm; 
+      margin: 0 auto; 
+      padding: 20mm; 
+      background: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen p-8">
+  
+  <!-- Print Button -->
+  <div class="no-print max-w-[210mm] mx-auto mb-4 flex justify-end">
+    <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+      🖨️ พิมพ์
+    </button>
+  </div>
+
+  <!-- Page 1 -->
+  <div class="print-page">
+    
+    <!-- Header -->
+    <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">รายงานสรุปสถานะใบอนุญาต</h1>
+        <p class="text-sm text-slate-500 mt-1">ระบบตรวจเอกสารและยื่นหน่วยงาน</p>
+      </div>
+      <div class="text-right">
+        <p class="text-sm font-medium text-slate-900">บริษัท Solar Dashboard จำกัด</p>
+        <p class="text-xs text-slate-500">วันที่ออกรายงาน: 11 กรกฎาคม 2569</p>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="mb-6">
+      <h2 class="text-lg font-bold text-slate-900 mb-3">สรุปภาพรวม</h2>
+      <div class="grid grid-cols-5 gap-3">
+        <div class="border border-slate-200 rounded-lg p-3 text-center">
+          <p class="text-2xl font-bold text-slate-900">5</p>
+          <p class="text-xs text-slate-500">โครงการทั้งหมด</p>
+        </div>
+        <div class="border border-slate-200 rounded-lg p-3 text-center">
+          <p class="text-2xl font-bold text-blue-600">2</p>
+          <p class="text-xs text-slate-500">กำลังดำเนินการ</p>
+        </div>
+        <div class="border border-slate-200 rounded-lg p-3 text-center">
+          <p class="text-2xl font-bold text-amber-600">1</p>
+          <p class="text-xs text-slate-500">รอตรวจสอบ</p>
+        </div>
+        <div class="border border-slate-200 rounded-lg p-3 text-center">
+          <p class="text-2xl font-bold text-red-600">1</p>
+          <p class="text-xs text-slate-500">ติดปัญหา</p>
+        </div>
+        <div class="border border-slate-200 rounded-lg p-3 text-center">
+          <p class="text-2xl font-bold text-emerald-600">1</p>
+          <p class="text-xs text-slate-500">เสร็จสิ้น</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Permit Type Summary -->
+    <div class="mb-6">
+      <h2 class="text-lg font-bold text-slate-900 mb-3">สรุปตามประเภทใบอนุญาต</h2>
+      <table class="w-full border-collapse border border-slate-300">
+        <thead>
+          <tr class="bg-slate-100">
+            <th class="border border-slate-300 px-3 py-2 text-left text-sm font-semibold">ประเภทใบอนุญาต</th>
+            <th class="border border-slate-300 px-3 py-2 text-center text-sm font-semibold">จำนวน</th>
+            <th class="border border-slate-300 px-3 py-2 text-center text-sm font-semibold">สัดส่วน</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="border border-slate-300 px-3 py-2 text-sm">จดแจ้งยกเว้น (≤ 1,000 kVA)</td>
+            <td class="border border-slate-300 px-3 py-2 text-center text-sm font-medium">4</td>
+            <td class="border border-slate-300 px-3 py-2 text-center text-sm">80%</td>
+          </tr>
+          <tr class="bg-slate-50">
+            <td class="border border-slate-300 px-3 py-2 text-sm">ขอใบอนุญาต (> 1,000 kVA)</td>
+            <td class="border border-slate-300 px-3 py-2 text-center text-sm font-medium">1</td>
+            <td class="border border-slate-300 px-3 py-2 text-center text-sm">20%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Service Type Summary -->
+    <div class="mb-6">
+      <h2 class="text-lg font-bold text-slate-900 mb-3">สรุปตามประเภทบริการ</h2>
+      <table class="w-full border-collapse border border-slate-300">
+        <thead>
+          <tr class="bg-slate-100">
+            <th class="border border-slate-300 px-3 py-2 text-left text-sm font-semibold">ประเภทบริการ</th>
+            <th class="border border-slate-300 px-3 py-2 text-center text-sm font-semibold">จำนวน</th>
+            <th class="border border-slate-300 px-3 py-2 text-center text-sm font-semibold">สัดส่วน</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="border border-slate-300 px-3 py-2 text-sm">⚡ ทำทั้งหมดจน COD</td>
+            <td class="border border-slate-300 px-3 py-2 text-center text-sm font-medium">4</td>
+            <td class="border border-slate-300 px-3 py-2 text-center text-sm">80%</td>
+          </tr>
+          <tr class="bg-slate-50">
+            <td class="border border-slate-300 px-3 py-2 text-sm">📋 ยื่นเอกสาร + ขออนุญาต</td>
+            <td class="border border-slate-300 px-3 py-2 text-center text-sm font-medium">1</td>
+            <td class="border border-slate-300 px-3 py-2 text-center text-sm">20%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-8 pt-4 border-t border-slate-200 flex justify-between text-xs text-slate-500">
+      <span> Solar Dashboard v1.1.1</span>
+      <span>หน้า 1/2</span>
+    </div>
+  </div>
+
+  <!-- Page 2 -->
+  <div class="print-page">
+    
+    <h2 class="text-lg font-bold text-slate-900 mb-4">รายละเอียดใบอนุญาตแต่ละโครงการ</h2>
+    
+    <table class="w-full border-collapse border border-slate-300">
+      <thead>
+        <tr class="bg-slate-100">
+          <th class="border border-slate-300 px-3 py-2 text-left text-sm font-semibold">รหัส</th>
+          <th class="border border-slate-300 px-3 py-2 text-left text-sm font-semibold">ชื่อโครงการ</th>
+          <th class="border border-slate-300 px-3 py-2 text-left text-sm font-semibold">ประเภทบริการ</th>
+          <th class="border border-slate-300 px-3 py-2 text-left text-sm font-semibold">ใบอนุญาต</th>
+          <th class="border border-slate-300 px-3 py-2 text-left text-sm font-semibold">สถานะ</th>
+          <th class="border border-slate-300 px-3 py-2 text-left text-sm font-semibold">ขั้นตอน</th>
+          <th class="border border-slate-300 px-3 py-2 text-center text-sm font-semibold">คืบหน้า</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="border border-slate-300 px-3 py-2 text-sm font-medium">P6807-001</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">Solar Rooftop โรงงาน ABC</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">⚡ ทำทั้งหมด</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">จดแจ้งยกเว้น</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">กำลังดำเนินการ</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">ERC</td>
+          <td class="border border-slate-300 px-3 py-2 text-center text-sm">45%</td>
+        </tr>
+        <tr class="bg-slate-50">
+          <td class="border border-slate-300 px-3 py-2 text-sm font-medium">P6807-002</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">Solar โรงแรม XYZ</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">⚡ ทำทั้งหมด</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">จดแจ้งยกเว้น</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm text-red-600">ติดปัญหา</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">Grid</td>
+          <td class="border border-slate-300 px-3 py-2 text-center text-sm">30%</td>
+        </tr>
+        <tr>
+          <td class="border border-slate-300 px-3 py-2 text-sm font-medium">P6807-003</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">Solar วิทยาลัยเทคนิค</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">⚡ ทำทั้งหมด</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">จดแจ้งยกเว้น</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm text-amber-600">รอตรวจสอบ</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">Testing</td>
+          <td class="border border-slate-300 px-3 py-2 text-center text-sm">85%</td>
+        </tr>
+        <tr class="bg-slate-50">
+          <td class="border border-slate-300 px-3 py-2 text-sm font-medium">P6807-004</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">Solar ฟาร์มโคนม</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">⚡ ทำทั้งหมด</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">จดแจ้งยกเว้น</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm text-emerald-600">เสร็จสิ้น</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">COD</td>
+          <td class="border border-slate-300 px-3 py-2 text-center text-sm">100%</td>
+        </tr>
+        <tr>
+          <td class="border border-slate-300 px-3 py-2 text-sm font-medium">P6807-005</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">Solar โรงงานอาหาร</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">📋 ยื่นเอกสาร</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">ขอใบอนุญาต</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">กำลังดำเนินการ</td>
+          <td class="border border-slate-300 px-3 py-2 text-sm">ERC</td>
+          <td class="border border-slate-300 px-3 py-2 text-center text-sm">60%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Notes -->
+    <div class="mt-8">
+      <h3 class="text-base font-bold text-slate-900 mb-2">หมายเหตุ</h3>
+      <ul class="list-disc list-inside text-sm text-slate-600 space-y-1">
+        <li>จดแจ้งยกเว้น = ระบบ ≤ 1,000 kVA (ไม่ต้องขอใบอนุญาตผลิตพลังงาน)</li>
+        <li>ขอใบอนุญาต = ระบบ > 1,000 kVA (ต้องขอใบอนุญาตจาก กกพ.)</li>
+        <li>ข้อมูล ณ วันที่ 11 กรกฎาคม 2569</li>
+      </ul>
+    </div>
+
+    <!-- Signature -->
+    <div class="mt-12 grid grid-cols-2 gap-8">
+      <div>
+        <p class="text-sm text-slate-500 mb-8">ผู้จัดทำรายงาน</p>
+        <div class="border-t border-slate-900 pt-2">
+          <p class="text-sm font-medium text-slate-900">_________________________</p>
+          <p class="text-xs text-slate-500">วันที่ ___/___/2569</p>
+        </div>
+      </div>
+      <div>
+        <p class="text-sm text-slate-500 mb-8">ผู้อนุมัติ</p>
+        <div class="border-t border-slate-900 pt-2">
+          <p class="text-sm font-medium text-slate-900">_________________________</p>
+          <p class="text-xs text-slate-500">วันที่ ___/___/2569</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-8 pt-4 border-t border-slate-200 flex justify-between text-xs text-slate-500">
+      <span> Solar Dashboard v1.1.1</span>
+      <span>หน้า 2/2</span>
+    </div>
+  </div>
+
+</body>
+</html>

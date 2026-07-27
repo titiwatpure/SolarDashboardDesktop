@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard สถานะใบอนุญาต - Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }
+    .status-badge { padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+    .status-done { background: #dcfce7; color: #166534; }
+    .status-waiting { background: #fef3c7; color: #92400e; }
+    .status-processing { background: #dbeafe; color: #1e40af; }
+    .status-blocked { background: #fee2e2; color: #991b1b; }
+    .status-review { background: #fce7f3; color: #9d174d; }
+    tr:hover { background-color: #f8fafc; }
+    .progress-bar { height: 6px; border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+    .overdue { color: #dc2626; font-weight: 600; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen p-6">
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">สถานะใบอนุญาต</h1>
+        <p class="text-sm text-slate-500 mt-1">ติดตามสถานะเอกสารและใบอนุญาตของลูกค้าทั้งหมด</p>
+      </div>
+      <button class="px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition">
+        + เพิ่มโครงการใหม่
+      </button>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <p class="text-xs text-slate-500 mb-1">รอเอกสาร</p>
+        <p class="text-2xl font-bold text-slate-900">3</p>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <p class="text-xs text-slate-500 mb-1">กำลังตรวจ</p>
+        <p class="text-2xl font-bold text-blue-600">2</p>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <p class="text-xs text-slate-500 mb-1">รอลูกค้าแก้</p>
+        <p class="text-2xl font-bold text-amber-600">4</p>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <p class="text-xs text-slate-500 mb-1">พร้อมยื่น</p>
+        <p class="text-2xl font-bold text-purple-600">2</p>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <p class="text-xs text-slate-500 mb-1">ยื่นแล้ว</p>
+        <p class="text-2xl font-bold text-indigo-600">3</p>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <p class="text-xs text-slate-500 mb-1">หน่วยงานให้แก้</p>
+        <p class="text-2xl font-bold text-red-600">2</p>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <p class="text-xs text-slate-500 mb-1">อนุมัติแล้ว</p>
+        <p class="text-2xl font-bold text-emerald-600">4</p>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl border border-slate-200 p-4">
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[200px]">
+          <input type="text" placeholder="ค้นหาชื่อโครงการ, รหัส, ลูกค้า..." class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-400 outline-none">
+        </div>
+        <select class="px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+          <option value="">ทุกสถานะ</option>
+          <option>รอเอกสาร</option>
+          <option>กำลังตรวจ</option>
+          <option>รอลูกค้าแก้</option>
+          <option>พร้อมยื่น</option>
+          <option>ยื่นแล้ว</option>
+          <option>หน่วยงานให้แก้</option>
+          <option>อนุมัติแล้ว</option>
+        </select>
+        <select class="px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+          <option value="">ทุกประเภทใบอนุญาต</option>
+          <option>พค.2 ใบอนุญาตผลิตพลังงาน</option>
+          <option>จดแจ้งยกเว้น</option>
+          <option>ขอใบอนุญาตก่อสร้าง</option>
+          <option>ขอต่อสาย</option>
+        </select>
+        <select class="px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+          <option value="">ทุกหน่วยงาน</option>
+          <option>กกพ. (ERC)</option>
+          <option>PEA</option>
+          <option>MEA</option>
+          <option>กรมโรงงาน</option>
+          <option>เทศบาล</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Permit Status Table -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">รหัส/โครงการ</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">ลูกค้า</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">ประเภทใบอนุญาต</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">หน่วยงาน</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">ขนาด (MW)</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">สถานะ</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">ความคืบหน้า</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">กำหนดส่ง</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">เลขรับ</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <!-- ADM -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">ADM</p>
+              <p class="text-xs text-slate-500">ADMIKOL (1991) CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">4.996</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">รอ พค.2</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:75%"></div></div>
+                <span class="text-xs text-slate-600">75%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">รอ พค.2</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- BGR -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">BGR</p>
+              <p class="text-xs text-slate-500">B.G.R. PLASTIC CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">0.615</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">รอ พค.2</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:80%"></div></div>
+                <span class="text-xs text-slate-600">80%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">รอ พค.2</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- BMC -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">BMC</p>
+              <p class="text-xs text-slate-500">BMC ELECTRIC SYSTEM CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">2.988</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">รอ พค.2</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:85%"></div></div>
+                <span class="text-xs text-slate-600">85%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">รอ พค.2</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- BRA -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">BRA</p>
+              <p class="text-xs text-slate-500">BRAITHWAITE (THAILAND) CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">0.999</td>
+            <td class="px-4 py-3"><span class="status-badge status-waiting">รอ พค.2</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-amber-500" style="width:70%"></div></div>
+                <span class="text-xs text-slate-600">70%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">21/5/2567</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- CMC -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">CMC</p>
+              <p class="text-xs text-slate-500">CMC GLOBAL LOGISTICS CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-done">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">5.982</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">รอ พค.2</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:90%"></div></div>
+                <span class="text-xs text-slate-600">90%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">รอ พค.2</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- IDM-LRI P2 -->
+          <tr class="bg-red-50/50">
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">IDM-LRI P2</p>
+              <p class="text-xs text-slate-500">INDORAMA HOLDINGS CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-blocked">ผังเมือง</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">เทศบาล</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">5.560</td>
+            <td class="px-4 py-3"><span class="status-badge status-blocked">ติดปัญหา</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-red-500" style="width:30%"></div></div>
+                <span class="text-xs text-slate-600">30%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">รอแก้ไขผังเมือง</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- IDM-NMA -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">IDM-NMA</p>
+              <p class="text-xs text-slate-500">PETFORM (THAILAND) CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-done">จดแจ้งยกเว้น</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กรมโรงงาน</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">0.584</td>
+            <td class="px-4 py-3"><span class="status-badge status-done">DONE</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-emerald-500" style="width:100%"></div></div>
+                <span class="text-xs text-emerald-600 font-semibold">100%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">จดแจ้งยกเว้น</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- MTY -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">MTY</p>
+              <p class="text-xs text-slate-500">MITUTOYO (THAILAND) CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">0.088</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">PP ดำเนินการ</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:85%"></div></div>
+                <span class="text-xs text-slate-600">85%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">PP ดำเนินการ</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- SEN -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">SEN</p>
+              <p class="text-xs text-slate-500">SIAM ENVIRONMENTAL TECHNOLOGIES</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">0.411</td>
+            <td class="px-4 py-3"><span class="status-badge status-waiting">รอตรวจโรงไฟฟ้า</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-amber-500" style="width:70%"></div></div>
+                <span class="text-xs text-slate-600">70%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">No.099/2567</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- SRF -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">SRF</p>
+              <p class="text-xs text-slate-500">SRF INDUSTRIES (THAILAND) CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">4.996</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">รอ พค.2</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:85%"></div></div>
+                <span class="text-xs text-slate-600">85%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">รอ พค.2</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- TAP -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">TAP</p>
+              <p class="text-xs text-slate-500">THAI-ASIA P.E.PILE CO.,LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">2.513</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">รอ CoP</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:80%"></div></div>
+                <span class="text-xs text-slate-600">80%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">No.88/2564</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- TPK -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">TPK</p>
+              <p class="text-xs text-slate-500">TEPAKORN HOSPITAL CO., LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-waiting">ขอใบอนุญาต</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">การไฟฟ้า</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">0.199</td>
+            <td class="px-4 py-3"><span class="status-badge status-waiting">รอการไฟฟ้าตรวจ</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-amber-500" style="width:50%"></div></div>
+                <span class="text-xs text-slate-600">50%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">PP 2M</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- ALVA -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">ALVA</p>
+              <p class="text-xs text-slate-500">ALVA ALUMINIUM CO., LTD.</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">IEAT</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">0.334</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">ส่ง กกพ.แล้ว</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:75%"></div></div>
+                <span class="text-xs text-slate-600">75%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">1-23-0-102-00505-2567</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- AIT -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">AIT</p>
+              <p class="text-xs text-slate-500">ASIA INDUSTRIAL TEXTILE CO., LTD</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">0.972</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">รอ ERC</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:85%"></div></div>
+                <span class="text-xs text-slate-600">85%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">No.217/2565</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+          <!-- DOD -->
+          <tr>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-slate-900">DOD</p>
+              <p class="text-xs text-slate-500">DOD BIOTECH PUBLIC COMPANY LIMITED</p>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">พค.2</span></td>
+            <td class="px-4 py-3 text-sm text-slate-600">กกพ.</td>
+            <td class="px-4 py-3 text-sm text-slate-900 font-medium">0.472</td>
+            <td class="px-4 py-3"><span class="status-badge status-processing">PP ดำเนินการ</span></td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <div class="progress-bar flex-1 bg-slate-100 w-20"><div class="progress-fill bg-blue-500" style="width:75%"></div></div>
+                <span class="text-xs text-slate-600">75%</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600">-</td>
+            <td class="px-4 py-3 text-xs text-slate-500">No.435/2564</td>
+            <td class="px-4 py-3 text-center"><button class="text-blue-600 text-xs font-medium hover:underline">ดู →</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Summary Bar -->
+    <div class="bg-white rounded-xl border border-slate-200 p-4">
+      <div class="flex items-center justify-between text-sm text-slate-600">
+        <span>แสดง 1-15 จาก 15 รายการ</span>
+        <div class="flex items-center gap-4">
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> DONE: 4</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-blue-500"></span> กำลังดำเนินการ: 8</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span> รอ: 2</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-red-500"></span> ติดปัญหา: 1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Note Section -->
+    <div class="bg-slate-100 rounded-xl p-4 text-xs text-slate-600">
+      <p class="font-semibold mb-2">คำอธิบายสถานะ:</p>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <span><span class="status-badge status-done">DONE</span> เสร็จสมบูรณ์</span>
+        <span><span class="status-badge status-processing">รอ พค.2</span> รอใบอนุญาตผลิตพลังงาน</span>
+        <span><span class="status-badge status-waiting">รอ CoP</span> รอประมวลหลักการปฏิบัติ</span>
+        <span><span class="status-badge status-blocked">ติดปัญหา</span> มีอุปสรรคต้องแก้ไข</span>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

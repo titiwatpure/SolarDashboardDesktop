@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>รายงานมืออาชีพ — Professional Report Example</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }
+    body { background: #e5e7eb; display: flex; justify-content: center; padding: 20px; }
+    .page {
+      width: 210mm; min-height: 297mm; background: white;
+      padding: 18mm 20mm; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      margin-bottom: 20px;
+    }
+    @media print { body { background: white; padding: 0; } .page { box-shadow: none; width: 100%; page-break-after: always; } }
+
+    /* Cover Page */
+    .cover { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 297mm; text-align: center; }
+    .cover-logo { width: 80px; height: 80px; background: #1E3A5F; border-radius: 16px; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 700; margin-bottom: 24px; }
+    .cover-title { font-size: 28px; font-weight: 700; color: #1E3A5F; margin-bottom: 8px; }
+    .cover-subtitle { font-size: 14px; color: #424242; margin-bottom: 40px; }
+    .cover-meta { font-size: 11px; color: #757575; line-height: 2; }
+    .cover-line { width: 200px; height: 3px; background: #1E3A5F; margin: 24px auto; }
+    .cover-badge { display: inline-block; padding: 6px 20px; border: 2px solid #1E3A5F; border-radius: 20px; font-size: 11px; font-weight: 600; color: #1E3A5F; margin-top: 20px; }
+
+    /* Page Header */
+    .page-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1E3A5F; margin-bottom: 16px; }
+    .page-header-left { font-size: 10px; color: #757575; }
+    .page-header-right { font-size: 10px; color: #757575; text-align: right; }
+    .page-title { font-size: 16px; font-weight: 700; color: #1E3A5F; margin-bottom: 12px; }
+
+    /* Section */
+    .section { margin-bottom: 16px; }
+    .section-title { font-size: 12px; font-weight: 700; color: #1E3A5F; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #E0E0E0; }
+    .section-subtitle { font-size: 11px; font-weight: 600; color: #424242; margin-bottom: 6px; }
+
+    /* KPI Grid */
+    .kpi-grid { display: grid; grid-templateColumns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+    .kpi-card { text-align: center; padding: 12px 8px; border-radius: 8px; border: 1px solid #E0E0E0; background: #FAFAFA; }
+    .kpi-number { font-size: 28px; font-weight: 700; line-height: 1; }
+    .kpi-label { font-size: 9px; color: #757575; margin-top: 4px; }
+    .kpi-change { font-size: 8px; margin-top: 2px; font-weight: 600; }
+    .kpi-up { color: #2E7D32; }
+    .kpi-down { color: #C62828; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: 9px; }
+    th { background: #F5F5F5; padding: 8px 10px; text-align: left; font-weight: 600; color: #424242; border-bottom: 2px solid #BDBDBD; font-size: 9px; }
+    td { padding: 8px 10px; border-bottom: 1px solid #E0E0E0; color: #212121; }
+    tr:hover { background: #F5F5F5; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 8px; font-weight: 600; }
+    .badge-success { background: #E8F5E9; color: #2E7D32; }
+    .badge-warning { background: #FFF8E1; color: #F57F17; }
+    .badge-danger { background: #FFEBEE; color: #C62828; }
+    .badge-info { background: #E3F2FD; color: #1565C0; }
+
+    /* Progress Bar */
+    .progress-bar { height: 6px; background: #E0E0E0; border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 3px; }
+
+    /* Callout Box */
+    .callout { padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 10px; line-height: 1.6; }
+    .callout-info { background: #E3F2FD; border-left: 4px solid #1565C0; color: #0D47A1; }
+    .callout-warning { background: #FFF8E1; border-left: 4px solid #F57F17; color: #E65100; }
+    .callout-danger { background: #FFEBEE; border-left: 4px solid #C62828; color: #B71C1C; }
+    .callout-success { background: #E8F5E9; border-left: 4px solid #2E7D32; color: #1B5E20; }
+
+    /* Bullet List */
+    .bullet-list { list-style: none; padding: 0; }
+    .bullet-list li { padding: 4px 0; padding-left: 16px; position: relative; font-size: 10px; color: #424242; line-height: 1.5; }
+    .bullet-list li::before { content: '▸'; position: absolute; left: 0; color: #1E3A5F; font-weight: 700; }
+
+    /* Footer */
+    .page-footer { position: relative; bottom: 0; width: 100%; padding-top: 8px; border-top: 1px solid #E0E0E0; font-size: 8px; color: #9E9E9E; display: flex; justify-content: space-between; }
+
+    /* Chart Placeholder */
+    .chart-placeholder { background: #F5F5F5; border: 1px dashed #BDBDBD; border-radius: 8px; padding: 20px; text-align: center; color: #9E9E9E; font-size: 10px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<!-- ==================== PAGE 1: COVER ==================== -->
+<div class="page">
+  <div class="cover">
+    <div class="cover-logo">S</div>
+    <div class="cover-title">รายงานสถานะโครงการ Solar</div>
+    <div class="cover-subtitle">Quarterly Performance Report — Q2/2569</div>
+    <div class="cover-line"></div>
+    <div class="cover-meta">
+      เลขที่เอกสาร: RPT-SOL-2569-Q2-001<br>
+      เวอร์ชัน: 1.0<br>
+      วันที่จัดทำ: 17 กรกฎาคม 2569<br>
+      รอบรายงาน: เมษายน - มิถุนายน 2569
+    </div>
+    <div class="cover-badge">CONFIDENTIAL — สำหรับผู้บริหารเท่านั้น</div>
+    <div class="cover-meta" style="margin-top: 40px;">
+      <strong>ผู้จัดทำ:</strong> แผนกปฏิบัติการโครงการ<br>
+      <strong>ผู้อนุมัติ:</strong> ผู้จัดการทั่วไป<br>
+      <strong>ผู้ตรวจสอบ:</strong> ฝ่ายตรวจสอบภายใน
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PAGE 2: EXECUTIVE SUMMARY ==================== -->
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-left">RPT-SOL-2569-Q2-001 | v1.0</div>
+    <div class="page-header-right">รายงานสถานะโครงการ Solar | Q2/2569</div>
+  </div>
+
+  <div class="page-title">1. Executive Summary</div>
+
+  <div class="callout callout-info">
+    <strong>ประเด็นสำคัญ:</strong> ปัจจุบันมีโครงการทั้งหมด 50 โครงการ กำลังดำเนินการ 35 โครงการ เสร็จสิ้น 12 โครงการ ติดปัญหา 3 โครงการ ความคืบหน้าโดยรวมอยู่ที่ 68% ซึ่งสูงกว่าเป้าหมาย 60%
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-number" style="color: #1E3A5F;">50</div>
+      <div class="kpi-label">โครงการทั้งหมด</div>
+      <div class="kpi-change kpi-up">↑ 5 โครงการ</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-number" style="color: #2E7D32;">12</div>
+      <div class="kpi-label">เสร็จสิ้น (COD)</div>
+      <div class="kpi-change kpi-up">↑ 3 โครงการ</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-number" style="color: #C62828;">3</div>
+      <div class="kpi-label">ติดปัญหา</div>
+      <div class="kpi-change kpi-down">↑ 1 โครงการ</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-number" style="color: #F57F17;">2</div>
+      <div class="kpi-label">ความเสี่ยงสูง</div>
+      <div class="kpi-change kpi-down">เพิ่มขึ้น</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">สถานะตามขั้นตอน</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25%;">ขั้นตอน</th>
+          <th style="width: 15%;">จำนวน</th>
+          <th style="width: 15%;">สัดส่วน</th>
+          <th>สถานะ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>สำรวจ</strong></td>
+          <td>8 โครงการ</td>
+          <td>16%</td>
+          <td>
+            <div class="progress-bar"><div class="progress-fill" style="width: 16%; background: #1565C0;"></div></div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ออกแบบ</strong></td>
+          <td>10 โครงการ</td>
+          <td>20%</td>
+          <td>
+            <div class="progress-bar"><div class="progress-fill" style="width: 20%; background: #1565C0;"></div></div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ERC</strong></td>
+          <td>12 โครงการ</td>
+          <td>24%</td>
+          <td>
+            <div class="progress-bar"><div class="progress-fill" style="width: 24%; background: #F57F17;"></div></div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Grid</strong></td>
+          <td>8 โครงการ</td>
+          <td>16%</td>
+          <td>
+            <div class="progress-bar"><div class="progress-fill" style="width: 16%; background: #1565C0;"></div></div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ก่อสร้าง</strong></td>
+          <td>7 โครงการ</td>
+          <td>14%</td>
+          <td>
+            <div class="progress-bar"><div class="progress-fill" style="width: 14%; background: #1565C0;"></div></div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ทดสอบ</strong></td>
+          <td>3 โครงการ</td>
+          <td>6%</td>
+          <td>
+            <div class="progress-bar"><div class="progress-fill" style="width: 6%; background: #1565C0;"></div></div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>COD</strong></td>
+          <td>2 โครงการ</td>
+          <td>4%</td>
+          <td>
+            <div class="progress-bar"><div class="progress-fill" style="width: 4%; background: #2E7D32;"></div></div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-footer">
+    <span> Solar Energy Co., Ltd. — Confidential</span>
+    <span>หน้า 2</span>
+  </div>
+</div>
+
+<!-- ==================== PAGE 3: ANALYSIS ==================== -->
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-left">RPT-SOL-2569-Q2-001 | v1.0</div>
+    <div class="page-header-right">รายงานสถานะโครงการ Solar | Q2/2569</div>
+  </div>
+
+  <div class="page-title">2. วิเคราะห์สถานการณ์</div>
+
+  <div class="section">
+    <div class="section-title">2.1 โครงการต้องติดตาม</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 12%;">รหัส</th>
+          <th style="width: 28%;">ชื่อโครงการ</th>
+          <th style="width: 12%;">ขั้นตอน</th>
+          <th style="width: 14%;">สถานะ</th>
+          <th style="width: 10%;">ความเสี่ยง</th>
+          <th style="width: 10%;">วันค้าง</th>
+          <th>หมายเหตุ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>IDM-NPT</strong></td>
+          <td>INDORAMA POLYESTER</td>
+          <td>ERC</td>
+          <td><span class="badge badge-danger">ติดปัญหา</span></td>
+          <td><span class="badge badge-danger">วิกฤต</span></td>
+          <td>45 วัน</td>
+          <td>รอ กกพ.อนุมัติ</td>
+        </tr>
+        <tr>
+          <td><strong>ALVA</strong></td>
+          <td>ALVA ALUMINIUM</td>
+          <td>ERC</td>
+          <td><span class="badge badge-danger">ติดปัญหา</span></td>
+          <td><span class="badge badge-danger">วิกฤต</span></td>
+          <td>35 วัน</td>
+          <td>เอกสารไม่ครบ</td>
+        </tr>
+        <tr>
+          <td><strong>GLD.P2</strong></td>
+          <td>GOLDEN LIME PCL</td>
+          <td>Grid</td>
+          <td><span class="badge badge-warning">เกินกำหนด</span></td>
+          <td><span class="badge badge-warning">สูง</span></td>
+          <td>30 วัน</td>
+          <td>รอ PEA ต่อสาย</td>
+        </tr>
+        <tr>
+          <td><strong>KPN.NMA</strong></td>
+          <td>PETFORM THAILAND</td>
+          <td>Construction</td>
+          <td><span class="badge badge-warning">เกินกำหนด</span></td>
+          <td><span class="badge badge-info">ปานกลาง</span></td>
+          <td>25 วัน</td>
+          <td>ล่าช้าจากผู้รับเหมา</td>
+        </tr>
+        <tr>
+          <td><strong>AIT</strong></td>
+          <td>ASIA INDUSTRIAL TEXTILE</td>
+          <td>Testing</td>
+          <td><span class="badge badge-warning">เกินกำหนด</span></td>
+          <td><span class="badge badge-info">ปานกลาง</span></td>
+          <td>20 วัน</td>
+          <td>รอตรวจสอบระบบ</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">2.2 วิเคราะห์ปัญหาหลัก</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <div class="callout callout-danger">
+        <strong>ปัญหาที่ 1: ความล่าช้าจากหน่วยงานราชการ</strong><br>
+        โครงการ 2 โครงการ ติดปัญหาการอนุมัติจาก กกพ. เฉลี่ย 40 วัน
+      </div>
+      <div class="callout callout-warning">
+        <strong>ปัญหาที่ 2: เอกสารไม่ครบถ้วน</strong><br>
+        เอกสาร 15 รายการ รอการแก้ไขจากลูกค้า เฉลี่ย 20 วัน
+      </div>
+      <div class="callout callout-warning">
+        <strong>ปัญหาที่ 3: ผู้รับเหมาล่าช้า</strong><br>
+        โครงการ 3 โครงการ ล่าช้าจากแผน 15-25 วัน
+      </div>
+      <div class="callout callout-info">
+        <strong>โอกาส: กำลังการผลิตเพิ่มขึ้น</strong><br>
+        กำลังการผลิตรวม 45 MWp เพิ่มขึ้น 8 MWp จากไตรมาสก่อน
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">2.3 เปรียบเทียบรายเดือน</div>
+    <div class="chart-placeholder">
+      📊 กราฟเปรียบเทียบจำนวนโครงการเสร็จสิ้นรายเดือน (เม.ย. - มิ.ย. 2569)<br>
+      <small>เม.ย.: 3 โครงการ | พ.ค.: 5 โครงการ | มิ.ย.: 4 โครงการ</small>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span> Solar Energy Co., Ltd. — Confidential</span>
+    <span>หน้า 3</span>
+  </div>
+</div>
+
+<!-- ==================== PAGE 4: RECOMMENDATIONS ==================== -->
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-left">RPT-SOL-2569-Q2-001 | v1.0</div>
+    <div class="page-header-right">รายงานสถานะโครงการ Solar | Q2/2569</div>
+  </div>
+
+  <div class="page-title">3. แผนปฏิบัติการและข้อเสนอแนะ</div>
+
+  <div class="section">
+    <div class="section-title">3.1 แผนปฏิบัติการระยะสั้น (30 วัน)</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 5%;">#</th>
+          <th style="width: 35%;">กิจกรรม</th>
+          <th style="width: 20%;">ผู้รับผิดชอบ</th>
+          <th style="width: 15%;">กำหนดเสร็จ</th>
+          <th style="width: 12%;">สถานะ</th>
+          <th>หมายเหตุ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>เร่งแก้ปัญหาโครงการ IDM-NPT</td>
+          <td>แผนก ERC</td>
+          <td>31 ก.ค. 69</td>
+          <td><span class="badge badge-danger">เร่งด่วน</span></td>
+          <td>นัดประชุม กกพ.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>ส่งเอกสารกลับให้ลูกค้า 15 รายการ</td>
+          <td>แผนกลูกค้าสัมพันธ์</td>
+          <td>25 ก.ค. 69</td>
+          <td><span class="badge badge-warning">กำลังทำ</span></td>
+          <td>ติดตามทุก 3 วัน</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>ตรวจสอบโครงการ ALVA</td>
+          <td>แผนกคุณภาพ</td>
+          <td>28 ก.ค. 69</td>
+          <td><span class="badge badge-info">รอดำเนินการ</span></td>
+          <td>ส่งทีมลงพื้นที่</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>จัดประชุมติดตามโครงการรายสัปดาห์</td>
+          <td>ผู้จัดการโครงการ</td>
+          <td>ทุกวันจันทร์</td>
+          <td><span class="badge badge-success">ดำเนินการอยู่</span></td>
+          <td>ทุกสัปดาห์</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>ติดตาม PEA โครงการ GLD.P2</td>
+          <td>แผนก Grid</td>
+          <td>31 ก.ค. 69</td>
+          <td><span class="badge badge-warning">กำลังทำ</span></td>
+          <td>ส่งหนังสือทวง</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">3.2 ข้อเสนอแนะเชิงนโยบาย</div>
+    <ul class="bullet-list">
+      <li><strong>จัดตั้งทีมเฉพาะกิจ</strong> สำหรับโครงการที่ติดปัญหาหน่วยงานราชการ ควรแต่งตั้งผู้ประสานงานประจำ กกพ. โดยเฉพาะ</li>
+      <li><strong>ปรับปรุงกระบวนการจัดการเอกสาร</strong> ใช้ระบบ Digital Document Management ลดเวลาการรอเอกสารจากลูกค้า</li>
+      <li><strong>สัญญาผู้รับเหมา</strong> ควรเพิ่มเงื่อนไขค่าปรับความล่าช้าในสัญญาจ้าง</li>
+      <li><strong>จัดอบรมทีมงาน</strong> เพิ่มทักษะการเจรจาต่อรองกับหน่วยงานราชการ</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-title">3.3 เป้าหมายไตรมาสถัดไป (Q3/2569)</div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #2E7D32;">18</div>
+        <div class="kpi-label">เป้าหมาย<br>เสร็จสิ้น</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #C62828;">0</div>
+        <div class="kpi-label">เป้าหมาย<br>ติดปัญหา</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #1565C0;">75%</div>
+        <div class="kpi-label">เป้าหมาย<br>ความคืบหน้า</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #F57F17;">55</div>
+        <div class="kpi-label">เป้าหมาย<br>MWp รวม</div>
+      </div>
+    </div>
+  </div>
+
+  <div style={{ marginTop: 20, paddingTop: 16, borderTop: '2px solid #1E3A5F' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+      <div>
+        <div style={{ fontSize: 10, color: '#757575' }}><strong>ผู้จัดทำ:</strong></div>
+        <div style={{ width: 150, borderBottom: '1px solid #424242', marginTop: 30 }}></div>
+        <div style={{ fontSize: 9, color: '#424242', marginTop: 4 }}>แผนกปฏิบัติการโครงการ</div>
+      </div>
+      <div>
+        <div style={{ fontSize: 10, color: '#757575' }}><strong>ผู้อนุมัติ:</strong></div>
+        <div style={{ width: 150, borderBottom: '1px solid #424242', marginTop: 30 }}></div>
+        <div style={{ fontSize: 9, color: '#424242', marginTop: 4 }}>ผู้จัดการทั่วไป</div>
+      </div>
+    </div>
+    <div style={{ textAlign: 'right', marginTop: 16, fontSize: 9, color: '#9E9E9E' }}>
+      วันที่: 17 กรกฎาคม 2569
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span> Solar Energy Co., Ltd. — Confidential</span>
+    <span>หน้า 4</span>
+  </div>
+</div>
+
+<!-- ==================== PAGE 5: APPENDIX ==================== -->
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-left">RPT-SOL-2569-Q2-001 | v1.0</div>
+    <div class="page-header-right">รายงานสถานะโครงการ Solar | Q2/2569</div>
+  </div>
+
+  <div class="page-title">附件 รายการโครงการทั้งหมด</div>
+
+  <div class="section">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 4%;">#</th>
+          <th style="width: 10%;">รหัส</th>
+          <th style="width: 22%;">ชื่อโครงการ</th>
+          <th style="width: 10%;">ขนาด</th>
+          <th style="width: 10%;">ขั้นตอน</th>
+          <th style="width: 10%;">สถานะ</th>
+          <th style="width: 8%;">%</th>
+          <th style="width: 10%;">กำหนดเสร็จ</th>
+          <th>ผู้รับผิดชอบ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td><strong>IDM-NPT</strong></td><td>INDORAMA POLYESTER</td><td>4,550 kWp</td><td>ERC</td><td><span class="badge badge-danger">ติดปัญหา</span></td><td>45%</td><td>30 ก.ย. 69</td><td>สมชาย</td></tr>
+        <tr><td>2</td><td><strong>IDM-EYG</strong></td><td>INDORAMA PETROCHEM</td><td>1,340 kWp</td><td>ERC</td><td><span class="badge badge-warning">เกินกำหนด</span></td><td>55%</td><td>15 ส.ค. 69</td><td>สมชาย</td></tr>
+        <tr><td>3</td><td><strong>GLD.P2</strong></td><td>GOLDEN LIME PCL</td><td>500 kWp</td><td>Grid</td><td><span class="badge badge-warning">เกินกำหนด</span></td><td>60%</td><td>01 ส.ค. 69</td><td>วิชัย</td></tr>
+        <tr><td>4</td><td><strong>GLD.P3</strong></td><td>GOLDEN LIME PCL</td><td>480 kWp</td><td>Grid</td><td><span class="badge badge-info">กำลังทำ</span></td><td>50%</td><td>15 ส.ค. 69</td><td>วิชัย</td></tr>
+        <tr><td>5</td><td><strong>KPN.NMA</strong></td><td>PETFORM THAILAND</td><td>584 kWp</td><td>Construction</td><td><span class="badge badge-warning">เกินกำหนด</span></td><td>70%</td><td>31 ก.ค. 69</td><td>สมศักดิ์</td></tr>
+        <tr><td>6</td><td><strong>MTY</strong></td><td>MITUTOYO THAILAND</td><td>811 kWp</td><td>ERC</td><td><span class="badge badge-info">กำลังทำ</span></td><td>40%</td><td>30 ก.ย. 69</td><td>สมชาย</td></tr>
+        <tr><td>7</td><td><strong>PLS</strong></td><td>PHITSANULOK ELECTRIC</td><td>991 kWp</td><td>Grid</td><td><span class="badge badge-info">กำลังทำ</span></td><td>55%</td><td>15 ส.ค. 69</td><td>วิชัย</td></tr>
+        <tr><td>8</td><td><strong>PNA</strong></td><td>PANA ASSEMBLY</td><td>949 kWp</td><td>ERC</td><td><span class="badge badge-info">กำลังทำ</span></td><td>45%</td><td>30 ก.ย. 69</td><td>สมชาย</td></tr>
+        <tr><td>9</td><td><strong>ALVA</strong></td><td>ALVA ALUMINIUM</td><td>334 kWp</td><td>ERC</td><td><span class="badge badge-danger">ติดปัญหา</span></td><td>35%</td><td>31 ก.ค. 69</td><td>สมศักดิ์</td></tr>
+        <tr><td>10</td><td><strong>AIT</strong></td><td>ASIA INDUSTRIAL TEXTILE</td><td>912 kWp</td><td>Testing</td><td><span class="badge badge-warning">เกินกำหนด</span></td><td>85%</td><td>15 ก.ค. 69</td><td>สมศักดิ์</td></tr>
+      </tbody>
+    </table>
+    <div style={{ fontSize: 8, color: '#9E9E9E', marginTop: 8, textAlign: 'center' }}>
+      แสดง 10 จาก 50 โครงการ — ข้อมูลเพิ่มเติมในระบบ Solar Dashboard
+    </div>
+  </div>
+
+  <div class="section" style={{ marginTop: 20 }}>
+    <div class="section-title">หมายเหตุ</div>
+    <ul class="bullet-list">
+      <li>รายงานนี้จัดทำขึ้นเพื่อผู้บริหารระดับสูงเท่านั้น ไม่ควรเปิดเผยต่อบุคคลภายนอก</li>
+      <li>ข้อมูลนำมาจาก Solar Dashboard ณ วันที่ 17 กรกฎาคม 2569 เวลา 14:30 น.</li>
+      <li>ความคืบหน้าคำนวณจาก step position (50%) + checkpoint completion (50%)</li>
+      <li>ระดับความเสี่ยง: ต่ำ (<25), ปานกลาง (25-49), สูง (50-79), วิกฤต (80+)</li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <span> Solar Energy Co., Ltd. — Confidential</span>
+    <span>หน้า 5</span>
+  </div>
+</div>
+
+</body>
+</html>

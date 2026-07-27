@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Status UX Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'IBM+Plex Sans Thai', system-ui, sans-serif; }
+    @media print { body { background: white; } .no-print { display: none; } }
+    .status-badge { padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+    .status-done { background: #dcfce7; color: #166534; }
+    .status-process { background: #dbeafe; color: #1e40af; }
+    .status-wait { background: #fef3c7; color: #92400e; }
+    .status-blocked { background: #fee2e2; color: #991b1b; }
+    .status-na { background: #f1f5f9; color: #64748b; }
+    .progress-bar { height: 8px; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 4px; }
+    .action-card { transition: all 0.2s ease; }
+    .action-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+  
+  <!-- Print Button -->
+  <div class="no-print max-w-6xl mx-auto mb-4 flex justify-end gap-3">
+    <button onclick="window.print()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200">🖨️ พิมพ์</button>
+    <button class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">📥 Export</button>
+  </div>
+
+  <div class="max-w-6xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+    
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold">รายงานสถานะเอกสารยื่นขออนุญาต</h1>
+          <p class="text-emerald-100 text-sm mt-1">ข้อมูล ณ วันที่ 15 กรกฎาคม 2569</p>
+        </div>
+        <div class="text-right">
+          <p class="text-sm font-medium">บริษัท Solar Dashboard จำกัด</p>
+          <p class="text-xs text-emerald-200">ข้อมูลอัปเดตล่าสุด 15:30 น.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-8 space-y-6">
+      
+      <!-- Section 1: KPI Summary -->
+      <section>
+        <h2 class="text-lg font-bold text-slate-900 mb-4">สรุปภาพรวม</h2>
+        <div class="grid grid-cols-5 gap-3">
+          <div class="bg-slate-50 rounded-lg p-4 text-center border border-slate-200">
+            <p class="text-3xl font-bold text-slate-900">5</p>
+            <p class="text-xs text-slate-500 mt-1">โครงการทั้งหมด</p>
+          </div>
+          <div class="bg-blue-50 rounded-lg p-4 text-center border border-blue-200">
+            <p class="text-3xl font-bold text-blue-600">2</p>
+            <p class="text-xs text-slate-500 mt-1">กำลังดำเนินการ</p>
+          </div>
+          <div class="bg-amber-50 rounded-lg p-4 text-center border border-amber-200">
+            <p class="text-3xl font-bold text-amber-600">1</p>
+            <p class="text-xs text-slate-500 mt-1">รอตรวจสอบ</p>
+          </div>
+          <div class="bg-red-50 rounded-lg p-4 text-center border border-red-200">
+            <p class="text-3xl font-bold text-red-600">1</p>
+            <p class="text-xs text-slate-500 mt-1">ติดปัญหา</p>
+          </div>
+          <div class="bg-emerald-50 rounded-lg p-4 text-center border border-emerald-200">
+            <p class="text-3xl font-bold text-emerald-600">1</p>
+            <p class="text-xs text-slate-500 mt-1">เสร็จสิ้น</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Main Table -->
+      <section>
+        <h2 class="text-lg font-bold text-slate-900 mb-4">สถานะเอกสารแต่ละโครงการ</h2>
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">รหัส</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">ชื่อโครงการ</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">ประเภทบริการ</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">ใบอนุญาต</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">สถานะ</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">คืบหน้า</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">กำหนดส่ง</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 font-medium text-blue-600">P6807-001</td>
+                <td class="px-4 py-3 text-slate-700">Solar Rooftop โรงงาน ABC</td>
+                <td class="px-4 py-3"><span class="px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-xs font-medium">⚡ ทำทั้งหมด</span></td>
+                <td class="px-4 py-3 text-slate-600">จดแจ้งยกเว้น</td>
+                <td class="px-4 py-3"><span class="status-badge status-process">กำลังทำ</span></td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="progress-bar flex-1 bg-slate-100 w-16"><div class="progress-fill bg-blue-500" style="width:45%"></div></div>
+                    <span class="text-xs text-slate-500">45%</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-500">15 ก.ค.</td>
+              </tr>
+              <tr class="hover:bg-slate-50 bg-red-50/30">
+                <td class="px-4 py-3 font-medium text-blue-600">P6807-002</td>
+                <td class="px-4 py-3 text-slate-700">Solar โรงแรม XYZ</td>
+                <td class="px-4 py-3"><span class="px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-xs font-medium">⚡ ทำทั้งหมด</span></td>
+                <td class="px-4 py-3 text-slate-600">จดแจ้งยกเว้น</td>
+                <td class="px-4 py-3"><span class="status-badge status-blocked">ติดปัญหา</span></td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="progress-bar flex-1 bg-slate-100 w-16"><div class="progress-fill bg-red-500" style="width:30%"></div></div>
+                    <span class="text-xs text-red-500">30%</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-red-500 font-medium">เกินกำหนด</td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 font-medium text-blue-600">P6807-003</td>
+                <td class="px-4 py-3 text-slate-700">Solar วิทยาลัยเทคนิค</td>
+                <td class="px-4 py-3"><span class="px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-xs font-medium">⚡ ทำทั้งหมด</span></td>
+                <td class="px-4 py-3 text-slate-600">จดแจ้งยกเว้น</td>
+                <td class="px-4 py-3"><span class="status-badge status-wait">รอตรวจสอบ</span></td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="progress-bar flex-1 bg-slate-100 w-16"><div class="progress-fill bg-amber-500" style="width:85%"></div></div>
+                    <span class="text-xs text-amber-600">85%</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-500">20 ก.ค.</td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 font-medium text-blue-600">P6807-004</td>
+                <td class="px-4 py-3 text-slate-700">Solar ฟาร์มโคนม</td>
+                <td class="px-4 py-3"><span class="px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-xs font-medium">⚡ ทำทั้งหมด</span></td>
+                <td class="px-4 py-3 text-slate-600">จดแจ้งยกเว้น</td>
+                <td class="px-4 py-3"><span class="status-badge status-done">เสร็จสิ้น</span></td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="progress-bar flex-1 bg-slate-100 w-16"><div class="progress-fill bg-emerald-500" style="width:100%"></div></div>
+                    <span class="text-xs text-emerald-600 font-semibold">100%</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-500">-</td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 font-medium text-blue-600">P6807-005</td>
+                <td class="px-4 py-3 text-slate-700">Solar โรงงานอาหาร</td>
+                <td class="px-4 py-3"><span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">📋 ยื่นเอกสาร</span></td>
+                <td class="px-4 py-3 text-slate-600">ขอใบอนุญาต</td>
+                <td class="px-4 py-3"><span class="status-badge status-process">กำลังทำ</span></td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="progress-bar flex-1 bg-slate-100 w-16"><div class="progress-fill bg-blue-500" style="width:60%"></div></div>
+                    <span class="text-xs text-slate-500">60%</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-500">25 ก.ค.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section 3: Action Items -->
+      <section>
+        <h2 class="text-lg font-bold text-slate-900 mb-4">สิ่งที่ต้องทำ</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          <!-- Urgent -->
+          <div class="action-card bg-red-50 border border-red-200 rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-red-500 text-lg">🔴</span>
+              <h3 class="font-semibold text-red-800">ต้องทำด่วน</h3>
+            </div>
+            <div class="space-y-2">
+              <div class="bg-white rounded-lg p-3 border border-red-100">
+                <p class="text-sm font-medium text-slate-900">P6807-002</p>
+                <p class="text-xs text-slate-500">รอเอกสารจากลูกค้า (เกินกำหนด)</p>
+              </div>
+              <div class="bg-white rounded-lg p-3 border border-red-100">
+                <p class="text-sm font-medium text-slate-900">P6807-001</p>
+                <p class="text-xs text-slate-500">ส่ง ERC วันนี้</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Should do -->
+          <div class="action-card bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-amber-500 text-lg">🟡</span>
+              <h3 class="font-semibold text-amber-800">ควรทำ</h3>
+            </div>
+            <div class="space-y-2">
+              <div class="bg-white rounded-lg p-3 border border-amber-100">
+                <p class="text-sm font-medium text-slate-900">P6807-003</p>
+                <p class="text-xs text-slate-500">ส่ง SLD แก้ไข</p>
+              </div>
+              <div class="bg-white rounded-lg p-3 border border-amber-100">
+                <p class="text-sm font-medium text-slate-900">P6807-005</p>
+                <p class="text-xs text-slate-500">ติดตามผลอนุมัติ</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Waiting -->
+          <div class="action-card bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-slate-400 text-lg">⚪</span>
+              <h3 class="font-semibold text-slate-700">รอ</h3>
+            </div>
+            <div class="space-y-2">
+              <div class="bg-white rounded-lg p-3 border border-slate-100">
+                <p class="text-sm font-medium text-slate-900">P6807-003</p>
+                <p class="text-xs text-slate-500">รอผลอนุมัติจาก กกพ.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Section 4: Summary -->
+      <section>
+        <h2 class="text-lg font-bold text-slate-900 mb-4">สรุปและข้อเสนอแนะ</h2>
+        <div class="bg-slate-50 rounded-lg p-4 mb-4">
+          <h3 class="text-sm font-semibold text-slate-700 mb-2">สถิติสำคัญ</h3>
+          <div class="grid grid-cols-4 gap-4 text-sm">
+            <div>
+              <p class="text-slate-500">เอกสารทั้งหมด</p>
+              <p class="font-semibold text-slate-900">25 ฉบับ</p>
+            </div>
+            <div>
+              <p class="text-slate-500">ส่งแล้ว</p>
+              <p class="font-semibold text-blue-600">15 ฉบับ (60%)</p>
+            </div>
+            <div>
+              <p class="text-slate-500">รอผลอนุมัติ</p>
+              <p class="font-semibold text-amber-600">6 ฉบับ (24%)</p>
+            </div>
+            <div>
+              <p class="text-slate-500">ต้องแก้ไข</p>
+              <p class="font-semibold text-red-600">4 ฉบับ (16%)</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <h3 class="text-sm font-semibold text-amber-800 mb-2">ข้อเสนอแนะ</h3>
+          <ul class="text-sm text-amber-700 space-y-1 list-disc list-inside">
+            <li>ควรติดตาม P6807-002 เนื่องจากเกินกำหนดส่งเอกสาร</li>
+            <li>ควรเร่ง P6807-001 เนื่องจากต้องส่ง ERC วันนี้</li>
+            <li>ควรตรวจสอบ P6807-003 อีกครั้งหลังแก้ไข SLD</li>
+          </ul>
+        </div>
+
+        <!-- Signature -->
+        <div class="grid grid-cols-2 gap-8 mt-8 pt-6 border-t border-slate-200">
+          <div>
+            <p class="text-xs text-slate-500 mb-8">ผู้จัดทำรายงาน</p>
+            <div class="border-t border-slate-900 pt-2">
+              <p class="text-sm font-medium text-slate-900">_________________________</p>
+              <p class="text-xs text-slate-500">วันที่ ___/___/2569</p>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs text-slate-500 mb-8">ผู้อนุมัติ</p>
+            <div class="border-t border-slate-900 pt-2">
+              <p class="text-sm font-medium text-slate-900">_________________________</p>
+              <p class="text-xs text-slate-500">วันที่ ___/___/2569</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <div class="mt-8 pt-4 border-t border-slate-200 flex justify-between text-xs text-slate-500">
+        <span>Solar Dashboard v1.1.1</span>
+        <span>หน้า 1/1</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

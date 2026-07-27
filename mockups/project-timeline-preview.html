@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Timeline & Create - Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }
+    .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight: 600; }
+    .tab-inactive { color: #64748b; }
+    .tab-inactive:hover { color: #334155; }
+    .service-card { transition: all 0.2s ease; cursor: pointer; }
+    .service-card:hover { border-color: #3b82f6; }
+    .service-card.selected { border-color: #3b82f6; background: #eff6ff; }
+    .step-item { transition: all 0.15s ease; }
+    .step-item:hover { background: #f8fafc; }
+    .timeline-line { position: relative; }
+    .timeline-line::before { content: ''; position: absolute; left: 19px; top: 0; bottom: 0; width: 2px; background: #e2e8f0; }
+    .timeline-dot { width: 12px; height: 12px; border-radius: 50%; position: relative; z-index: 1; }
+    .progress-bar { height: 6px; border-radius: 3px; overflow: hidden; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+  
+  <!-- Tab Navigation -->
+  <div class="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="flex gap-6">
+        <button onclick="showTab('create')" id="tab-create" class="py-4 text-sm font-medium tab-active border-b-2 border-blue-600">
+          สร้างโครงการใหม่
+        </button>
+        <button onclick="showTab('timeline')" id="tab-timeline" class="py-4 text-sm font-medium tab-inactive">
+          Timeline โครงการ
+        </button>
+        <button onclick="showTab('detail')" id="tab-detail" class="py-4 text-sm font-medium tab-inactive">
+          รายละเอียดโครงการ
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-6 py-6">
+    
+    <!-- ==================== Tab 1: Create New Project ==================== -->
+    <div id="content-create" class="space-y-6">
+      
+      <!-- Header -->
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">สร้างโครงการใหม่</h1>
+        <p class="text-sm text-slate-500 mt-1">เลือกประเภทบริการและกรอกข้อมูลโครงการ</p>
+      </div>
+
+      <!-- Service Type -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-2">ประเภทบริการ</h2>
+        <p class="text-sm text-slate-500 mb-4">เลือกขอบเขตงานที่ต้องการเสนอให้ลูกค้า</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="service-card rounded-xl border-2 border-slate-200 p-4">
+            <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center mb-2">
+              <span class="text-xl">📄</span>
+            </div>
+            <h3 class="font-medium text-slate-900 text-sm">ยื่นเอกสารอย่างเดียว</h3>
+            <p class="text-xs text-slate-500 mt-1">รับยื่นเอกสารให้หน่วยงาน</p>
+          </div>
+
+          <div class="service-card rounded-xl border-2 border-slate-200 p-4">
+            <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center mb-2">
+              <span class="text-xl">📋</span>
+            </div>
+            <h3 class="font-medium text-slate-900 text-sm">ยื่นเอกสาร + ขออนุญาต</h3>
+            <p class="text-xs text-slate-500 mt-1">ยื่นเอกสารและติดตามผล</p>
+          </div>
+
+          <div class="service-card selected rounded-xl border-2 border-blue-500 p-4">
+            <div class="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center mb-2">
+              <span class="text-xl">⚡</span>
+            </div>
+            <h3 class="font-medium text-slate-900 text-sm">ทำทั้งหมดจน COD</h3>
+            <p class="text-xs text-slate-500 mt-1">ดูแลทุกขั้นตอน</p>
+          </div>
+
+          <div class="service-card rounded-xl border-2 border-slate-200 p-4">
+            <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center mb-2">
+              <span class="text-xl">⚙️</span>
+            </div>
+            <h3 class="font-medium text-slate-900 text-sm">กำหนดเอง</h3>
+            <p class="text-xs text-slate-500 mt-1">เลือกขั้นตอนเอง</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project Info + Scope -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Project Info -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4">ข้อมูลโครงการ</h2>
+          
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อโครงการ *</label>
+              <input type="text" value="Solar Rooftop โรงงาน ABC ชลบุรี" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-400 outline-none">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">ขนาด (kW)</label>
+                <input type="number" value="450" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-400 outline-none">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">จังหวัด</label>
+                <select class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+                  <option selected>ชลบุรี</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">ลูกค้า</label>
+              <input type="text" value="บริษัท ABC จำกัด" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-400 outline-none">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">วันที่คาดว่าจะเริ่ม</label>
+                <input type="date" value="2026-07-15" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-400 outline-none">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">วันที่คาดว่าจะเสร็จ</label>
+                <input type="date" value="2026-10-30" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-400 outline-none">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scope Selection -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-2">ขอบเขตงาน</h2>
+          <p class="text-sm text-slate-500 mb-4">เลือกว่าใครรับผิดชอบขั้นตอนไหน</p>
+          
+          <div class="flex items-center gap-4 mb-4 text-xs">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-500"></span> บริษัท</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-500"></span> ลูกค้า</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border border-slate-300"></span> ไม่เลือก</span>
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 p-2.5 rounded-lg bg-blue-50 border border-blue-200">
+              <div class="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <span class="text-sm font-medium text-slate-900 flex-1">1. สำรวจพื้นที่</span>
+              <span class="text-xs text-slate-500">14 วัน</span>
+            </div>
+            <div class="flex items-center gap-3 p-2.5 rounded-lg bg-blue-50 border border-blue-200">
+              <div class="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <span class="text-sm font-medium text-slate-900 flex-1">2. ออกแบบระบบ</span>
+              <span class="text-xs text-slate-500">21 วัน</span>
+            </div>
+            <div class="flex items-center gap-3 p-2.5 rounded-lg bg-blue-50 border border-blue-200">
+              <div class="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <span class="text-sm font-medium text-slate-900 flex-1">3. ยื่นขออนุญาต ERC</span>
+              <span class="text-xs text-slate-500">45 วัน</span>
+            </div>
+            <div class="flex items-center gap-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+              <div class="w-5 h-5 rounded bg-amber-500 flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <span class="text-sm font-medium text-slate-900 flex-1">4. ขอต่อสายไฟฟ้า</span>
+              <span class="text-xs text-slate-500">30 วัน</span>
+            </div>
+            <div class="flex items-center gap-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+              <div class="w-5 h-5 rounded bg-amber-500 flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <span class="text-sm font-medium text-slate-900 flex-1">5. ก่อสร้าง</span>
+              <span class="text-xs text-slate-500">45 วัน</span>
+            </div>
+            <div class="flex items-center gap-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+              <div class="w-5 h-5 rounded bg-amber-500 flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <span class="text-sm font-medium text-slate-900 flex-1">6. ทดสอบระบบ</span>
+              <span class="text-xs text-slate-500">14 วัน</span>
+            </div>
+            <div class="flex items-center gap-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+              <div class="w-5 h-5 rounded bg-amber-500 flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <span class="text-sm font-medium text-slate-900 flex-1">7. จำหน่ายไฟ (COD)</span>
+              <span class="text-xs text-slate-500">14 วัน</span>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 bg-slate-50 rounded-lg">
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-600">งานบริษัท:</span>
+              <span class="font-medium text-blue-600">3 ขั้นตอน (80 วัน)</span>
+            </div>
+            <div class="flex justify-between text-sm mt-1">
+              <span class="text-slate-600">งานลูกค้า:</span>
+              <span class="font-medium text-amber-600">4 ขั้นตอน (103 วัน)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create Button -->
+      <div class="flex justify-end gap-3">
+        <button class="px-6 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">ยกเลิก</button>
+        <button class="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">สร้างโครงการ</button>
+      </div>
+    </div>
+
+    <!-- ==================== Tab 2: Timeline ==================== -->
+    <div id="content-timeline" class="space-y-6 hidden">
+      
+      <!-- Header -->
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900">Solar Rooftop โรงงาน ABC ชลบุรี</h1>
+          <p class="text-sm text-slate-500 mt-1">P6807-001 • 450 kW • ชลบุรี</p>
+        </div>
+        <span class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">กำลังดำเนินการ</span>
+      </div>
+
+      <!-- Progress -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium text-slate-700">ความคืบหน้า</span>
+          <span class="text-sm font-bold text-blue-600">43%</span>
+        </div>
+        <div class="progress-bar bg-slate-100">
+          <div class="progress-bar bg-blue-500" style="width: 43%"></div>
+        </div>
+        <div class="flex items-center justify-between mt-2 text-xs text-slate-500">
+          <span>ขั้นตอนที่ 3/7</span>
+          <span>กำหนดสิ้นสุด: 30 ต.ค. 2569</span>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-6">Timeline</h2>
+        
+        <div class="timeline-line space-y-6">
+          <!-- Step 1 - Completed -->
+          <div class="flex gap-4">
+            <div class="flex flex-col items-center">
+              <div class="timeline-dot bg-emerald-500 border-4 border-emerald-100"></div>
+            </div>
+            <div class="flex-1 pb-6">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-sm font-semibold text-slate-900">1. สำรวจพื้นที่</span>
+                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">เสร็จสิ้น</span>
+              </div>
+              <p class="text-xs text-slate-500 mb-2">15 ม.ค. - 28 ม.ค. 2569 (14 วัน)</p>
+              <div class="p-3 bg-slate-50 rounded-lg text-sm text-slate-600">
+                สำรวจพื้นที่เสร็จสิ้น พบว่าหลังคาเหมาะกับการติดตั้งแผงโซลาร์เซลล์ ขนาด 450 kW
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 - Completed -->
+          <div class="flex gap-4">
+            <div class="flex flex-col items-center">
+              <div class="timeline-dot bg-emerald-500 border-4 border-emerald-100"></div>
+            </div>
+            <div class="flex-1 pb-6">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-sm font-semibold text-slate-900">2. ออกแบบระบบ</span>
+                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">เสร็จสิ้น</span>
+              </div>
+              <p class="text-xs text-slate-500 mb-2">29 ม.ค. - 18 ก.พ. 2569 (21 วัน)</p>
+              <div class="p-3 bg-slate-50 rounded-lg text-sm text-slate-600">
+                ออกแบบ SLD เสร็จสิ้น ใช้ Inverter 50kW จำนวน 9 ตัว แผง 820 แผ่น
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3 - In Progress -->
+          <div class="flex gap-4">
+            <div class="flex flex-col items-center">
+              <div class="timeline-dot bg-blue-500 border-4 border-blue-100 ring-4 ring-blue-50"></div>
+            </div>
+            <div class="flex-1 pb-6">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-sm font-semibold text-slate-900">3. ยื่นขออนุญาต ERC</span>
+                <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">กำลังดำเนินการ</span>
+              </div>
+              <p class="text-xs text-slate-500 mb-2">19 ก.พ. - ปัจจุบัน</p>
+              <div class="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                <p class="font-medium mb-1">สถานะ: รอผลอนุมัติจาก กกพ.</p>
+                <p class="text-xs text-blue-600">ยื่นเอกสารแล้วเมื่อ 5 มี.ค. 2569 • เลขรับ No.87/2569</p>
+              </div>
+              <!-- Pending Checkpoints -->
+              <div class="mt-3 space-y-2">
+                <div class="flex items-center gap-2 text-sm">
+                  <div class="w-4 h-4 rounded border-2 border-amber-400 bg-amber-50"></div>
+                  <span class="text-slate-600">รอ กกพ. อนุมัติใบอนุญาต</span>
+                </div>
+                <div class="flex items-center gap-2 text-sm">
+                  <div class="w-4 h-4 rounded border-2 border-slate-300"></div>
+                  <span class="text-slate-500">ได้รับใบอนุญาตผลิตพลังงาน</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 4 - Pending -->
+          <div class="flex gap-4">
+            <div class="flex flex-col items-center">
+              <div class="timeline-dot bg-slate-300 border-4 border-slate-100"></div>
+            </div>
+            <div class="flex-1 pb-6">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-sm font-semibold text-slate-900">4. ขอต่อสายไฟฟ้า</span>
+                <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-medium">ยังไม่เริ่ม</span>
+              </div>
+              <p class="text-xs text-slate-500">รอใบอนุญาต ERC ก่อน</p>
+            </div>
+          </div>
+
+          <!-- Step 5-7 - Pending -->
+          <div class="flex gap-4 opacity-50">
+            <div class="flex flex-col items-center">
+              <div class="timeline-dot bg-slate-300 border-4 border-slate-100"></div>
+            </div>
+            <div class="flex-1">
+              <span class="text-sm font-medium text-slate-500">5-7. ก่อสร้าง → ทดสอบ → COD</span>
+              <p class="text-xs text-slate-400">รอขั้นตอนก่อนหน้าเสร็จ</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== Tab 3: Detail ==================== -->
+    <div id="content-detail" class="space-y-6 hidden">
+      
+      <!-- Header -->
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900">Solar Rooftop โรงงาน ABC ชลบุรี</h1>
+          <p class="text-sm text-slate-500 mt-1">P6807-001</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">แก้ไข</button>
+          <button class="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">อัปเดตสถานะ</button>
+        </div>
+      </div>
+
+      <!-- Info Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <p class="text-xs text-slate-500">ประเภทบริการ</p>
+          <p class="text-sm font-semibold text-slate-900 mt-1">ทำทั้งหมดจน COD</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <p class="text-xs text-slate-500">ขนาด</p>
+          <p class="text-sm font-semibold text-slate-900 mt-1">450 kW</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <p class="text-xs text-slate-500">ลูกค้า</p>
+          <p class="text-sm font-semibold text-slate-900 mt-1">บริษัท ABC</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <p class="text-xs text-slate-500">จังหวัด</p>
+          <p class="text-sm font-semibold text-slate-900 mt-1">ชลบุรี</p>
+        </div>
+      </div>
+
+      <!-- Scope -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">ขอบเขตงาน</h2>
+        <div class="grid grid-cols-7 gap-2">
+          <div class="text-center">
+            <div class="w-10 h-10 rounded-lg bg-blue-500 text-white flex items-center justify-center mx-auto mb-2 text-sm font-bold">1</div>
+            <p class="text-xs font-medium text-slate-900">สำรวจ</p>
+            <p class="text-[10px] text-emerald-600">✓ เสร็จ</p>
+          </div>
+          <div class="text-center">
+            <div class="w-10 h-10 rounded-lg bg-blue-500 text-white flex items-center justify-center mx-auto mb-2 text-sm font-bold">2</div>
+            <p class="text-xs font-medium text-slate-900">ออกแบบ</p>
+            <p class="text-[10px] text-emerald-600">✓ เสร็จ</p>
+          </div>
+          <div class="text-center">
+            <div class="w-10 h-10 rounded-lg bg-blue-500 text-white flex items-center justify-center mx-auto mb-2 text-sm font-bold ring-4 ring-blue-100">3</div>
+            <p class="text-xs font-medium text-slate-900">ERC</p>
+            <p class="text-[10px] text-blue-600 font-medium">● กำลังทำ</p>
+          </div>
+          <div class="text-center">
+            <div class="w-10 h-10 rounded-lg bg-amber-500 text-white flex items-center justify-center mx-auto mb-2 text-sm font-bold">4</div>
+            <p class="text-xs font-medium text-slate-900">ต่อสาย</p>
+            <p class="text-[10px] text-slate-400">รอ</p>
+          </div>
+          <div class="text-center">
+            <div class="w-10 h-10 rounded-lg bg-amber-500 text-white flex items-center justify-center mx-auto mb-2 text-sm font-bold">5</div>
+            <p class="text-xs font-medium text-slate-900">ก่อสร้าง</p>
+            <p class="text-[10px] text-slate-400">รอ</p>
+          </div>
+          <div class="text-center">
+            <div class="w-10 h-10 rounded-lg bg-amber-500 text-white flex items-center justify-center mx-auto mb-2 text-sm font-bold">6</div>
+            <p class="text-xs font-medium text-slate-900">ทดสอบ</p>
+            <p class="text-[10px] text-slate-400">รอ</p>
+          </div>
+          <div class="text-center">
+            <div class="w-10 h-10 rounded-lg bg-amber-500 text-white flex items-center justify-center mx-auto mb-2 text-sm font-bold">7</div>
+            <p class="text-xs font-medium text-slate-900">COD</p>
+            <p class="text-[10px] text-slate-400">รอ</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500">
+          <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-500"></span> งานบริษัท (3 ขั้นตอน)</span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-500"></span> งานลูกค้า (4 ขั้นตอน)</span>
+        </div>
+      </div>
+
+      <!-- Documents -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">เอกสารที่เกี่ยวข้อง</h2>
+        <div class="space-y-3">
+          <div class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50">
+            <div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+              <span class="text-red-600 text-sm font-bold">PDF</span>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-slate-900">SLD-001.pdf</p>
+              <p class="text-xs text-slate-500">Single Line Diagram • 2.5 MB</p>
+            </div>
+            <button class="text-xs text-blue-600 hover:underline">ดาวน์โหลด</button>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50">
+            <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+              <span class="text-blue-600 text-sm font-bold">DOC</span>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-slate-900">คำขออนุญาต ERC.docx</p>
+              <p class="text-xs text-slate-500">เอกสารยื่นขออนุญาต • 1.2 MB</p>
+            </div>
+            <button class="text-xs text-blue-600 hover:underline">ดาวน์โหลด</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function showTab(tab) {
+      document.querySelectorAll('[id^="content-"]').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('[id^="tab-"]').forEach(el => {
+        el.classList.remove('tab-active');
+        el.classList.add('tab-inactive');
+      });
+      document.getElementById('content-' + tab).classList.remove('hidden');
+      document.getElementById('tab-' + tab).classList.add('tab-active');
+      document.getElementById('tab-' + tab).classList.remove('tab-inactive');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>รายงานสรุปโครงการ Solar — Executive Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }
+    body { background: #e5e7eb; display: flex; justify-content: center; padding: 20px; }
+    .page {
+      width: 210mm; min-height: 297mm; background: white;
+      padding: 15mm; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    @media print { body { background: white; padding: 0; } .page { box-shadow: none; width: 100%; } }
+
+    /* Header */
+    .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 3px solid #1E40AF; margin-bottom: 14px; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 40px; height: 40px; background: #1E40AF; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 16px; }
+    .header-title { font-size: 18px; font-weight: 700; color: #0F172A; }
+    .header-sub { font-size: 10px; color: #475569; margin-top: 2px; }
+    .header-date { font-size: 10px; color: #475569; text-align: right; }
+
+    /* KPI Section */
+    .section-label { font-size: 10px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 16px; }
+    .kpi-card { text-align: center; padding: 10px 4px; border-radius: 8px; border: 1px solid #E2E8F0; }
+    .kpi-number { font-size: 24px; font-weight: 700; line-height: 1; }
+    .kpi-label { font-size: 9px; color: #475569; margin-top: 4px; line-height: 1.2; }
+
+    /* Pipeline */
+    .pipeline { margin-bottom: 16px; }
+    .pipeline-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .pipeline-label { width: 60px; font-size: 9px; font-weight: 500; color: #475569; text-align: right; flex-shrink: 0; }
+    .pipeline-bar-bg { flex: 1; height: 18px; background: #F1F5F9; border-radius: 4px; overflow: hidden; display: flex; }
+    .pipeline-bar { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 600; color: white; min-width: 20px; }
+    .pipeline-count { width: 24px; font-size: 10px; font-weight: 600; color: #0F172A; text-align: center; flex-shrink: 0; }
+
+    /* Table */
+    .table-section { margin-bottom: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 9px; }
+    th { background: #F1F5F9; padding: 6px 8px; text-align: left; font-weight: 600; color: #475569; border-bottom: 2px solid #E2E8F0; }
+    td { padding: 6px 8px; border-bottom: 1px solid #E2E8F0; color: #0F172A; }
+    tr:last-child td { border-bottom: none; }
+    .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 8px; font-weight: 600; }
+    .status-blocked { background: #FEE2E2; color: #DC2626; }
+    .status-critical { background: #FEE2E2; color: #DC2626; }
+    .status-high { background: #FEF3C7; color: #D97706; }
+    .status-overdue { background: #FEF3C7; color: #D97706; }
+
+    /* Footer */
+    .footer { border-top: 1px solid #E2E8F0; padding-top: 10px; }
+    .footer-summary { font-size: 10px; color: #475569; line-height: 1.6; margin-bottom: 8px; }
+    .footer-recommend { font-size: 10px; color: #0F172A; line-height: 1.6; }
+    .footer-recommend strong { color: #1E40AF; }
+    .signature { text-align: right; margin-top: 12px; font-size: 9px; color: #475569; }
+    .signature-line { width: 120px; border-top: 1px solid #0F172A; margin-left: auto; margin-top: 30px; padding-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Section 1: Header -->
+    <div class="header">
+      <div class="header-left">
+        <div class="logo">S</div>
+        <div>
+          <div class="header-title">รายงานสรุปโครงการ Solar</div>
+          <div class="header-sub">Solar Dashboard — Executive Summary Report</div>
+        </div>
+      </div>
+      <div class="header-date">
+        อัปเดต: 17 กรกฎาคม 2569<br>
+        รอบรายงาน: รายสัปดาห์
+      </div>
+    </div>
+
+    <!-- Section 2: KPI Summary -->
+    <div class="section-label">ภาพรวมโครงการ</div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #1E40AF;">5</div>
+        <div class="kpi-label">โครงการ<br>ทั้งหมด</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #059669;">3</div>
+        <div class="kpi-label">แจ้งยกเว้น<br>(&le; 1,000 kVA)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #D97706;">2</div>
+        <div class="kpi-label">ขอใบอนุญาต<br>(&gt; 1,000 kVA)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #3b82f6;">5</div>
+        <div class="kpi-label">กำลัง<br>ดำเนินการ</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #DC2626;">1</div>
+        <div class="kpi-label">ติด<br>ปัญหา</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #059669;">0</div>
+        <div class="kpi-label">เสร็จ<br>แล้ว (COD)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-number" style="color: #DC2626;">1</div>
+        <div class="kpi-label">ความเสี่ยง<br>วิกฤต</div>
+      </div>
+    </div>
+
+    <!-- Section 3: Pipeline -->
+    <div class="section-label">สถานะตามขั้นตอน</div>
+    <div class="pipeline">
+      <div class="pipeline-row">
+        <div class="pipeline-label">สำรวจ</div>
+        <div class="pipeline-bar-bg">
+          <div class="pipeline-bar" style="width: 100%; background: #3b82f6;">5</div>
+        </div>
+        <div class="pipeline-count">5</div>
+      </div>
+      <div class="pipeline-row">
+        <div class="pipeline-label">ออกแบบ</div>
+        <div class="pipeline-bar-bg">
+          <div class="pipeline-bar" style="width: 0%; background: #3b82f6;"></div>
+        </div>
+        <div class="pipeline-count">0</div>
+      </div>
+      <div class="pipeline-row">
+        <div class="pipeline-label">ERC</div>
+        <div class="pipeline-bar-bg">
+          <div class="pipeline-bar" style="width: 0%; background: #3b82f6;"></div>
+        </div>
+        <div class="pipeline-count">0</div>
+      </div>
+      <div class="pipeline-row">
+        <div class="pipeline-label">Grid</div>
+        <div class="pipeline-bar-bg">
+          <div class="pipeline-bar" style="width: 0%; background: #3b82f6;"></div>
+        </div>
+        <div class="pipeline-count">0</div>
+      </div>
+      <div class="pipeline-row">
+        <div class="pipeline-label">ก่อสร้าง</div>
+        <div class="pipeline-bar-bg">
+          <div class="pipeline-bar" style="width: 0%; background: #3b82f6;"></div>
+        </div>
+        <div class="pipeline-count">0</div>
+      </div>
+      <div class="pipeline-row">
+        <div class="pipeline-label">ทดสอบ</div>
+        <div class="pipeline-bar-bg">
+          <div class="pipeline-bar" style="width: 0%; background: #3b82f6;"></div>
+        </div>
+        <div class="pipeline-count">0</div>
+      </div>
+      <div class="pipeline-row">
+        <div class="pipeline-label">COD</div>
+        <div class="pipeline-bar-bg">
+          <div class="pipeline-bar" style="width: 0%; background: #059669;"></div>
+        </div>
+        <div class="pipeline-count">0</div>
+      </div>
+    </div>
+
+    <!-- Section 4: Projects to Watch -->
+    <div class="table-section">
+      <div class="section-label">โครงการต้องติดตาม</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 70px;">รหัส</th>
+            <th>ชื่อโครงการ</th>
+            <th style="width: 70px;">ขั้นตอน</th>
+            <th style="width: 80px;">สถานะ</th>
+            <th style="width: 80px;">อัปเดต</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight: 600;">IDM-NPT</td>
+            <td>INDORAMA POLYESTER INDUSTRIES</td>
+            <td>ERC</td>
+            <td><span class="status-badge status-blocked">ติดปัญหา</span></td>
+            <td>12 มิ.ย. 69</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">GLD.P2</td>
+            <td>GOLDEN LIME PCL</td>
+            <td>Grid</td>
+            <td><span class="status-badge status-overdue">เกินกำหนด</span></td>
+            <td>15 มิ.ย. 69</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">KPN.NMA</td>
+            <td>PETFORM THAILAND</td>
+            <td>Construction</td>
+            <td><span class="status-badge status-high">ความเสี่ยงสูง</span></td>
+            <td>20 มิ.ย. 69</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">ALVA</td>
+            <td>ALVA ALUMINIUM CO., LTD.</td>
+            <td>ERC</td>
+            <td><span class="status-badge status-critical">วิกฤต</span></td>
+            <td>10 มิ.ย. 69</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">AIT</td>
+            <td>ASIA INDUSTRIAL TEXTILE</td>
+            <td>Testing</td>
+            <td><span class="status-badge status-overdue">เกินกำหนด</span></td>
+            <td>18 มิ.ย. 69</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Section 5: Summary & Recommendations -->
+    <div class="footer">
+      <div class="section-label">สรุปและข้อเสนอแนะ</div>
+      <div class="footer-summary">
+        ปัจจุบันมีโครงการทั้งหมด <strong>5 โครงการ</strong> อยู่ในขั้นตอนสำรวจทั้งหมด ยังไม่มีโครงการที่เสร็จสิ้น (COD)
+        มี <strong>1 โครงการ</strong> ติดปัญหา (IDM-NPT) และ <strong>1 โครงการ</strong> อยู่ในระดับความเสี่ยงวิกฤต (ALVA)
+        ระยะเวลาเฉลี่ยในแต่ละขั้นตอนยังไม่มีข้อมูลเพียงพอสำหรับการคำนวณ
+      </div>
+      <div class="footer-recommend">
+        <strong>ข้อเสนอแนะ:</strong><br>
+        1. เร่งแก้ปัญหาโครงการ IDM-NPT ที่ค้างที่ขั้นตอน ERC มาเกิน 30 วัน<br>
+        2. ติดตามโครงการ ALVA ที่มีความเสี่ยงวิกฤตอย่างใกล้ชิด
+      </div>
+      <div class="signature">
+        <div class="signature-line">
+          ผู้จัดทำ<br>
+          <span style="font-size: 8px;">วันที่: 17 กรกฎาคม 2569</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

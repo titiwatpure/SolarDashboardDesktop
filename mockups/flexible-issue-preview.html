@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flexible Issue System - Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }
+    .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+    .modal { animation: slideUp 0.3s ease; max-height: 90vh; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; }
+    .tab-inactive { border-bottom: 2px solid transparent; color: #64748b; }
+    .tab-inactive:hover { color: #334155; }
+    .thread-line { position: relative; }
+    .thread-line::before { content: ''; position: absolute; left: 15px; top: 40px; bottom: 0; width: 2px; background: #e2e8f0; }
+    .badge { padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 500; }
+    .badge-high { background: #fee2e2; color: #991b1b; }
+    .badge-medium { background: #fef3c7; color: #92400e; }
+    .badge-low { background: #e0f2fe; color: #075985; }
+    .badge-engineer { background: #ede9fe; color: #5b21b6; }
+    .badge-internal { background: #f0fdf4; color: #166534; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+    .checklist-item { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; cursor: pointer; }
+    .checklist-item:hover { background: #f8fafc; }
+    .checklist-item.completed { opacity: 0.6; }
+    .checklist-item.completed span { text-decoration: line-through; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen p-6">
+  <div class="max-w-5xl mx-auto">
+    
+    <!-- Header -->
+    <div class="mb-6">
+      <h1 class="text-xl font-bold text-slate-900">Flexible Issue System</h1>
+      <p class="text-sm text-slate-500">ระบบจัดการปัญหาที่ยืดหยุ่น รองรับรายละเอียดเยอะและหลายฝ่าย</p>
+    </div>
+
+    <!-- Demo Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      
+      <!-- Card 1: ปัญหาจากหน่วยงาน -->
+      <button onclick="document.getElementById('modal1').classList.remove('hidden')" class="bg-white rounded-xl border border-slate-200 p-5 text-left hover:border-blue-400 transition">
+        <div class="flex items-start justify-between mb-3">
+          <span class="badge badge-high">สูง</span>
+          <span class="text-xs text-slate-400">30 วัน</span>
+        </div>
+        <h3 class="font-medium text-slate-900 mb-1">ผังเมืองไม่สอดคล้อง</h3>
+        <p class="text-sm text-slate-500 mb-3">เทศบาลปฏิเสธใบอนุญาต เนื่องจากผังเมืองไม่รองรับกิจการผลิตไฟฟ้า</p>
+        <div class="flex items-center gap-2">
+          <div class="avatar bg-blue-100 text-blue-600">A</div>
+          <div class="avatar bg-emerald-100 text-emerald-600">S</div>
+          <div class="avatar bg-purple-100 text-purple-600">E</div>
+          <span class="text-xs text-slate-400 ml-1">3 คน</span>
+        </div>
+      </button>
+
+      <!-- Card 2: ปัญหาจากวิศวกร -->
+      <button onclick="document.getElementById('modal2').classList.remove('hidden')" class="bg-white rounded-xl border border-slate-200 p-5 text-left hover:border-blue-400 transition">
+        <div class="flex items-start justify-between mb-3">
+          <span class="badge badge-engineer">วิศวกร</span>
+          <span class="text-xs text-slate-400">15 วัน</span>
+        </div>
+        <h3 class="font-medium text-slate-900 mb-1">SLD ต้องแก้ไข 3 จุด</h3>
+        <p class="text-sm text-slate-500 mb-3">วิศวกรออกแบบตรวจพบว่า SLD ต้องแก้ไข 3 จุด เพื่อให้ผ่านการตรวจสอบ</p>
+        <div class="flex items-center gap-2">
+          <div class="avatar bg-purple-100 text-purple-600">E</div>
+          <span class="text-xs text-slate-400 ml-1">วิศวกร 1 คน</span>
+        </div>
+      </button>
+
+      <!-- Card 3: ปัญหาจากลูกค้า -->
+      <button onclick="document.getElementById('modal3').classList.remove('hidden')" class="bg-white rounded-xl border border-slate-200 p-5 text-left hover:border-blue-400 transition">
+        <div class="flex items-start justify-between mb-3">
+          <span class="badge badge-medium">ปานกลาง</span>
+          <span class="text-xs text-slate-400">7 วัน</span>
+        </div>
+        <h3 class="font-medium text-slate-900 mb-1">ลูกค้าส่งเอกสารล่าช้า</h3>
+        <p class="text-sm text-slate-500 mb-3">ลูกค้ายังไม่ส่งสำเนาบัตรประชาชนและหนังสือรับรองบริษัท</p>
+        <div class="flex items-center gap-2">
+          <div class="avatar bg-amber-100 text-amber-600">L</div>
+          <span class="text-xs text-slate-400 ml-1">ลูกค้า 1 คน</span>
+        </div>
+      </button>
+
+      <!-- Card 4: ปัญหาภายใน -->
+      <button onclick="document.getElementById('modal4').classList.remove('hidden')" class="bg-white rounded-xl border border-slate-200 p-5 text-left hover:border-blue-400 transition">
+        <div class="flex items-start justify-between mb-3">
+          <span class="badge badge-internal">ภายใน</span>
+          <span class="text-xs text-slate-400">3 วัน</span>
+        </div>
+        <h3 class="font-medium text-slate-900 mb-1">ต้องขออนุมัติงบประมาณ</h3>
+        <p class="text-sm text-slate-500 mb-3">ค่าธรรมเนียมยื่นเอกสาร 15,000 บาท ต้องขออนุมัติก่อนดำเนินการ</p>
+        <div class="flex items-center gap-2">
+          <div class="avatar bg-blue-100 text-blue-600">A</div>
+          <span class="text-xs text-slate-400 ml-1">Admin 1 คน</span>
+        </div>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- ===== Modal 1: ปัญหาจากหน่วยงาน (รายละเอียดเยอะ) ===== -->
+  <div id="modal1" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+    <div class="modal bg-white rounded-2xl w-full max-w-3xl mx-4 shadow-2xl flex flex-col" style="max-height: 90vh;">
+      
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge badge-high">สูง</span>
+            <span class="badge badge-internal">หน่วยงานให้แก้</span>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">ผังเมืองไม่สอดคล้องกับกิจการพลังงาน</h2>
+        </div>
+        <button onclick="document.getElementById('modal1').classList.add('hidden')" class="p-2 hover:bg-slate-100 rounded-lg">
+          <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="px-6 border-b border-slate-100 flex gap-6 flex-shrink-0">
+        <button class="py-3 text-sm font-medium tab-active">รายละเอียด</button>
+        <button class="py-3 text-sm font-medium tab-inactive">คอมเมนต์ (5)</button>
+        <button class="py-3 text-sm font-medium tab-inactive">ไฟล์แนบ (2)</button>
+        <button class="py-3 text-sm font-medium tab-inactive">ประวัติ</button>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        
+        <!-- ข้อมูลปัญหา -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-medium text-slate-500">ประเภทปัญหา</label>
+            <p class="text-sm text-slate-900">หน่วยงานให้แก้ไข</p>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-500">ความสำคัญ</label>
+            <p class="text-sm"><span class="badge badge-high">สูง - ต้องแก้ภายใน 7 วัน</span></p>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-500">เปิดเมื่อ</label>
+            <p class="text-sm text-slate-900">11 มิ.ย. 2569 09:30</p>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-500">กำหนดแก้ไข</label>
+            <p class="text-sm text-red-600 font-medium">18 มิ.ย. 2569 (เกินกำหนด 30 วัน)</p>
+          </div>
+          <div class="col-span-2">
+            <label class="text-xs font-medium text-slate-500">มอบหมายให้แก้ไข</label>
+            <div class="flex items-center gap-2 mt-1">
+              <div class="avatar bg-blue-100 text-blue-600">A</div>
+              <span class="text-sm text-slate-900">Admin User</span>
+              <span class="text-xs text-slate-400">(ผู้ดูแล)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- รายละเอียดปัญหา (รองรับข้อความเยอะ) -->
+        <div>
+          <label class="text-xs font-medium text-slate-500 mb-2 block">รายละเอียดปัญหา</label>
+          <div class="bg-slate-50 rounded-xl p-4 text-sm text-slate-700 space-y-3">
+            <p>เทศบาลได้ปฏิเสธใบอนุญาตก่อสร้างเนื่องจากผังเมืองในพื้นที่ไม่รองรับกิจการผลิตพลังงานไฟฟ้า</p>
+            <p><strong>สาเหตุ:</strong> พื้นที่อยู่ใน zone สีเขียว (ที่อยู่อาศัย) ไม่ใช่ zone สีเหลือง (พาณิชย์) หรือสีม่วง (อุตสาหกรรม)</p>
+            <p><strong>ทางเลือกที่มี:</strong></p>
+            <ul class="list-disc list-inside ml-4 space-y-1">
+              <li>ยื่นขออนุญาตพิเศษตามมาตรา 59 (ใช้เวลา 30-60 วัน)</li>
+              <li>ย้าย location ไปที่อื่นใน zone ที่เหมาะสม</li>
+              <li>รอการแก้ไขผังเมืองใหม่ (ไม่ทราบกำหนด)</li>
+            </ul>
+            <p><strong>ผลกระทบ:</strong> ถ้าไม่แก้ไข จะไม่สามารถดำเนินการต่อได้ โครงการจะหยุดชะงัก</p>
+            <p><strong>เอกสารที่ต้องเตรียม:</strong></p>
+            <ul class="list-disc list-inside ml-4 space-y-1">
+              <li>ใบขออนุญาตพิเศษ (แบบ กท.)</li>
+              <li>แผนผังโครงการ</li>
+              <li>รายงานผลกระทบสิ่งแวดล้อม</li>
+              <li>หนังสือยินยอมเจ้าของที่ดิน</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Checklist ย่อย -->
+        <div>
+          <label class="text-xs font-medium text-slate-500 mb-2 block">Checklist แก้ไข (4/6 เสร็จ)</label>
+          <div class="bg-slate-50 rounded-xl p-3 space-y-1">
+            <div class="checklist-item completed">
+              <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              <span class="text-sm text-slate-600">ติดต่อเทศบาลสอบถามสาเหตุ</span>
+            </div>
+            <div class="checklist-item completed">
+              <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              <span class="text-sm text-slate-600">ขอสำเนาผังเมืองฉบับปัจจุบัน</span>
+            </div>
+            <div class="checklist-item completed">
+              <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              <span class="text-sm text-slate-600">ประชุมทีมเพื่อตัดสินใจทางเลือก</span>
+            </div>
+            <div class="checklist-item completed">
+              <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              <span class="text-sm text-slate-600">แจ้งลูกค้าเกี่ยวกับทางเลือก</span>
+            </div>
+            <div class="checklist-item">
+              <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <span class="text-sm text-slate-700 font-medium">ยื่นขออนุญาตพิเศษ (มาตรา 59)</span>
+            </div>
+            <div class="checklist-item">
+              <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <span class="text-sm text-slate-700">รอผลอนุมัติจากเทศบาล</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- คอมเมนต์ล่าสุด -->
+        <div>
+          <label class="text-xs font-medium text-slate-500 mb-2 block">คอมเมนต์ล่าสุด</label>
+          <div class="space-y-3">
+            <div class="flex gap-3">
+              <div class="avatar bg-purple-100 text-purple-600">E</div>
+              <div class="flex-1 bg-slate-50 rounded-xl p-3">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-sm font-medium text-slate-900">Engineer User</span>
+                  <span class="badge badge-engineer">วิศวกร</span>
+                  <span class="text-xs text-slate-400">2 ชม. ที่แล้ว</span>
+                </div>
+                <p class="text-sm text-slate-600">ได้ตรวจสอบผังเมืองแล้ว พบว่าพื้นที่อยู่ใน zone สีเขียวจริง ต้องยื่นขออนุญาตพิเศษเท่านั้น</p>
+              </div>
+            </div>
+            <div class="flex gap-3">
+              <div class="avatar bg-blue-100 text-blue-600">A</div>
+              <div class="flex-1 bg-slate-50 rounded-xl p-3">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-sm font-medium text-slate-900">Admin User</span>
+                  <span class="text-xs text-slate-400">5 ชม. ที่แล้ว</span>
+                </div>
+                <p class="text-sm text-slate-600">ได้ติดต่อลูกค้าแล้ว ลูกค้ายินดีให้ดำเนินการขออนุญาตพิเศษ กำลังรวบรวมเอกสารอยู่</p>
+              </div>
+            </div>
+          </div>
+          <button class="mt-3 text-sm text-blue-600 hover:underline">ดูคอมเมนต์ทั้งหมด (5) →</button>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">🔄 เปลี่ยนสถานะ</button>
+          <button class="px-3 py-2 text-xs font-medium text-amber-600 border border-amber-200 bg-amber-50 rounded-lg hover:bg-amber-100">⏳ เลื่อนกำหนด</button>
+          <button class="px-3 py-2 text-xs font-medium text-purple-600 border border-purple-200 bg-purple-50 rounded-lg hover:bg-purple-100">👤 เพิ่มผู้รับผิดชอบ</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="document.getElementById('modal1').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50">ปิด</button>
+          <button class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700">บันทึก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal 2: ปัญหาจากวิศวกร ===== -->
+  <div id="modal2" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+    <div class="modal bg-white rounded-2xl w-full max-w-3xl mx-4 shadow-2xl flex flex-col" style="max-height: 90vh;">
+      
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge badge-engineer">วิศวกร</span>
+            <span class="badge badge-low">ต่ำ</span>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">SLD ต้องแก้ไข 3 จุด</h2>
+        </div>
+        <button onclick="document.getElementById('modal2').classList.add('hidden')" class="p-2 hover:bg-slate-100 rounded-lg">
+          <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-medium text-slate-500">ประเภทปัญหา</label>
+            <p class="text-sm text-slate-900">วิศวกรตรวจพบ</p>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-500">ความสำคัญ</label>
+            <p class="text-sm"><span class="badge badge-low">ต่ำ - แก้ไขได้ตามสะดวก</span></p>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-500">ผู้แจ้ง</label>
+            <div class="flex items-center gap-2 mt-1">
+              <div class="avatar bg-purple-100 text-purple-600">E</div>
+              <span class="text-sm text-slate-900">Engineer User (วิศวกรออกแบบ)</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-500">มอบหมายให้แก้ไข</label>
+            <div class="flex items-center gap-2 mt-1">
+              <div class="avatar bg-purple-100 text-purple-600">E</div>
+              <span class="text-sm text-slate-900">Engineer User (ตนเอง)</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-medium text-slate-500 mb-2 block">รายละเอียดปัญหา</label>
+          <div class="bg-slate-50 rounded-xl p-4 text-sm text-slate-700 space-y-3">
+            <p>ตรวจสอบ Single Line Diagram (SLD) พบว่าต้องแก้ไข 3 จุด:</p>
+            <ol class="list-decimal list-inside ml-4 space-y-2">
+              <li><strong>จุดที่ 1:</strong> ขนาด Breaker ไม่สอดคล้องกับ Inverter — ต้องเปลี่ยนจาก 63A เป็น 80A</li>
+              <li><strong>จุดที่ 2:</strong> ขาด Surge Protection Device (SPD) — ต้องเพิ่ม SPD ที่ตำแหน่ง Main Board</li>
+              <li><strong>จุดที่ 3:</strong> ตำแหน่ง Meter ไม่ถูกต้อง — ต้องย้ายไปที่จุดเชื่อมต่อสายส่ง</li>
+            </ol>
+            <p><strong>เอกสารอ้างอิง:</strong> คู่มือ PEA ฉบับปรับปรุง 2567, มาตรา 52 พระราชบัญญัติการประกอบกิจการพลังงาน</p>
+          </div>
+        </div>
+
+        <!-- Checklist แก้ไข -->
+        <div>
+          <label class="text-xs font-medium text-slate-500 mb-2 block">Checklist แก้ไข (1/3 เสร็จ)</label>
+          <div class="bg-slate-50 rounded-xl p-3 space-y-1">
+            <div class="checklist-item completed">
+              <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              <span class="text-sm text-slate-600">แก้ไขจุดที่ 1: เปลี่ยน Breaker 63A → 80A</span>
+            </div>
+            <div class="checklist-item">
+              <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <span class="text-sm text-slate-700">แก้ไขจุดที่ 2: เพิ่ม SPD ที่ Main Board</span>
+            </div>
+            <div class="checklist-item">
+              <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <span class="text-sm text-slate-700">แก้ไขจุดที่ 3: ย้ายตำแหน่ง Meter</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Input คอมเมนต์ -->
+        <div class="border-t border-slate-100 pt-4">
+          <div class="flex gap-3">
+            <div class="avatar bg-purple-100 text-purple-600">E</div>
+            <div class="flex-1">
+              <textarea rows="2" placeholder="เพิ่มความเห็น..." class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-400 outline-none resize-none"></textarea>
+              <div class="flex items-center justify-end mt-2">
+                <button class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700">ส่ง</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between flex-shrink-0">
+        <button class="px-3 py-2 text-xs font-medium text-emerald-600 border border-emerald-200 bg-emerald-50 rounded-lg hover:bg-emerald-100">✓ แก้ไขเสร็จแล้ว</button>
+        <div class="flex items-center gap-2">
+          <button onclick="document.getElementById('modal2').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50">ปิด</button>
+          <button class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700">บันทึก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal 3: ปัญหาจากลูกค้า ===== -->
+  <div id="modal3" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+    <div class="modal bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-2xl flex flex-col" style="max-height: 90vh;">
+      
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge badge-medium">ปานกลาง</span>
+            <span class="badge bg-amber-100 text-amber-700">ลูกค้า</span>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">ลูกค้าส่งเอกสารล่าช้า</h2>
+        </div>
+        <button onclick="document.getElementById('modal3').classList.add('hidden')" class="p-2 hover:bg-slate-100 rounded-lg">
+          <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        
+        <div class="bg-amber-50 rounded-xl p-4 text-sm text-amber-800">
+          <p class="font-medium mb-1">⚠️ ลูกค้ายังไม่ส่งเอกสารที่ต้องการ</p>
+          <p>กำหนดส่งเดิม: 4 ก.ค. 2569 (เกินกำหนด 7 วัน)</p>
+        </div>
+
+        <div>
+          <label class="text-xs font-medium text-slate-500 mb-2 block">เอกสารที่ต้องการ</label>
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+              <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-slate-900">สำเนาบัตรประชาชน</p>
+                <p class="text-xs text-slate-500">ของกรรมการผู้มีอำนาจลงนาม</p>
+              </div>
+              <span class="text-xs text-red-500 font-medium">ยังไม่ส่ง</span>
+            </div>
+            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+              <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-slate-900">หนังสือรับรองบริษัท</p>
+                <p class="text-xs text-slate-500">ออกโดยกรมพัฒนาธุรกิจการค้า (ไม่เกิน 6 เดือน)</p>
+              </div>
+              <span class="text-xs text-red-500 font-medium">ยังไม่ส่ง</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Input คอมเมนต์ -->
+        <div class="border-t border-slate-100 pt-4">
+          <div class="flex gap-3">
+            <div class="avatar bg-blue-100 text-blue-600">A</div>
+            <div class="flex-1">
+              <textarea rows="2" placeholder="พิมพ์ข้อความถึงลูกค้า..." class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-400 outline-none resize-none"></textarea>
+              <div class="flex items-center justify-between mt-2">
+                <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input type="checkbox" class="rounded">
+                  ส่ง LINE แจ้งเตือนลูกค้า
+                </label>
+                <button class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700">ส่ง</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
